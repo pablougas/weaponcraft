@@ -1,3 +1,4 @@
+import { godDef } from '../defs';
 import type { Intent } from '../intents';
 import type { Entity, EntityId, PlayerId, WorldState } from '../types';
 import { fuse, isKnownWeapon } from '../weapons';
@@ -86,7 +87,8 @@ export function applyItemIntent(ctx: SimContext, intent: Extract<Intent, { type:
       const b = player.inventory[slotB];
       if (a === undefined || b === undefined || slotA === slotB) return 'pick two weapons';
       if (!nearAltar(world, hero)) return 'not at an altar';
-      const result = fuse(world, a, b, intent.playerId);
+      // The result keeps the fusing god's power (Zeus → Lightning).
+      const result = fuse(world, a, b, intent.playerId, godDef(hero.defId).element);
       // Both weapons are used up; the result takes the first slot.
       const wasEquipped = hero.hero.weaponId === a || hero.hero.weaponId === b;
       for (const slot of [slotA, slotB].sort((x, y) => y - x)) player.inventory.splice(slot, 1);

@@ -27,14 +27,16 @@ export function createCodex(parent: HTMLElement, deps: ScreenDeps): Screen {
     if (signature === rendered) return;
     rendered = signature;
     const legendaryIds = weapons.filter((w) => w.legendary).map((w) => w.id);
-    const found = legendaryIds.filter((id) => Object.values(world.codex).some((e) => e.resultId === id));
+    const isLegend = (resultId: string, id: string) => resultId === id || resultId.startsWith(`${id}@`);
+    const found = legendaryIds.filter((id) => Object.values(world.codex).some((e) => isLegend(e.resultId, id)));
     const cards = legendaryIds.map((id) => {
       const recipe = FUSIONS.find((r) => r.result === id);
       const entry = recipe ? world.codex[pairKey(recipe.a, recipe.b)] : undefined;
       if (!entry) {
         return `<li class="wc-codex-card wc-locked"><span class="wc-codex-icon" aria-hidden="true">?</span><strong>Undiscovered</strong><span>A legendary waits for the right pair.</span></li>`;
       }
-      const weapon = weaponData(world, id);
+      // The god's variant if one was made (e.g. a Lightning Dawnbringer for Zeus).
+      const weapon = weaponData(world, entry.resultId);
       return `<li class="wc-codex-card">${weaponIconSvg(weapon, 64)}<strong>${escapeHtml(weapon.name)}</strong>
         <span>${escapeHtml(name(entry.inputs[0]))} + ${escapeHtml(name(entry.inputs[1]))}</span></li>`;
     }).join('');

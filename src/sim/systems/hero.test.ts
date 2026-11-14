@@ -90,9 +90,11 @@ describe('hero (with Rapier)', () => {
     expect(hero().hero.dodge).not.toBeNull();
     expect(hero().hero.iframes).toBeGreaterThan(0);
     expect(hero().stamina!.current).toBeLessThan(100);
+    // Rolling is cheap: about 4 stamina, so roughly 25 rolls from full.
+    expect(hero().stamina!.current).toBeGreaterThanOrEqual(95);
     run(15);
     expect(hero().hero.dodge).toBeNull();
-    hero().stamina!.current = 5;
+    hero().stamina!.current = 2; // a roll costs 4
     const events = run(1, () => [act('dodge')]);
     expect(events).toContainEqual(expect.objectContaining({ type: 'intent:rejected', reason: 'no stamina' }));
     expect(world).toBeTruthy();

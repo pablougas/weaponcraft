@@ -27,6 +27,8 @@ export interface BodySize {
 
 export interface GodDef extends ContentDef {
   name: string;
+  /** The god's power: weapons this god fuses take this element (Zeus → Lightning). */
+  element: Element;
   maxHealth: number;
   maxStamina: number;
   /** m/s */

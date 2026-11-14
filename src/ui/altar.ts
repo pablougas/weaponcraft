@@ -1,3 +1,5 @@
+import { godDef } from '../sim/defs';
+import { ELEMENT_INFO } from '../sim/elements';
 import type { GameEvent } from '../sim/events';
 import { isKnownWeapon, pairKey, weaponData } from '../sim/weapons';
 import type { Screen, ScreenDeps } from './inventory';
@@ -12,9 +14,18 @@ export interface AltarScreen extends Screen {
 /**
  * The Fusion Altar (F at the altar): pick weapon A, then weapon B, see what's
  * known about the pair, and fuse. Unknown pairs make a weapon with A's shape
- * and B's element (SPEC §8).
+ * and the fusing god's element (Zeus → Lightning).
  */
 export function createAltarScreen(parent: HTMLElement, deps: ScreenDeps): AltarScreen {
+  /** E.g. "Zeus's lightning": what every fused weapon keeps. */
+  const godPower = () => {
+    const world = deps.getWorld();
+    const heroId = world.players[deps.playerId]?.entityId;
+    const hero = heroId ? world.entities[heroId] : undefined;
+    if (!hero) return 'your god’s power';
+    const god = godDef(hero.defId);
+    return `${god.name}’s ${ELEMENT_INFO[god.element].name.toLowerCase()}`;
+  };
   const element = document.createElement('div');
   element.id = 'wc-altar';
   element.className = 'wc-modal';
@@ -64,10 +75,10 @@ export function createAltarScreen(parent: HTMLElement, deps: ScreenDeps): AltarS
     if (slotA !== null && slotB !== null) {
       const a = items[slotA];
       const b = items[slotB];
-      const known = world.codex[pairKey(a, b)] ?? world.codex[`fused:${a}|${b}`];
+      const known = world.codex[pairKey(a, b)] ?? Object.values(world.codex).find((e) => !e.legendary && e.inputs[0] === a && e.inputs[1] === b);
       preview = known
         ? `Known fusion: <strong>${escapeHtml(weaponData(world, known.resultId).name)}</strong>`
-        : 'Unknown result. If no legend answers, the new weapon takes A’s shape and B’s element.';
+        : `Unknown result. If no legend answers, the new weapon takes A’s shape. Either way it carries ${escapeHtml(godPower())}.`;
     }
     const list = items.map((id, i) => {
       const weapon = weaponData(world, id);
@@ -81,7 +92,7 @@ export function createAltarScreen(parent: HTMLElement, deps: ScreenDeps): AltarS
         <div class="wc-fuse-row">
           ${pick(slotA, 'A · shape')}
           <span class="wc-fuse-plus" aria-hidden="true">+</span>
-          ${pick(slotB, 'B · element')}
+          ${pick(slotB, 'B')}
         </div>
         <p class="wc-fuse-preview" aria-live="polite">${preview}</p>
         <div class="wc-slots wc-slots-row" role="group" aria-label="Your weapons">${list}</div>

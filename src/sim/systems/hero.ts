@@ -16,7 +16,8 @@ import type { SimContext } from '../world';
 export const DODGE_TICKS = 8; // ≈0.26 s
 const DODGE_IFRAMES = 6; // 0.2 s
 const DODGE_SPEED = 17; // ≈4.5 m
-const DODGE_STAMINA = 18;
+/** Rolling is cheap (team request): about 25 rolls from full stamina. */
+export const DODGE_STAMINA = 4;
 const SPRINT_DRAIN_PER_SEC = 18;
 const HOVER_DRAIN_PER_SEC = 10;
 const STAMINA_REGEN_PER_SEC = 28;

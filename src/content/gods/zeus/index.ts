@@ -7,6 +7,7 @@ import { skyStrike } from './sky-strike';
 export const zeus: GodDef = {
   id: 'zeus',
   name: 'Zeus',
+  element: 'lightning',
   // Part of the current milestone and shown to the team in the running game (CLAUDE.md exception).
   approved: true,
   maxHealth: 100,

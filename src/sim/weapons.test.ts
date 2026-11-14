@@ -59,6 +59,15 @@ describe('fusion discovery table', () => {
     expect(genericFusion(b, a)).toMatchObject({ archetype: 'sword', element: null });
   });
 
+  it('the fusing god\'s element wins: Zeus\'s fusions are Lightning, legendaries included', () => {
+    const world = createWorld(1, 0);
+    expect(fuse(world, 'oak-staff', 'sunlit-sword', 'p1', 'lightning').weapon).toMatchObject({ archetype: 'staff', element: 'lightning' });
+    const legend = fuse(world, 'starter-spear', 'sunlit-sword', 'p1', 'lightning');
+    expect(legend.weapon).toMatchObject({ id: 'dawnbringer@lightning', name: 'Dawnbringer', element: 'lightning', legendary: true });
+    // Already Lightning: the registry legendary itself, no variant.
+    expect(fuse(world, 'starter-spear', 'storm-axe', 'p1', 'lightning').weapon.id).toBe('thunderclap-halberd');
+  });
+
   it('fused weapons are stored in the world and survive a save', () => {
     const world = createWorld(1, 0);
     const result = fuse(world, 'oak-staff', 'sunlit-sword', 'p1');

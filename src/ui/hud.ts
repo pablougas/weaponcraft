@@ -1,6 +1,7 @@
 import { DEFAULT_BINDINGS, keyLabel, type InputAction, type InputMap } from '../engine/input-map';
 import { enemyDef, godDef } from '../sim/defs';
 import type { Entity, WorldState } from '../sim/types';
+import { DODGE_STAMINA } from '../sim/systems/hero';
 import { isKnownWeapon, weaponData } from '../sim/weapons';
 import { weaponIconSvg } from './weapon-icon';
 
@@ -81,7 +82,7 @@ export function createHud(parent: HTMLElement): Hud {
     const god = godDef(godId);
     const defs: AbilitySlot[] = [
       { hud: 'punch', action: 'punch', glyph: 'punch', name: 'Punch', staminaNeeded: () => 3 },
-      { hud: 'dodge', action: 'dodge', glyph: 'roll', name: 'Roll', staminaNeeded: () => 18 },
+      { hud: 'dodge', action: 'dodge', glyph: 'roll', name: 'Roll', staminaNeeded: () => DODGE_STAMINA },
     ];
     if (god.chargedMove) {
       const move = god.chargedMove;

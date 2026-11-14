@@ -18,7 +18,7 @@ interface FloatingNumber {
 /**
  * Labels drawn over the 3D view: damage numbers (gold with "Weak!" when the
  * element wheel doubles a hit), status chips over affected creatures, and the
- * F prompt next to things you can pick up or use. Reads state only.
+ * F prompt on the right of the screen when something is in reach. Reads state only.
  */
 export class WorldLabels {
   readonly element: HTMLElement;
@@ -124,7 +124,7 @@ export class WorldLabels {
     const key = document.createElement('kbd');
     key.textContent = this.interactKey();
     this.prompt.append(key, document.createTextNode(label));
-    place(this.prompt, this.projected.set(target.position.x, target.position.y + (target.structure ? 2.3 : 1.7), target.position.z).clone());
+    // Fixed on the right of the screen (not over the object, which sits mid-screen behind the god).
   }
 
   clear(): void {

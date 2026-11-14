@@ -29,6 +29,10 @@ test.describe('weapons and fusion (M4)', () => {
     // The Sunlit Blade lies in the meadow, east of the rock.
     await page.evaluate(() => window.wc!.teleport(12.8, 7));
     await expect(page.locator('.wc-prompt')).toContainText('Pick up Sunlit Blade');
+    // The prompt is a fixed hint on the right of the screen, not over the item.
+    const box = (await page.locator('.wc-prompt').boundingBox())!;
+    expect(box.x + box.width).toBeGreaterThan(1280 - 60);
+    expect(box.x).toBeGreaterThan(1280 / 2);
     await page.keyboard.press('KeyF');
     await expect.poll(async () => (await state(page)).world!.players[(await state(page)).localPlayerId!].inventory).toEqual(['starter-spear', 'sunlit-sword']);
 
@@ -44,9 +48,11 @@ test.describe('weapons and fusion (M4)', () => {
     await expect(altar).toContainText('Dawnbringer');
 
     const s = await state(page);
-    expect(s.world!.players[s.localPlayerId!].inventory).toEqual(['dawnbringer']);
-    expect(hero(s).hero!.weaponId).toBe('dawnbringer');
-    expect(s.world!.codex['starter-spear+sunlit-sword']).toMatchObject({ resultId: 'dawnbringer', legendary: true });
+    // Fused by Zeus, the Light legendary keeps his power: Lightning.
+    expect(s.world!.players[s.localPlayerId!].inventory).toEqual(['dawnbringer@lightning']);
+    expect(hero(s).hero!.weaponId).toBe('dawnbringer@lightning');
+    expect(s.world!.customWeapons['dawnbringer@lightning']).toMatchObject({ element: 'lightning' });
+    expect(s.world!.codex['starter-spear+sunlit-sword']).toMatchObject({ resultId: 'dawnbringer@lightning', legendary: true });
 
     await altar.locator('[data-action="close"]').first().click();
     await page.keyboard.press('KeyC');

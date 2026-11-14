@@ -11,7 +11,7 @@ export type Intent =
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }
   /** Equip the weapon in inventory slot `slot`. */
   | { type: 'player:equip'; playerId: PlayerId; slot: number }
-  /** Fuse inventory slots A and B at a Fusion Altar (order matters for unknown pairs: shape of A, element of B). */
+  /** Fuse inventory slots A and B at a Fusion Altar (order matters for unknown pairs: shape of A; the result takes the god's element). */
   | { type: 'player:fuse'; playerId: PlayerId; slotA: number; slotB: number }
   /** Dev/test: move the sender's hero onto the ground at (x, z), facing `rotationY`. M6 uses it for "teleport to biome". */
   | { type: 'dev:teleport'; playerId: PlayerId; x: number; z: number; rotationY?: number }

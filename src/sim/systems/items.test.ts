@@ -65,11 +65,13 @@ describe('equip and fuse', () => {
     standAt(ALTAR_SPOT.x - 1.5, ALTAR_SPOT.z);
     expect(run([press('interact')])).toContainEqual(expect.objectContaining({ type: 'altar:opened', playerId: 'p1' }));
     const events = run([{ type: 'player:fuse', playerId: 'p1', slotA: 1, slotB: 0 }]);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'fusion:created', resultId: 'dawnbringer', legendary: true, newDiscovery: true }));
-    expect(player.inventory).toEqual(['dawnbringer']);
+    // Dawnbringer is a Light legendary; fused by Zeus it keeps his power: Lightning.
+    expect(events).toContainEqual(expect.objectContaining({ type: 'fusion:created', resultId: 'dawnbringer@lightning', legendary: true, newDiscovery: true }));
+    expect(player.inventory).toEqual(['dawnbringer@lightning']);
+    expect(world.customWeapons['dawnbringer@lightning']).toMatchObject({ name: 'Dawnbringer', element: 'lightning', legendary: true });
     // The equipped starter spear was used up, so the result is equipped.
-    expect(hero.hero.weaponId).toBe('dawnbringer');
-    expect(world.codex[pairKey('starter-spear', 'sunlit-sword')]).toMatchObject({ resultId: 'dawnbringer', inputs: ['sunlit-sword', 'starter-spear'] });
+    expect(hero.hero.weaponId).toBe('dawnbringer@lightning');
+    expect(world.codex[pairKey('starter-spear', 'sunlit-sword')]).toMatchObject({ resultId: 'dawnbringer@lightning', inputs: ['sunlit-sword', 'starter-spear'] });
   });
 
   it('an unknown pair makes a saved generic fused weapon', () => {
@@ -78,9 +80,10 @@ describe('equip and fuse', () => {
     run([{ type: 'dev:give', playerId: 'p1', weaponId: 'sunlit-sword' }]);
     standAt(ALTAR_SPOT.x - 1.5, ALTAR_SPOT.z);
     run([{ type: 'player:fuse', playerId: 'p1', slotA: 1, slotB: 2 }]);
-    expect(player.inventory).toEqual(['starter-spear', 'fused:oak-staff|sunlit-sword']);
+    expect(player.inventory).toEqual(['starter-spear', 'fused:oak-staff|sunlit-sword@lightning']);
     const restored = deserialize(serialize(world));
-    expect(restored.customWeapons['fused:oak-staff|sunlit-sword']).toMatchObject({ archetype: 'staff', element: 'light' });
+    // Shape of A (staff); Zeus's power, not B's Light.
+    expect(restored.customWeapons['fused:oak-staff|sunlit-sword@lightning']).toMatchObject({ archetype: 'staff', element: 'lightning' });
   });
 
   it('fusing away from the altar, or the same slot twice, is rejected', () => {

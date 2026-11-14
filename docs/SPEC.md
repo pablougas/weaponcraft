@@ -105,7 +105,8 @@ Counter wheel **Light > Shadow > Poison > Lightning > Light**. Hitting the eleme
 - **Sources:** starter kit; Forge crafting from gathered materials (wood → bronze → storm iron → mech parts → divine ore); soldier and camp drops; mech drops; chests.
 - **Weapons are built from parts** (handle / blade or head / guard) × material × element, assembled from primitives so fused weapons visibly combine parts.
 - **Fusion Altar:** combine two weapons.
-  - **Discovery table:** specific pairs make named legendaries. Unknown pairs make a generic fused weapon (fallback rule: shape of A, element of B, stats averaged + 10%).
+  - **Discovery table:** specific pairs make named legendaries. Unknown pairs make a generic fused weapon (fallback rule: shape of A, stats averaged + 10%).
+  - **Fused weapons keep the fusing god's power:** the result takes that god's element (Zeus → Lightning), named legendaries included (a Light legendary fused by Zeus becomes its Lightning variant).
   - Table is data, keyed by the **sorted pair of weapon IDs**.
 - **Fusion Codex:** records every discovery. This is the main sandbox goal.
 - **Both roles:** the weapon drives basic attacks, and its element boosts the matching god or spirit ability.
