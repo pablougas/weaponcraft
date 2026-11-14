@@ -4,6 +4,8 @@ import { attackSpecFor, DODGE_TICKS } from '../../../sim/systems/hero';
 import type { Entity } from '../../../sim/types';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from '../../../view/entity-model';
 import { createParticles } from '../../../view/particles';
+import { buildWeaponModel } from '../../../view/weapon-model';
+import { isKnownWeapon, weaponData } from '../../../sim/weapons';
 import { drawFace, SKIN } from './face';
 
 /** Seconds Zeus looks pleased after a successful Chain Lightning. */
@@ -82,6 +84,13 @@ export const createModel: ModelFactory = (look, entityId) => {
   spear.position.set(0, -0.36, 0);
   spear.rotation.x = 1.45;
   rightArm.elbow.add(spear);
+  // Any other equipped weapon replaces the hand-built starter spear in the same grip.
+  const heldWeapon = new THREE.Group();
+  heldWeapon.position.copy(spear.position);
+  heldWeapon.rotation.copy(spear.rotation);
+  rightArm.elbow.add(heldWeapon);
+  let heldWeaponId = 'starter-spear';
+  let heldTip: THREE.Object3D | null = null;
   spear.add(M(new THREE.CylinderGeometry(0.024, 0.024, 2.2, 8), bronze, [0, 0.35, 0], { outline: 0.008 }));
   spear.add(M(new THREE.CylinderGeometry(0.045, 0.04, 0.1, 8), gold, [0, 1.45, 0], { outline: 0.008 }));
   const bolt = toon({ color: '#d8f4ff', emissive: '#6EC6FF', emissiveIntensity: 3.5, rim: false });
@@ -176,6 +185,18 @@ export const createModel: ModelFactory = (look, entityId) => {
   const model: EntityModel = {
     root,
     update(entity: Entity, frame: ModelFrame) {
+      const weaponId = entity.hero?.weaponId ?? 'starter-spear';
+      if (weaponId !== heldWeaponId) {
+        heldWeaponId = weaponId;
+        heldWeapon.clear();
+        heldTip = null;
+        spear.visible = weaponId === 'starter-spear';
+        if (!spear.visible && isKnownWeapon(frame.world, weaponId)) {
+          const built = buildWeaponModel(look, weaponData(frame.world, weaponId));
+          heldWeapon.add(built.group);
+          heldTip = built.tip;
+        }
+      }
       const t = frame.time;
       const hero = entity.hero;
       const moving = !!hero?.moving;
@@ -211,7 +232,7 @@ export const createModel: ModelFactory = (look, entityId) => {
       let fistPower = 0;
       const attack = hero?.attack;
       if (hero && attack) {
-        const spec = attackSpecFor(entity, attack);
+        const spec = attackSpecFor(frame.world, entity, attack);
         const p = Math.min(1, attack.tick / spec.totalTicks);
         const hit = spec.hitTick / spec.totalTicks;
         const windup = Math.min(1, p / hit);
@@ -293,7 +314,7 @@ export const createModel: ModelFactory = (look, entityId) => {
       if (expression) showFace(expression);
     },
     anchor(_name, out) {
-      return tip.getWorldPosition(out);
+      return (heldTip ?? tip).getWorldPosition(out);
     },
     dispose() {
       faceTex.dispose();

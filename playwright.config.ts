@@ -17,6 +17,9 @@ export function makeConfig(baseURL: string, webServer: PlaywrightTestConfig['web
       toHaveScreenshot: { maxDiffPixelRatio: 0.02, threshold: 0.1 },
     },
     snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+    // Never write baselines implicitly: only `npm run test:visual:update` (after the
+    // team approves) records them. New looks go to artifacts/review/ via test:visual:review.
+    updateSnapshots: 'none',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,

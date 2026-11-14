@@ -22,7 +22,7 @@ async function frozenScene(page: Page, dayFraction: number, camera: Camera = 'vi
   await openGame(page);
   await page.locator('#wc-title').click();
   await expect(page.locator('#wc-title, #wc-loading')).toHaveCount(0);
-  if (!hud) await page.addStyleTag({ content: '#wc-hud { display: none !important; }' });
+  if (!hud) await page.addStyleTag({ content: '#wc-hud, #wc-labels { display: none !important; }' });
   await page.evaluate(async ({ dayFraction, camera }) => {
     await window.wc!.freeze(12);
     await window.wc!.setSeed(7);
@@ -89,5 +89,48 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   test('practice yard: dummies and sheep', async ({ page }) => {
     await frozenScene(page, 0.7, 'yard');
     await expect(page).toHaveScreenshot('yard.png', SHOT);
+  });
+
+  /** Walks Zeus to (x, z) and presses F there (frozen clock: the sim only moves on wc.step). */
+  async function pickUpAt(page: Page, x: number, z: number) {
+    await page.evaluate(([px, pz]) => window.wc!.teleport(px, pz), [x, z]);
+    await page.keyboard.press('KeyF');
+    await page.evaluate(() => window.wc!.step(1));
+  }
+
+  test('inventory screen', async ({ page }) => {
+    await frozenScene(page, 0.7, 'follow');
+    await pickUpAt(page, 12.8, 7);
+    await pickUpAt(page, -8.2, 14);
+    await page.keyboard.press('KeyI');
+    await expect(page.locator('#wc-inventory')).toBeVisible();
+    await page.evaluate(() => window.wc!.freeze(12));
+    await expect(page).toHaveScreenshot('inventory.png', SHOT);
+  });
+
+  test('Fusion Altar screen with a pair chosen', async ({ page }) => {
+    await frozenScene(page, 0.7, 'follow');
+    await pickUpAt(page, 12.8, 7);
+    await pickUpAt(page, 6.5, 3);
+    await expect(page.locator('#wc-altar')).toBeVisible();
+    await page.locator('#wc-altar [data-slot="0"]').click();
+    await page.locator('#wc-altar [data-slot="1"]').click();
+    await page.evaluate(() => window.wc!.freeze(12));
+    await expect(page).toHaveScreenshot('fusion-altar.png', SHOT);
+  });
+
+  test('Fusion Codex with one legendary found', async ({ page }) => {
+    await frozenScene(page, 0.7, 'follow');
+    await pickUpAt(page, 12.8, 7);
+    await pickUpAt(page, 6.5, 3);
+    await page.locator('#wc-altar [data-slot="0"]').click();
+    await page.locator('#wc-altar [data-slot="1"]').click();
+    await page.locator('#wc-altar [data-action="fuse"]').click();
+    await page.evaluate(() => window.wc!.step(1));
+    await page.locator('#wc-altar [data-action="close"]').first().click();
+    await page.keyboard.press('KeyC');
+    await expect(page.locator('#wc-codex')).toBeVisible();
+    await page.evaluate(() => window.wc!.freeze(12));
+    await expect(page).toHaveScreenshot('codex.png', SHOT);
   });
 });

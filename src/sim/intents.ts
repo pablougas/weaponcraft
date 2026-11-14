@@ -7,6 +7,12 @@ import type { PlayerId, Vec3 } from './types';
 export type Intent =
   | { type: 'dev:spawn'; playerId: PlayerId; defId: string; position?: Vec3 }
   | { type: 'dev:despawn'; playerId: PlayerId; entityId: string }
+  /** Dev/test: put a weapon in the sender's inventory. */
+  | { type: 'dev:give'; playerId: PlayerId; weaponId: string }
+  /** Equip the weapon in inventory slot `slot`. */
+  | { type: 'player:equip'; playerId: PlayerId; slot: number }
+  /** Fuse inventory slots A and B at a Fusion Altar (order matters for unknown pairs: shape of A, element of B). */
+  | { type: 'player:fuse'; playerId: PlayerId; slotA: number; slotB: number }
   /** Dev/test: move the sender's hero onto the ground at (x, z), facing `rotationY`. M6 uses it for "teleport to biome". */
   | { type: 'dev:teleport'; playerId: PlayerId; x: number; z: number; rotationY?: number }
   /**
@@ -32,7 +38,7 @@ export type Intent =
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 
-export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn';
+export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn' | 'interact';
 
 export type IntentType = Intent['type'];
 

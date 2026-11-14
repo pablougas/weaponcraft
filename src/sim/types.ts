@@ -41,6 +41,24 @@ export interface Entity {
   hero?: HeroState;
   /** Practice dummies and wildlife. */
   creature?: CreatureState;
+  /** Element of this entity, for the counter wheel (practice dummies, later soldiers and mechs). */
+  element?: Element | null;
+  /** Lingering status effects (poison, blind, stun). */
+  statuses?: StatusEffect[];
+  /** A weapon lying in the world; F picks it up. */
+  pickup?: { weaponId: string };
+  /** An interactive structure (F to use). */
+  structure?: { kind: 'fusion-altar' };
+}
+
+export type StatusKind = 'blind' | 'poison' | 'stun';
+
+export interface StatusEffect {
+  kind: StatusKind;
+  ticksLeft: number;
+  /** Poison: damage per second. */
+  power: number;
+  sourceId: EntityId | null;
 }
 
 export interface Meter {
@@ -136,6 +154,8 @@ export interface PlayerState {
   name: string;
   /** The entity this player controls (their god), once spawned (M3). */
   entityId: EntityId | null;
+  /** Weapon IDs carried (the equipped one included), in slot order. */
+  inventory: string[];
 }
 
 /** Story and progress flags (SPEC §11). Unknown keys are allowed for content. */
@@ -144,7 +164,9 @@ export interface WorldFlags {
   olympusShattered: boolean;
   /** The meadow's god, dummies and wildlife have been spawned (false/missing in older saves). */
   meadowPopulated: boolean;
-  [flag: string]: boolean;
+  /** M4: the Fusion Altar, the weapons to find and elemental dummies are placed. */
+  armoryPlaced?: boolean;
+  [flag: string]: boolean | undefined;
 }
 
 export interface CutsceneState {
@@ -171,4 +193,54 @@ export interface WorldState {
   cutscene: CutsceneState | null;
   /** Saved positions of the seeded RNG streams the sim draws from. */
   rngStreams: Record<string, number>;
+  /** Weapons created in this world by fusing unknown pairs, by ID (plain data, saved). */
+  customWeapons: Record<string, WeaponData>;
+  /** Fusion Codex: every fusion discovered in this world, by pair key. */
+  codex: Record<string, CodexEntry>;
+}
+
+export type WeaponArchetype = 'spear' | 'sword' | 'axe' | 'staff';
+export type MaterialId = 'wood' | 'bronze' | 'storm-iron' | 'mech-brass' | 'divine-ore';
+
+/** The pieces a weapon's model is assembled from (SPEC §8), so fusions visibly combine parts. */
+export interface WeaponParts {
+  handle: 'grip' | 'shaft' | 'pole';
+  head: 'spearhead' | 'thunder-tip' | 'blade' | 'axe-head' | 'orb' | 'crescent';
+  guard: 'none' | 'crossguard' | 'ring' | 'wings';
+}
+
+export interface AttackNumbers {
+  damage: number;
+  range: number;
+  arcDeg: number;
+  hitTick: number;
+  totalTicks: number;
+  staminaCost: number;
+  cleave: boolean;
+  lunge: number;
+}
+
+/** Everything about a weapon, as plain data: registry weapons and fused ones alike. */
+export interface WeaponData {
+  id: string;
+  name: string;
+  archetype: WeaponArchetype;
+  parts: WeaponParts;
+  material: MaterialId;
+  element: Element | null;
+  light: AttackNumbers;
+  heavy: AttackNumbers;
+  legendary: boolean;
+  description: string;
+  /** For fused weapons: the two weapons that made it, in the order chosen. */
+  fusedFrom?: [string, string];
+}
+
+export interface CodexEntry {
+  resultId: string;
+  legendary: boolean;
+  /** The two weapons, in the order they were first fused. */
+  inputs: [string, string];
+  discoveredTick: number;
+  by: PlayerId;
 }

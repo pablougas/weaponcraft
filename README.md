@@ -80,11 +80,24 @@ game day every 4 real hours; frozen at golden hour during the prologue).
 | Chain Lightning | **Q**: tap for one bolt, hold to keep firing until stamina runs out |
 | Sky Strike | **R**: needs half stamina and spends all of it; a ring marks the spot, then a huge bolt falls from the sky |
 | Lock on | **Tab** |
+| Interact (pick up, use the Fusion Altar) | **F** |
+| Inventory | **I** |
+| Fusion Codex | **C** |
 | Settings | **Esc** |
 
 Zeus starts on the rock. Behind it (south) are three practice dummies and a
 small flock of sheep to try attacks on. Dummies reset a few seconds after you
 stop hitting them.
+
+**Weapons and fusion:** three weapons lie in the meadow east and south of the
+rock (they glow and float; press **F** next to one). Open the inventory with
+**I** to see and equip them. At the **Fusion Altar** east of the rock, press
+**F** and pick two weapons: known pairs make named legendaries, others make a
+new fused weapon with the first one's shape and the second one's element.
+Every discovery goes into the **Fusion Codex** (**C**). Elements follow the
+counter wheel Light > Shadow > Poison > Lightning > Light: hitting the element
+you beat does double damage (the practice dummies wear their element's colour).
+See every weapon at [http://localhost:5173/?preview=weapons](http://localhost:5173/?preview=weapons).
 
 Press **Esc** to open **Settings**: quality (Auto / Low / Medium / High), time
 of day (Live / Always golden hour / Always night), toggles for bloom, god rays,

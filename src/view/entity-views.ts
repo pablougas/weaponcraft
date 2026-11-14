@@ -1,16 +1,18 @@
 import * as THREE from 'three';
 import { enemies } from '../content/enemies';
 import { gods } from '../content/gods';
+import { structures } from '../content/structures';
 import type { ModelLoader } from '../content/types';
 import type { EntityId, GameEvent, WorldState } from '../sim';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from './entity-model';
 import type { Interpolator } from './interpolation';
 import type { Look } from './look';
+import { createPickupModel } from './pickup-model';
 
 /** Every approved def that has a model, by def ID. */
 function modelLoaders(): Map<string, ModelLoader> {
   const loaders = new Map<string, ModelLoader>();
-  for (const def of [...gods, ...enemies]) {
+  for (const def of [...gods, ...enemies, ...structures]) {
     if (def.approved) loaders.set(def.id, def.model);
   }
   return loaders;
@@ -22,6 +24,8 @@ export async function preloadModels(): Promise<Map<string, ModelFactory>> {
   await Promise.all([...modelLoaders()].map(async ([id, load]) => {
     factories.set(id, (await load()).createModel);
   }));
+  // Weapons lying in the world use one built-in model that shows whichever weapon it is.
+  factories.set('weapon-pickup', createPickupModel);
   return factories;
 }
 

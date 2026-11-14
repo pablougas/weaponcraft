@@ -1,6 +1,8 @@
 import { DEFAULT_BINDINGS, keyLabel, type InputAction, type InputMap } from '../engine/input-map';
 import { enemyDef, godDef } from '../sim/defs';
 import type { Entity, WorldState } from '../sim/types';
+import { isKnownWeapon, weaponData } from '../sim/weapons';
+import { weaponIconSvg } from './weapon-icon';
 
 const GLYPHS: Record<string, string> = {
   bolt: '<path d="M13.5 2 5 13.2h5.6L9.2 22l9.8-12.6h-5.9z" fill="currentColor"/>',
@@ -20,6 +22,8 @@ interface AbilitySlot {
   /** Stamina needed to use it now. */
   staminaNeeded: (max: number) => number;
   name: string;
+  /** Element of the ability, if any: it's boosted when the equipped weapon matches. */
+  element?: string;
 }
 
 export interface Hud {
@@ -47,6 +51,10 @@ export function createHud(parent: HTMLElement): Hud {
       <div class="wc-bar wc-bar-stamina" role="meter" aria-label="Stamina" aria-valuemin="0" data-hud="stamina-meter">
         <span class="wc-bar-fill" data-hud="stamina"></span>
       </div>
+      <div class="wc-hud-weapon" data-hud="weapon">
+        <span class="wc-hud-weapon-icon" data-hud="weapon-icon" aria-hidden="true"></span>
+        <span class="wc-hud-weapon-name" data-hud="weapon-name"></span>
+      </div>
     </section>
     <section class="wc-hud-abilities" aria-label="Abilities" data-hud="abilities"></section>
     <section class="wc-hud-target" data-hud="target" hidden aria-live="polite">
@@ -62,6 +70,9 @@ export function createHud(parent: HTMLElement): Hud {
   const stamina = get('stamina');
   const staminaMeter = get('stamina-meter');
   const abilitiesEl = get('abilities');
+  const weaponIcon = get('weapon-icon');
+  const weaponName = get('weapon-name');
+  let shownWeapon = '';
   let slots: Array<AbilitySlot & { el: HTMLElement; cooldown: HTMLElement; key: HTMLElement }> = [];
   let builtFor = '';
   let codesFor: (action: InputAction) => readonly string[] = (action) => DEFAULT_BINDINGS[action];
@@ -74,12 +85,12 @@ export function createHud(parent: HTMLElement): Hud {
     ];
     if (god.chargedMove) {
       const move = god.chargedMove;
-      defs.push({ hud: 'charged', action: 'chargedMove', glyph: 'fist', name: move.name, cooldownId: move.id, cooldownTicks: move.cooldownTicks, staminaNeeded: () => move.staminaMin });
+      defs.push({ hud: 'charged', action: 'chargedMove', glyph: 'fist', name: move.name, cooldownId: move.id, cooldownTicks: move.cooldownTicks, staminaNeeded: () => move.staminaMin, element: move.element });
     }
-    defs.push({ hud: 'ability', action: 'godAbility', glyph: 'bolt', name: god.ability.name, cooldownId: god.ability.id, cooldownTicks: god.ability.cooldownTicks, staminaNeeded: () => god.ability.staminaCost });
+    defs.push({ hud: 'ability', action: 'godAbility', glyph: 'bolt', name: god.ability.name, cooldownId: god.ability.id, cooldownTicks: god.ability.cooldownTicks, staminaNeeded: () => god.ability.staminaCost, element: god.ability.element });
     if (god.ultimate) {
       const ultimate = god.ultimate;
-      defs.push({ hud: 'ultimate', action: 'ultimate', glyph: 'sky', name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction });
+      defs.push({ hud: 'ultimate', action: 'ultimate', glyph: 'sky', name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction, element: ultimate.element });
     }
     abilitiesEl.replaceChildren();
     slots = defs.map((def) => {
@@ -131,6 +142,13 @@ export function createHud(parent: HTMLElement): Hud {
       setMeter(staminaMeter, stamina, hero.stamina?.current ?? 0, hero.stamina?.max ?? 0);
 
       if (builtFor !== hero.defId) buildSlots(hero.defId);
+      const weapon = isKnownWeapon(world, hero.hero.weaponId) ? weaponData(world, hero.hero.weaponId) : undefined;
+      if (weapon && weapon.id !== shownWeapon) {
+        shownWeapon = weapon.id;
+        weaponIcon.innerHTML = weaponIconSvg(weapon, 34);
+        weaponName.textContent = weapon.name;
+        weaponName.classList.toggle('wc-legendary', weapon.legendary);
+      }
       const staminaNow = hero.stamina?.current ?? 0;
       const staminaMax = hero.stamina?.max ?? 0;
       for (const slot of slots) {
@@ -141,6 +159,8 @@ export function createHud(parent: HTMLElement): Hud {
         const active = (slot.hud === 'charged' && hero.hero.charge != null) || (slot.hud === 'ultimate' && !!hero.hero.ultimate)
           || (slot.hud === 'ability' && !!hero.hero.abilityHeld);
         slot.el.classList.toggle('wc-active', active);
+        // A weapon of the same element boosts the ability (+25%, SPEC §8).
+        slot.el.classList.toggle('wc-boosted', !!slot.element && slot.element === weapon?.element);
       }
 
       const locked = hero.hero.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;

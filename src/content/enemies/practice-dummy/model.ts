@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ELEMENT_INFO } from '../../../sim/elements';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
 /** A straw dummy on a wooden post, with a painted target. Wobbles when hit and slumps at zero health. */
@@ -21,6 +22,12 @@ export const createModel: ModelFactory = (look, entityId) => {
   pivot.add(M(new THREE.TorusGeometry(0.255, 0.022, 6, 18), rope, [0, 1.25, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
   pivot.add(M(new THREE.TorusGeometry(0.245, 0.022, 6, 18), rope, [0, 0.86, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
   pivot.add(M(new THREE.CircleGeometry(0.12, 18), paint, [0, 1.06, 0.272], { outline: false, cast: false }));
+  // Element sash (M4): a diagonal band in the dummy's element colour, so the counter wheel reads at a glance.
+  const sashMat = toon({ color: '#ffffff', emissive: '#000000', emissiveIntensity: 0.4, rim: false });
+  const sash = M(new THREE.TorusGeometry(0.265, 0.035, 6, 20), sashMat, [0, 1.05, 0], { rot: [Math.PI / 2 - 0.5, 0, 0], outline: false });
+  sash.visible = false;
+  pivot.add(sash);
+  let elementShown: string | null | undefined;
   pivot.add(M(new THREE.BoxGeometry(1.0, 0.07, 0.07), wood, [0, 1.3, 0], { outline: 0.012 }));
   for (const sx of [-1, 1]) pivot.add(M(new THREE.SphereGeometry(0.09, 10, 8), straw, [sx * 0.52, 1.3, 0]));
   pivot.add(M(new THREE.SphereGeometry(0.2, 16, 12), sack, [0, 1.6, 0], { scale: [1, 1.08, 1], outline: 0.012 }));
@@ -31,6 +38,16 @@ export const createModel: ModelFactory = (look, entityId) => {
   const model: EntityModel = {
     root,
     update(entity, frame) {
+      if (entity.element !== elementShown) {
+        elementShown = entity.element;
+        sash.visible = !!entity.element;
+        if (entity.element) {
+          const color = ELEMENT_INFO[entity.element].color;
+          sashMat.color.set(color);
+          sashMat.emissive.set(color);
+          paint.color.set(color);
+        }
+      }
       const down = (entity.health?.current ?? 1) <= 0;
       slump += ((down ? 1 : 0) - slump) * Math.min(1, frame.dt * 6);
       wobble = Math.max(0, wobble - frame.dt * 1.8);

@@ -1,5 +1,5 @@
 import type { AbilityModule, ChargedMove, UltimateModule } from '../sim/abilities';
-import type { Element } from '../sim/types';
+import type { Element, WeaponData } from '../sim/types';
 import type { ModelFactory } from '../view/entity-model';
 
 /**
@@ -76,10 +76,12 @@ export interface AttackSpec {
   lunge: number;
 }
 
-export interface WeaponDef extends ContentDef {
-  name: string;
-  archetype: 'spear' | 'sword' | 'axe' | 'bow' | 'staff';
-  element: Element | null;
-  light: AttackSpec;
-  heavy: AttackSpec;
+/** A weapon in the registry: plain weapon data plus approval. Fused weapons use `WeaponData` alone. */
+export interface WeaponDef extends ContentDef, WeaponData {}
+
+/** Fusion Altar discovery table entry: these two weapons (any order) make `result`. */
+export interface FusionRecipe {
+  a: string;
+  b: string;
+  result: string;
 }

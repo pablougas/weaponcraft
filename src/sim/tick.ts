@@ -1,7 +1,9 @@
 import type { GameEvent } from './events';
 import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
 import type { PhysicsWorld } from './physics';
+import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
+import { applyItemIntent } from './systems/items';
 import { updateCreatures } from './systems/wildlife';
 import { groundHeightAt } from './terrain/meadow-rocks';
 import type { WorldState } from './types';
@@ -38,6 +40,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     input.physics.syncFrom(world);
     input.physics.step();
   }
+  updateStatuses(ctx);
   updateHeroes(ctx, input.physics);
   if (input.isAuthority) updateCreatures(ctx, input.physics);
 
@@ -86,6 +89,13 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       hero.hero.grounded = true;
       hero.hero.dodge = null;
       hero.hero.lastSafe = { ...position };
+      return;
+    }
+    case 'dev:give':
+    case 'player:equip':
+    case 'player:fuse': {
+      const reason = applyItemIntent(ctx, intent);
+      if (reason) reject(reason);
       return;
     }
     case 'player:move':

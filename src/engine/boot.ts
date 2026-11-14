@@ -2,10 +2,14 @@ import '@fontsource/cinzel/600.css';
 import '@fontsource/cinzel/700.css';
 import * as THREE from 'three';
 import '../ui/ui.css';
-import { cloneWorld, MEADOW_RADIUS, type Entity } from '../sim';
+import { cloneWorld, MEADOW_RADIUS, type Entity, type IntentInput } from '../sim';
 import { godDef } from '../sim/defs';
 import { createDevMenu, type DevMenu } from '../ui/dev-menu';
+import { createAltarScreen } from '../ui/altar';
 import { createCaptions } from '../ui/captions';
+import { createCodex } from '../ui/codex';
+import { createInventory } from '../ui/inventory';
+import { WorldLabels } from '../ui/world-labels';
 import { createHud } from '../ui/hud';
 import { hideLoadingScreen, setLoadingText, showFatalError } from '../ui/loading-screen';
 import { createSettingsMenu, type SettingsMenu } from '../ui/settings-menu';
@@ -20,7 +24,7 @@ import { Interpolator } from '../view/interpolation';
 import { createWorldView, type WorldView } from '../view/world-view';
 import { unlockAudio } from './audio';
 import { InputController } from './input';
-import { InputMap } from './input-map';
+import { InputMap, keyLabel } from './input-map';
 import { FixedStepLoop } from './loop';
 import { loadPhysics } from './physics';
 import { requestPointerLockSafely } from './pointer-lock';
@@ -252,6 +256,9 @@ export async function boot(): Promise<void> {
   activeSession.bus.onAny((event) => {
     views.handleEvent(event, frame);
     sfx.handle(event);
+    altarScreen.handleEvent(event);
+    labels.handleEvent(event, activeSession.world, (id) => !!id && id === localHero()?.id);
+    if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
     if (event.type === 'hero:dodge') {
       const roller = activeSession.world.entities[event.entityId];
       if (roller) dust.spawn(roller.position, roller.rotationY, settings.get().reduceMotion);
@@ -275,6 +282,8 @@ export async function boot(): Promise<void> {
     lightning.clear();
     skyStrikes.clear();
     dust.clear();
+    labels.clear();
+    for (const screen of screens) screen.close();
     cameraRig.reset();
     const hero = localHero();
     if (hero) cameraRig.faceHeading(hero.rotationY);
@@ -305,7 +314,28 @@ export async function boot(): Promise<void> {
   settingsMenu.setAutoQuality(autoQuality);
 
   const inputMap = new InputMap();
-  const gameplayInput = () => shell.screen === 'playing' && !settingsMenu?.isOpen && !devMenu?.isOpen;
+  // Inventory (I), Fusion Altar (F at the altar) and Codex (C).
+  const screenDeps = {
+    getWorld: () => activeSession.world,
+    playerId: activeSession.localPlayerId,
+    send: (intent: IntentInput) => activeSession.sendIntent(intent),
+    keyFor: (action: 'inventory' | 'codex' | 'interact') => keyLabel(inputMap.codesFor(action)[0] ?? ''),
+  };
+  const inventoryScreen = createInventory(document.body, screenDeps);
+  const altarScreen = createAltarScreen(document.body, screenDeps);
+  const codexScreen = createCodex(document.body, screenDeps);
+  const screens = [inventoryScreen, altarScreen, codexScreen];
+  const openScreen = (screen: (typeof screens)[number]) => {
+    for (const other of screens) if (other !== screen) other.close();
+    screen.open();
+    if (document.pointerLockElement) {
+      expectingUnlock = true;
+      document.exitPointerLock();
+    }
+  };
+  const anyScreenOpen = () => screens.some((screen) => screen.isOpen);
+  const labels = new WorldLabels(document.body, () => keyLabel(inputMap.codesFor('interact')[0] ?? 'KeyF'));
+  const gameplayInput = () => shell.screen === 'playing' && !settingsMenu?.isOpen && !devMenu?.isOpen && !anyScreenOpen();
   input = new InputController(inputMap, view.canvas, gameplayInput);
   hud.setBindings(inputMap);
   if (devMenuEnabled()) {
@@ -321,6 +351,23 @@ export async function boot(): Promise<void> {
         document.exitPointerLock();
       }
       return;
+    }
+    if (shell.screen === 'playing' && !settingsMenu?.isOpen) {
+      for (const [action, screen] of [['inventory', inventoryScreen], ['codex', codexScreen]] as const) {
+        if (inputMap.matches(action, event)) {
+          event.preventDefault();
+          if (screen.isOpen) screen.close();
+          else openScreen(screen);
+          return;
+        }
+      }
+      // Esc closes an open screen before it opens Settings.
+      if (inputMap.matches('settings', event) && anyScreenOpen()) {
+        event.preventDefault();
+        for (const screen of screens) screen.close();
+        settingsOpenedAt = performance.now();
+        return;
+      }
     }
     if (inputMap.matches('settings', event) && shell.screen === 'playing') {
       event.preventDefault();
@@ -445,6 +492,8 @@ export async function boot(): Promise<void> {
         cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null);
       }
       hud.update(world, hero?.id ?? null);
+      for (const screen of screens) screen.refresh();
+      labels.update(world, meadow.camera, activeSession.localPlayerId, dt, settings.get().reduceMotion, shell.screen === 'playing');
 
       meadow.update(viewSeconds, activeSession.worldTime().dayFraction);
       meadow.render();

@@ -24,7 +24,7 @@ test.describe('sim core (M1)', () => {
     expect(Object.keys(s.world!.players)).toEqual([s.localPlayerId]);
     // The meadow's cast: the local god on the rock, three dummies and five sheep.
     const defIds = Object.values(s.world!.entities).map((e) => e.defId).sort();
-    expect(defIds).toEqual(['practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'zeus']);
+    expect(defIds).toEqual(['fusion-altar', 'practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'weapon-pickup', 'weapon-pickup', 'weapon-pickup', 'zeus']);
     expect(s.world!.players[s.localPlayerId!].entityId).toBe(Object.values(s.world!.entities).find((e) => e.defId === 'zeus')!.id);
   });
 

@@ -58,7 +58,15 @@ export function deserialize(text: string): WorldState {
       throw new SaveFormatError(`Entity ${id} is malformed.`);
     }
   }
-  return world as unknown as WorldState;
+  return migrate(world as unknown as WorldState);
+}
+
+/** Fills in fields added after a save was written (older saves stay loadable). */
+function migrate(world: WorldState): WorldState {
+  world.customWeapons ??= {};
+  world.codex ??= {};
+  for (const player of Object.values(world.players)) player.inventory ??= [];
+  return world;
 }
 
 /** A deep, detached copy of the world (via the serializer). */

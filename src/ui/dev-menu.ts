@@ -1,3 +1,4 @@
+import { weapons } from '../content/weapons';
 import type { FixedStepLoop } from '../engine/loop';
 import type { Session } from '../engine/session';
 import type { SettingsStore } from '../engine/settings';
@@ -52,6 +53,7 @@ export function createDevMenu(
     <div class="wc-dev-buttons">
       <button type="button" data-action="clear-scrub">Stop scrubbing</button>
       <button type="button" data-action="spawn">Spawn marker</button>
+      <button type="button" data-action="give-weapons">Give all weapons</button>
       <button type="button" data-action="save">Save now</button>
       <button type="button" data-action="new-game">New game</button>
     </div>`;
@@ -74,6 +76,10 @@ export function createDevMenu(
     const action = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action;
     if (action === 'clear-scrub') session.timeOverride = null;
     if (action === 'spawn') session.sendIntent({ type: 'dev:spawn', defId: 'dev:marker' });
+    if (action === 'give-weapons') {
+      // Every base weapon (the inventory holds 12; extra gives are ignored).
+      for (const weapon of weapons.filter((w) => !w.legendary)) session.sendIntent({ type: 'dev:give', weaponId: weapon.id });
+    }
     if (action === 'save') session.save();
     if (action === 'new-game') onNewGame();
     lastUpdate = -Infinity;

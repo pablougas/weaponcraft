@@ -81,7 +81,7 @@ export class PhysicsWorld {
       }
     }
     for (const entity of Object.values(state.entities)) {
-      if (!entity.body || !(entity.hero || entity.creature)) continue;
+      if (!entity.body || !(entity.hero || entity.creature || entity.structure)) continue;
       let record = this.bodies.get(entity.id);
       if (!record) {
         const { radius, height } = entity.body;

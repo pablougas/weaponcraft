@@ -16,7 +16,11 @@ describe('meadow population', () => {
     expect(count(world, 'sheep')).toBe(5);
     const hero = world.entities[world.players.p1.entityId!];
     expect(hero).toMatchObject({ defId: 'zeus', ownerId: 'p1', position: { y: HERO_SPAWN.y }, health: { current: 100 }, stamina: { current: 100 } });
-    expect(events.filter((e) => e.type === 'entity:spawned')).toHaveLength(10);
+    // 2 gods, 3 dummies, 5 sheep, the Fusion Altar and 3 weapons to find.
+    expect(events.filter((e) => e.type === 'entity:spawned')).toHaveLength(14);
+    expect(count(world, 'fusion-altar')).toBe(1);
+    expect(count(world, 'weapon-pickup')).toBe(3);
+    expect(world.players.p1.inventory).toEqual(['starter-spear']);
     expect(ensureMeadowPopulated(world)).toEqual([]);
   });
 

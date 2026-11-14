@@ -1,4 +1,4 @@
-import type { AttackKind, EntityId, PlayerId, Vec3 } from './types';
+import type { AttackKind, Element, EntityId, PlayerId, Vec3 } from './types';
 
 /**
  * Events the sim emits each tick. Payloads are plain data and carry IDs, never
@@ -9,7 +9,16 @@ export interface EventMap {
   'entity:spawned': { entityId: EntityId; defId: string };
   'entity:despawned': { entityId: EntityId; defId: string };
   'intent:rejected': { playerId: PlayerId; intentType: string; reason: string };
-  'combat:hit': { attackerId: EntityId | null; targetId: EntityId; amount: number; kind: AttackKind | 'ability'; remaining: number };
+  'combat:hit': {
+    attackerId: EntityId | null;
+    targetId: EntityId;
+    amount: number;
+    kind: AttackKind | 'ability' | 'status';
+    remaining: number;
+    /** Element of the hit, and the total multiplier from the wheel and ability boost (2 = super effective). */
+    element?: Element | null;
+    multiplier?: number;
+  };
   'combat:evaded': { attackerId: EntityId | null; targetId: EntityId };
   'entity:defeated': { entityId: EntityId; defId: string; by: EntityId | null };
   'hero:attack': { entityId: EntityId; kind: AttackKind };
@@ -26,6 +35,13 @@ export interface EventMap {
   'hero:charge': { entityId: EntityId; abilityId: string };
   /** Ran out of stamina while holding an ability: regen pauses longer. */
   'hero:exhausted': { entityId: EntityId };
+  /** A weapon was picked up from the ground. */
+  'item:picked': { playerId: PlayerId; weaponId: string; entityId: EntityId };
+  /** A player used the Fusion Altar (F): their UI opens. */
+  'altar:opened': { playerId: PlayerId; altarId: EntityId };
+  'weapon:equipped': { playerId: PlayerId; weaponId: string };
+  /** Two weapons were fused. `newDiscovery` = first time this pair was fused in this world. */
+  'fusion:created': { playerId: PlayerId; resultId: string; key: string; legendary: boolean; newDiscovery: boolean; inputs: [string, string] };
   /** The hero was put back on safe ground (stuck or fell out of the world). */
   'hero:recovered': { entityId: EntityId; reason: string };
 }

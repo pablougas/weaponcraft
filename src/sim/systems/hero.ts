@@ -1,13 +1,15 @@
 import type { AttackSpec } from '../../content/types';
 import { applyDamage, isHittable, targetsInArc } from '../combat';
 import { DT, GRAVITY, MEADOW_RADIUS, perTick, ticks } from '../constants';
-import { godDef, weaponDef } from '../defs';
+import { godDef } from '../defs';
+import { weaponData } from '../weapons';
+import { interact } from './items';
 import type { Intent, PlayerAction } from '../intents';
 import type { PhysicsWorld } from '../physics';
 import { meadowHeightAt, WATER_LEVEL } from '../terrain/meadow';
 import { groundHeightAt } from '../terrain/meadow-rocks';
 import { COMBO_WINDOW_TICKS, PUNCH_COMBO } from '../unarmed';
-import type { Entity, EntityId, HeroState, Vec3 } from '../types';
+import type { Entity, EntityId, HeroState, Vec3, WorldState } from '../types';
 import type { SimContext } from '../world';
 
 /** Dodge roll (M3.1): fast and short, invulnerable at the start. */
@@ -109,7 +111,7 @@ function faceTowards(entity: Entity, x: number, z: number): void {
 }
 
 /** The attack numbers for the hero's current attack. */
-export function attackSpecFor(entity: Entity, attack: NonNullable<HeroState['attack']>): AttackSpec {
+export function attackSpecFor(world: WorldState, entity: Entity, attack: NonNullable<HeroState['attack']>): AttackSpec {
   switch (attack.kind) {
     case 'punch':
       return PUNCH_COMBO[Math.max(0, Math.min(PUNCH_COMBO.length - 1, (attack.step ?? 1) - 1))];
@@ -119,7 +121,7 @@ export function attackSpecFor(entity: Entity, attack: NonNullable<HeroState['att
       return move.attack(attack.power ?? 0);
     }
     default:
-      return weaponDef(entity.hero!.weaponId)[attack.kind];
+      return weaponData(world, entity.hero!.weaponId)[attack.kind];
   }
 }
 
@@ -198,7 +200,7 @@ function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): st
     case 'heavyAttack': {
       if (hero.attack || hero.dodge || hero.charge != null) return 'busy';
       const kind = action === 'lightAttack' ? 'light' : 'heavy';
-      const spec = weaponDef(hero.weaponId)[kind];
+      const spec = weaponData(ctx.world, hero.weaponId)[kind];
       if (!spendStamina(entity, spec.staminaCost)) return 'no stamina';
       hero.attack = { kind, tick: 0, hit: false };
       faceLockTarget(ctx, entity);
@@ -229,6 +231,8 @@ function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): st
     case 'lockOn':
       hero.lockTarget = hero.lockTarget ? null : findLockTarget(ctx, entity);
       return null;
+    case 'interact':
+      return interact(ctx, entity.ownerId ?? '');
     default:
       return 'unknown action';
   }
@@ -401,7 +405,7 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
     if (hero.dodge.ticksLeft <= 0) hero.dodge = null;
   } else if (hero.attack) {
     const attack = hero.attack;
-    const spec = attackSpecFor(entity, attack);
+    const spec = attackSpecFor(world, entity, attack);
     attack.tick += 1;
     // Lunge forward during the wind-up, but stop once a target is within easy reach
     // (so a long lunge never carries the hero past the enemy).
@@ -413,8 +417,12 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
       attack.hit = true;
       const targets = targetsInArc(world, entity, spec.range, spec.arcDeg);
       const kind = attack.kind;
+      // Weapon strikes carry the weapon's element; punches have none; the fist is the god's move.
+      const element = kind === 'light' || kind === 'heavy'
+        ? weaponData(world, hero.weaponId).element
+        : kind === 'fist' ? god.chargedMove?.element ?? null : null;
       for (const id of spec.cleave ? targets : targets.slice(0, 1)) {
-        applyDamage(ctx, id, spec.damage, entity.id, kind === 'fist' ? 'ability' : kind);
+        applyDamage(ctx, id, spec.damage, entity.id, kind === 'fist' ? 'ability' : kind, element);
         if (kind === 'fist') god.chargedMove?.onHit?.(ctx, entity.id, id, attack.power ?? 0);
       }
     }

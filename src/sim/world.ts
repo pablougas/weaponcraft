@@ -10,7 +10,7 @@ export const DEFAULT_PLAYER_ID: PlayerId = 'p1';
 export function createWorld(seed: number, nowMs: number, playerIds: readonly PlayerId[] = [DEFAULT_PLAYER_ID]): WorldState {
   const players: Record<PlayerId, PlayerState> = {};
   playerIds.forEach((id, index) => {
-    players[id] = { id, name: `Player ${index + 1}`, entityId: null };
+    players[id] = { id, name: `Player ${index + 1}`, entityId: null, inventory: [] };
   });
   return {
     version: WORLD_VERSION,
@@ -23,6 +23,8 @@ export function createWorld(seed: number, nowMs: number, playerIds: readonly Pla
     flags: { prologueDone: false, olympusShattered: false, meadowPopulated: false },
     cutscene: null,
     rngStreams: {},
+    customWeapons: {},
+    codex: {},
   };
 }
 

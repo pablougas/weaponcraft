@@ -93,7 +93,14 @@ describe('Chain Lightning (Q)', () => {
     expect(cast).toMatchObject({ casterId: hero.id, abilityId: 'chain-lightning' });
     const hits = events.filter((e) => e.type === 'combat:hit');
     expect(hits.length).toBe(3); // three dummies within chain range of each other
-    expect(hits.map((h) => (h as { amount: number }).amount)).toEqual([18, 14, 12]);
+    // Pipeline: 18 × 0.8^jump, × 1.25 because the starter spear's element (lightning)
+    // matches the ability, × 2 on the Light dummy (lightning beats light).
+    const expected = hits.map((h, i) => {
+      const target = dummies.find((d) => d.id === (h as { targetId: string }).targetId)!;
+      return Math.round(18 * 0.8 ** i * 1.25 * (target.element === 'light' ? 2 : 1));
+    });
+    expect(hits.map((h) => (h as { amount: number }).amount)).toEqual(expected);
+    expect(hits.some((h) => (h as { multiplier: number }).multiplier === 2.5)).toBe(true);
     expect(hero.hero.cooldowns['chain-lightning']).toBe(8); // 0.3 s fire rate, one tick already counted down
 
     const again = run(1, [act('godAbility')]);

@@ -52,7 +52,7 @@ export const chainLightning: AbilityModule = {
       caster.rotationY = aimYaw(caster);
       const point = aimPoint(caster, GROUND_RANGE);
       const splashed = targetsNear(world, point, SPLASH_RADIUS, visited);
-      for (const id of splashed) applyDamage(ctx, id, BASE_DAMAGE * SPLASH_FRACTION, casterId, 'ability');
+      for (const id of splashed) applyDamage(ctx, id, BASE_DAMAGE * SPLASH_FRACTION, casterId, 'ability', 'lightning');
       ctx.emit('ability:cast', { casterId, abilityId: this.id, targetIds: splashed, points: [origin, { ...point, y: point.y + 0.05 }] });
       return true;
     }
@@ -68,7 +68,7 @@ export const chainLightning: AbilityModule = {
     }
     // Record where each target stood before damage (defeated wildlife may be removed later).
     const points = [origin, ...chain.map((id) => chestPoint(world.entities[id]))];
-    chain.forEach((id, i) => applyDamage(ctx, id, BASE_DAMAGE * FALLOFF ** i, casterId, 'ability'));
+    chain.forEach((id, i) => applyDamage(ctx, id, BASE_DAMAGE * FALLOFF ** i, casterId, 'ability', 'lightning'));
     ctx.emit('ability:cast', { casterId, abilityId: this.id, targetIds: chain, points });
     return true;
   },

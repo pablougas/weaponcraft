@@ -109,7 +109,7 @@ describe('Session', () => {
     expect(second.session.world).toMatchObject({ seed: 33, tick: 1, flags: { prologueDone: false, meadowPopulated: true } });
     // A fresh meadow: the god, three dummies, five sheep; the stale spawn intent was dropped.
     expect(Object.values(second.session.world.entities).map((e) => e.defId).sort()).toEqual(
-      ['practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'zeus'],
+      ['fusion-altar', 'practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'weapon-pickup', 'weapon-pickup', 'weapon-pickup', 'zeus'],
     );
     expect(openSession(storage, () => 44, () => 0).session.world.seed).toBe(33);
   });

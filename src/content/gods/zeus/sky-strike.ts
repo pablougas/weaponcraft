@@ -40,7 +40,7 @@ export const skyStrike: UltimateModule = {
       const distance = flatDistance(entity.position, point);
       if (distance > RADIUS + (entity.body?.radius ?? 0.4) || Math.abs(entity.position.y - point.y) > 6) continue;
       const falloff = 1 - (1 - EDGE_FRACTION) * Math.min(1, distance / RADIUS);
-      applyDamage(ctx, entity.id, spent * DAMAGE_PER_STAMINA * falloff, casterId, 'ability');
+      applyDamage(ctx, entity.id, spent * DAMAGE_PER_STAMINA * falloff, casterId, 'ability', 'lightning');
       knockBack(ctx, entity.id, point, 9, ticks(0.3), ticks(1.5));
       hit.push(entity.id);
     }

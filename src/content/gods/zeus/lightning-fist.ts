@@ -44,7 +44,7 @@ export const lightningFist: ChargedMove = {
     const hitIds = [targetId];
     if (arc) {
       points.push(chestPoint(ctx.world.entities[arc]));
-      applyDamage(ctx, arc, (20 + 25 * power) * ARC_FRACTION, casterId, 'ability');
+      applyDamage(ctx, arc, (20 + 25 * power) * ARC_FRACTION, casterId, 'ability', 'lightning');
       hitIds.push(arc);
     } else {
       // A short spark burst off the target so the hit always reads as lightning.

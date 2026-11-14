@@ -18,6 +18,9 @@ export type InputAction =
   | 'godAbility'
   | 'ultimate'
   | 'lockOn'
+  | 'interact'
+  | 'inventory'
+  | 'codex'
   | 'cameraLeft'
   | 'cameraRight'
   | 'settings'
@@ -44,6 +47,9 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   godAbility: ['KeyQ'],
   ultimate: ['KeyR'],
   lockOn: ['Tab'],
+  interact: ['KeyF'],
+  inventory: ['KeyI'],
+  codex: ['KeyC'],
   cameraLeft: ['Comma'],
   cameraRight: ['Period'],
   settings: ['Escape'],

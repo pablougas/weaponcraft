@@ -1,5 +1,7 @@
-import { ticks } from './constants';
-import type { AttackKind, Entity, EntityId, Vec3, WorldState } from './types';
+import { TICK_HZ, ticks } from './constants';
+import { elementMultiplier } from './elements';
+import type { AttackKind, Element, Entity, EntityId, StatusEffect, StatusKind, Vec3, WorldState } from './types';
+import { isKnownWeapon, weaponData } from './weapons';
 import type { SimContext } from './world';
 
 /** Ticks a hurt reaction (face, flinch) lasts. */
@@ -76,31 +78,110 @@ export function knockBack(ctx: SimContext, targetId: EntityId, from: Vec3, speed
   creature.knock = { x: (dx / length) * speed, z: (dz / length) * speed, ticks: knockTicks };
 }
 
+/** Damage kinds: weapon/fist attacks, abilities, and lingering status damage. */
+export type DamageKind = AttackKind | 'ability' | 'status';
+
+/** A weapon whose element matches an ability's boosts that ability's damage (SPEC §8). */
+export const ABILITY_BOOST = 1.25;
+/** Status effects per element (SPEC §7). */
+const BLIND_TICKS = ticks(3);
+const POISON_TICKS = ticks(4);
+const POISON_DPS = 3;
+const STUN_TICKS = ticks(0.4);
+/** Shadow heals the attacker by this fraction of the damage dealt. */
+const LIFESTEAL = 0.25;
+
+export function hasStatus(entity: Entity | undefined, kind: StatusKind): boolean {
+  return !!entity?.statuses?.some((s) => s.kind === kind && s.ticksLeft > 0);
+}
+
+function addStatus(target: Entity, status: StatusEffect): void {
+  target.statuses ??= [];
+  const existing = target.statuses.find((s) => s.kind === status.kind);
+  if (existing) {
+    existing.ticksLeft = Math.max(existing.ticksLeft, status.ticksLeft);
+    existing.power = Math.max(existing.power, status.power);
+    existing.sourceId = status.sourceId;
+  } else {
+    target.statuses.push(status);
+  }
+}
+
 /**
- * The single damage entry point. M4 extends it into the full pipeline
- * (base → element wheel → status → ability boosts). Returns damage dealt.
+ * The single damage pipeline (SPEC §8): base → element wheel → status →
+ * ability boosts. Every hit in the game goes through here. Returns damage dealt.
+ *
+ * - Element wheel: 2× when the attack's element beats the target's.
+ * - Ability boost: ×1.25 for an ability whose element matches the attacker's weapon.
+ * - Status by element: Light blinds, Shadow steals life, Poison poisons, Lightning stuns.
  */
-export function applyDamage(ctx: SimContext, targetId: EntityId, amount: number, attackerId: EntityId | null, kind: AttackKind | 'ability'): number {
+export function applyDamage(
+  ctx: SimContext,
+  targetId: EntityId,
+  amount: number,
+  attackerId: EntityId | null,
+  kind: DamageKind,
+  element: Element | null = null,
+): number {
   if (!ctx.isAuthority) return 0;
-  const target = ctx.world.entities[targetId];
+  const { world } = ctx;
+  const target = world.entities[targetId];
   if (!isHittable(target)) return 0;
   if (target.hero && target.hero.iframes > 0) {
     ctx.emit('combat:evaded', { attackerId, targetId });
     return 0;
   }
-  const dealt = Math.min(target.health.current, Math.max(0, Math.round(amount)));
+  const attacker = attackerId ? world.entities[attackerId] : undefined;
+
+  // Base → element wheel → ability boost.
+  const multiplier = elementMultiplier(element, target.element);
+  let boost = 1;
+  if (kind === 'ability' && element && attacker?.hero && isKnownWeapon(world, attacker.hero.weaponId)
+    && weaponData(world, attacker.hero.weaponId).element === element) {
+    boost = ABILITY_BOOST;
+  }
+  const dealt = Math.min(target.health.current, Math.max(0, Math.round(amount * multiplier * boost)));
   target.health.current -= dealt;
-  if (target.hero) target.hero.hurtTicks = HURT_TICKS;
-  if (target.creature) {
+
+  if (target.hero && kind !== 'status') target.hero.hurtTicks = HURT_TICKS;
+  if (target.creature && kind !== 'status') {
     target.creature.sinceHit = 0;
-    if (target.creature.wanders) {
+    if (target.creature.wanders && !hasStatus(target, 'blind')) {
       target.creature.flee = FLEE_TICKS;
       target.creature.target = null;
     }
   }
-  ctx.emit('combat:hit', { attackerId, targetId, amount: dealt, kind, remaining: target.health.current });
+
+  // Status effects (not from status damage itself, so poison doesn't re-poison).
+  if (element && kind !== 'status' && dealt > 0) {
+    if (element === 'light') addStatus(target, { kind: 'blind', ticksLeft: BLIND_TICKS, power: 0, sourceId: attackerId });
+    if (element === 'poison') addStatus(target, { kind: 'poison', ticksLeft: POISON_TICKS, power: POISON_DPS, sourceId: attackerId });
+    if (element === 'lightning') {
+      addStatus(target, { kind: 'stun', ticksLeft: STUN_TICKS, power: 0, sourceId: attackerId });
+      if (target.creature) target.creature.stun = Math.max(target.creature.stun ?? 0, STUN_TICKS);
+    }
+    if (element === 'shadow' && attacker?.health) {
+      attacker.health.current = Math.min(attacker.health.max, attacker.health.current + Math.round(dealt * LIFESTEAL));
+    }
+  }
+
+  ctx.emit('combat:hit', { attackerId, targetId, amount: dealt, kind, remaining: target.health.current, element, multiplier: multiplier * boost });
   if (target.health.current <= 0) {
     ctx.emit('entity:defeated', { entityId: targetId, defId: target.defId, by: attackerId });
   }
   return dealt;
+}
+
+/** Ticks down status effects and applies poison damage once a second. */
+export function updateStatuses(ctx: SimContext): void {
+  for (const entity of Object.values(ctx.world.entities)) {
+    if (!entity.statuses?.length) continue;
+    for (const status of entity.statuses) {
+      status.ticksLeft -= 1;
+      if (status.kind === 'poison' && status.ticksLeft % TICK_HZ === 0 && status.ticksLeft >= 0) {
+        applyDamage(ctx, entity.id, status.power, status.sourceId, 'status');
+      }
+    }
+    entity.statuses = entity.statuses.filter((s) => s.ticksLeft > 0);
+  }
 }

@@ -4,7 +4,7 @@ import { enemyDef } from '../defs';
 import { worldRng } from '../rng';
 import { WATER_LEVEL } from '../terrain/meadow';
 import { groundHeightAt, HERO_ROCK, MEADOW_ROCKS, rockColliderRadius } from '../terrain/meadow-rocks';
-import type { Entity, Vec3 } from '../types';
+import type { Entity, Vec3, Element } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 
 /** Dummies refill this long after the last hit. */
@@ -26,7 +26,7 @@ const GROUND_PROBE = 0.25;
 export const SHEEP_HOME: Vec3 = { x: 3, y: 0, z: 19 };
 
 /** Places a dummy or wild creature on the ground. */
-export function spawnCreature(ctx: SimContext, defId: string, x: number, z: number, rotationY = 0): string {
+export function spawnCreature(ctx: SimContext, defId: string, x: number, z: number, rotationY = 0, element: Element | null = null): string {
   const def = enemyDef(defId);
   const position = { x, y: groundHeightAt(x, z), z };
   const id = spawn(ctx, defId, { position, rotationY });
@@ -34,6 +34,7 @@ export function spawnCreature(ctx: SimContext, defId: string, x: number, z: numb
   entity.body = { ...def.body };
   entity.health = { current: def.maxHealth, max: def.maxHealth };
   entity.creature = { wanders: def.wanders, home: { ...position }, target: null, wait: 0, flee: 0, sinceHit: DUMMY_RESET_TICKS };
+  if (element) entity.element = element;
   return id;
 }
 

@@ -10,6 +10,7 @@ const PRESS_ACTIONS: Partial<Record<InputAction, PlayerAction>> = {
   godAbility: 'godAbility',
   ultimate: 'ultimate',
   lockOn: 'lockOn',
+  interact: 'interact',
 };
 
 /**
@@ -31,7 +32,7 @@ export class InputController {
     const gameCodes = map.allCodes();
     window.addEventListener('keydown', (event) => {
       if (!this.enabled()) return;
-      if (gameCodes.has(event.code) && !['Escape', 'Backquote'].includes(event.code)) event.preventDefault();
+      if (gameCodes.has(event.code) && !['Escape', 'Backquote', 'KeyI', 'KeyC'].includes(event.code)) event.preventDefault();
       if (event.repeat) return;
       this.press(event.code);
     });
