@@ -6,6 +6,10 @@ const MIN_PITCH = -0.35;
 const MAX_PITCH = 1.15;
 const MIN_DISTANCE = 2.6;
 const MAX_DISTANCE = 11;
+/** How quickly auto-follow swings the camera behind the god, per second. */
+const FOLLOW_RATE = 1.3;
+/** Keyboard camera turning speed, radians/s. */
+export const CAMERA_TURN_SPEED = 2.2;
 /** Camera looks at this height above the player's feet. */
 const PIVOT_HEIGHT = 1.55;
 
@@ -27,6 +31,21 @@ export class CameraRig {
     const k = 0.0025 * sensitivity;
     this.yaw -= dx * k;
     this.pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, this.pitch + dy * k * (invertY ? -1 : 1)));
+  }
+
+  /** Keyboard turning: positive `amount` (radians) turns right, like moving the mouse right. */
+  turn(amount: number): void {
+    this.yaw -= amount;
+  }
+
+  /**
+   * Auto-follow (M3.1): eases the camera back behind `heading` so the arrow
+   * keys steer. It doesn't swing around when the god walks toward the camera.
+   */
+  follow(heading: number, dt: number): void {
+    const delta = Math.atan2(Math.sin(heading - this.yaw), Math.cos(heading - this.yaw));
+    if (Math.abs(delta) > 1.75) return;
+    this.yaw += delta * Math.min(1, dt * FOLLOW_RATE);
   }
 
   zoom(deltaY: number): void {

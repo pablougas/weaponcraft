@@ -65,9 +65,19 @@ The GDD's per-god Divine Beasts are **replaced** by spirits for this build.
 - **Terrain:** chunked heightfield (e.g. 64 m chunks), generated from the seed (in a Web Worker if needed) and streamed around the player, with simple LODs. Smooth terrain; no carving.
 - **Dungeon:** one small hand-built dungeon (proposed: a ruined shrine in Marble Highlands) with one puzzle.
 
+### 4.1 Map and fog of war
+- **Minimap, top-right corner.** A round, north-up map centered on the player. It **starts dark** and reveals the area around the player as they explore (proposed: 60 m reveal radius, larger from high ground). Explored terrain is drawn from the heightfield and biome colors; unexplored stays dark.
+- **Full map** on **M** (rebindable): pan and zoom over the whole revealed world.
+- **Markers:** the player (arrow), the Refuge, Olympus, human camps once seen (shown as cleared after clearing), mech lairs once scouted, freed spirits, chests, and custom pins (click on the full map).
+- **Fog of war is game state:** a coarse grid (proposed: 16 m cells) stored as a bitset in `WorldState`, included in saves. It's ready to share in co-op later, since every player's reveals can merge into one map.
+- **Prologue:** the minimap is hidden during the tutorial and appears when control returns after the rocket, with the meadow and the view toward Olympus already revealed.
+- **Accessibility:** minimap toggle, size (small/medium/large) and rotation (north-up / player-up) in settings.
+
 ## 5. Player
 - **Zeus first:** passive charge build-up, **Chain Lightning** (Q), short hover jump. **Hades second**, after Zeus is fully working: Shadow Step, Skull Cage (with the fair-warning rules from the GDD).
-- **Controls (rebindable):** WASD move, mouse orbit (pointer lock), LMB light / RMB heavy, Shift sprint, Space jump, Ctrl dodge roll, Q god ability, **E spirit ability**, F interact, Tab lock-on, I inventory, C codex, Esc settings.
+- **Controls (rebindable):** **arrow keys move**; letters are actions. Space jump/hover, Shift sprint, **X dodge roll** (also Alt), **A punch** (also left mouse), **S weapon strike** (tap light / hold heavy; right mouse = heavy), **D Lightning Fist** (hold to charge), **Q Chain Lightning** (tap or hold to keep firing), **R Sky Strike**, E spirit ability, F interact, Tab lock-on, mouse or Comma/Period to turn the camera (it auto-follows when not turned), I inventory, C codex, M map, Esc settings. The game must be fully playable without the mouse.
+- **Zeus's lightning kit:** Chain Lightning (hold to fire every 0.3 s until stamina runs out; fires forward even with no target), **Sky Strike** (needs ≥50% stamina, drains all of it, huge AoE bolt from the sky after a 0.6 s marker, 12 s cooldown), **Lightning Fist** (charged electrified punch with a short lunge), plus a plain 3-hit **punch** combo. Details and numbers: `docs/prompts/M3.1-fixes.md`.
+- **Dodge roll:** fast (≈0.26 s, ≈4.4 m), early i-frames, input buffer, cancels attack recovery.
 - Health + stamina (sprint, dodge, climb). Death respawns at the last bed.
 - Combat is a **ranged + melee mix**: the weapon archetype decides the moveset (sword, spear, axe, bow, staff…).
 

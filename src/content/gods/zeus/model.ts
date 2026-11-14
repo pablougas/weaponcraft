@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import { rng } from '../../../sim/rng';
-import { weaponDef } from '../../../sim/defs';
+import { attackSpecFor, DODGE_TICKS } from '../../../sim/systems/hero';
 import type { Entity } from '../../../sim/types';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from '../../../view/entity-model';
 import { createParticles } from '../../../view/particles';
 import { drawFace, SKIN } from './face';
 
-const DODGE_TICKS = 10;
 /** Seconds Zeus looks pleased after a successful Chain Lightning. */
 const HAPPY_SECONDS = 1.2;
 
@@ -91,6 +90,16 @@ export const createModel: ModelFactory = (look, entityId) => {
     spear.add(M(new THREE.BoxGeometry(0.07, 0.3, 0.05), bolt, [x, y, z], { rot: [0, 0, rz], outline: false, cast: false }));
   }
   spear.add(M(new THREE.ConeGeometry(0.06, 0.18, 6), bolt, [-0.03, 2.25, 0], { rot: [0, 0, 0.3], outline: false }));
+  // Lightning Fist: the free (left) hand crackles while charging and punching.
+  const fistGlowMat = new THREE.MeshBasicMaterial({ color: '#bfeaff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const fistGlow = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), fistGlowMat);
+  fistGlow.position.set(0, -0.36, 0);
+  fistGlow.visible = false;
+  leftArm.elbow.add(fistGlow);
+  const fistLight = new THREE.PointLight('#6ec6ff', 0, 5, 2);
+  fistLight.position.set(0, -0.36, 0);
+  leftArm.elbow.add(fistLight);
+
   const tip = new THREE.Object3D();
   tip.position.set(0, 1.85, 0);
   spear.add(tip);
@@ -188,35 +197,77 @@ export const createModel: ModelFactory = (look, entityId) => {
       legs[1].rotation.x = airborne ? 0.2 : -swing;
       body.position.y = -0.9 + (moving && !airborne ? Math.abs(Math.cos(walkPhase)) * 0.05 : 0);
       torso.rotation.x = moving ? (sprinting ? 0.22 : 0.1) : 0;
-      leftArm.shoulder.rotation.x = 0.08 - swing * 0.6;
 
       // Dodge: a full forward roll around the hips.
       const dodge = hero?.dodge;
       hips.rotation.x = dodge ? (1 - dodge.ticksLeft / DODGE_TICKS) * Math.PI * 2 : 0;
 
-      // Attacks: thrust or overhead sweep with the spear arm.
+      // Attacks. Right arm holds the spear; the left is the free fist.
       let shoulderX = -0.3;
       let elbowX = -1.15;
-      if (hero?.attack) {
-        const spec = weaponDef(hero.weaponId)[hero.attack.kind];
-        const p = Math.min(1, hero.attack.tick / spec.totalTicks);
+      let leftShoulderX = 0.08 - swing * 0.6;
+      let leftElbowX = -0.1;
+      let twist = 0;
+      let fistPower = 0;
+      const attack = hero?.attack;
+      if (hero && attack) {
+        const spec = attackSpecFor(entity, attack);
+        const p = Math.min(1, attack.tick / spec.totalTicks);
         const hit = spec.hitTick / spec.totalTicks;
-        if (hero.attack.kind === 'light') {
-          const thrust = p < hit ? -(p / hit) * 0.25 : Math.sin(Math.min(1, (p - hit) / (1 - hit)) * Math.PI);
+        const windup = Math.min(1, p / hit);
+        const follow = p < hit ? 0 : Math.min(1, (p - hit) / (1 - hit));
+        const strike = p < hit ? windup : 1 - follow * 0.85;
+        if (attack.kind === 'light') {
+          const thrust = p < hit ? -(p / hit) * 0.25 : Math.sin(follow * Math.PI);
           shoulderX = -0.3 - thrust * 1.1;
           elbowX = -1.15 + thrust * 0.95;
-        } else {
-          const windup = Math.min(1, p / hit);
-          const follow = p < hit ? 0 : Math.min(1, (p - hit) / (1 - hit));
+        } else if (attack.kind === 'heavy') {
           shoulderX = -0.3 - windup * 2.3 + follow * 2.6;
           elbowX = -1.15 + windup * 0.6;
-          torso.rotation.y = (1 - follow) * windup * 0.35;
+          twist = (1 - follow) * windup * 0.35;
+        } else if (attack.kind === 'punch') {
+          // Jab (left), cross (right, spear in hand), uppercut (left).
+          const step = attack.step ?? 1;
+          const upper = step === 3;
+          const reachShoulder = upper ? -2.3 : -1.55;
+          const reachElbow = upper ? -0.7 : -0.05;
+          if (step === 2) {
+            shoulderX = -0.3 + (reachShoulder + 0.3) * strike;
+            elbowX = -1.15 + (reachElbow + 1.15) * strike;
+            twist = 0.45 * strike;
+          } else {
+            leftShoulderX = 0.08 + (reachShoulder - 0.08) * strike;
+            leftElbowX = -1.3 + (reachElbow + 1.3) * strike;
+            twist = -0.4 * strike;
+          }
+        } else {
+          // Lightning Fist: a straight left with the whole body behind it.
+          leftShoulderX = 0.5 + (-1.65 - 0.5) * strike;
+          leftElbowX = -1.6 + 1.6 * strike;
+          twist = -0.6 * strike;
+          fistPower = (attack.power ?? 0) * (1 - follow);
         }
-      } else {
-        torso.rotation.y = 0;
+      } else if (hero && hero.charge != null) {
+        // Charging: fist drawn back, crackling brighter as it charges.
+        const charge = Math.min(1, hero.charge / 30);
+        leftShoulderX = 0.5;
+        leftElbowX = -1.6;
+        twist = 0.35 * charge;
+        fistPower = 0.25 + 0.75 * charge;
+      } else if (hero?.ultimate) {
+        // Sky Strike: spear raised to call the bolt down.
+        shoulderX = -2.9;
+        elbowX = -0.2;
       }
+      torso.rotation.y = twist;
       rightArm.shoulder.rotation.x = shoulderX;
       rightArm.elbow.rotation.x = elbowX;
+      leftArm.shoulder.rotation.x = leftShoulderX;
+      leftArm.elbow.rotation.x = leftElbowX;
+      fistGlow.visible = fistPower > 0.01;
+      fistGlowMat.opacity = Math.min(1, fistPower * 0.9);
+      fistGlow.scale.setScalar(0.8 + fistPower * (frame.reduceMotion ? 0.5 : 0.9 + Math.sin(t * 40) * 0.08));
+      fistLight.intensity = fistPower * 3;
 
       spearLight.intensity = 0.8 + look.U.night.value * 1.6;
 
@@ -226,7 +277,7 @@ export const createModel: ModelFactory = (look, entityId) => {
         showFace('hurt');
       } else if (t < happyUntil) {
         showFace('happy');
-      } else if (hero && (hero.attack || hero.lockTarget || hero.dodge)) {
+      } else if (hero && (hero.attack || hero.lockTarget || hero.dodge || hero.charge != null || hero.ultimate)) {
         showFace('determined');
       } else {
         showFace('neutral');

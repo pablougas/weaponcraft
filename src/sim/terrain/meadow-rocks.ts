@@ -34,6 +34,11 @@ function placeRocks(): { rocks: RockPlacement[]; stateAfter: number } {
 
 const placed = placeRocks();
 
+/** Radius of a boulder's collision ball (a squashed ball: close enough for bumping into). */
+export function rockColliderRadius(rock: RockPlacement): number {
+  return Math.min(rock.scale.x, rock.scale.z) * 0.9;
+}
+
 /** The 14 scattered boulders. */
 export const MEADOW_ROCKS: readonly RockPlacement[] = placed.rocks;
 /** RNG state after the rocks, where the view continues with trees, grass and so on. */

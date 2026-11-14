@@ -7,12 +7,30 @@ import type { PlayerId, Vec3 } from './types';
 export type Intent =
   | { type: 'dev:spawn'; playerId: PlayerId; defId: string; position?: Vec3 }
   | { type: 'dev:despawn'; playerId: PlayerId; entityId: string }
-  /** Held input, sent every tick: world-space move direction (length ≤ 1) and held buttons. */
-  | { type: 'player:move'; playerId: PlayerId; x: number; z: number; sprint: boolean; jumpHeld: boolean }
+  /**
+   * Held input, sent when it changes: world-space move direction (length ≤ 1),
+   * held buttons, and the camera heading the player aims along.
+   */
+  | {
+    type: 'player:move';
+    playerId: PlayerId;
+    x: number;
+    z: number;
+    sprint: boolean;
+    jumpHeld: boolean;
+    /** Q held: keep firing the god ability. */
+    abilityHeld?: boolean;
+    /** D held: charging the charged move (Lightning Fist); releasing throws it. */
+    chargeHeld?: boolean;
+    /** S held: tap for a light weapon strike, hold for heavy. */
+    weaponHeld?: boolean;
+    /** Camera heading, radians (forward = (sin, cos)). */
+    aimYaw?: number;
+  }
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 
-export type PlayerAction = 'jump' | 'dodge' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'lockOn';
+export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn';
 
 export type IntentType = Intent['type'];
 

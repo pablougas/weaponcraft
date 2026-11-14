@@ -94,20 +94,24 @@ describe('Chain Lightning (Q)', () => {
     const hits = events.filter((e) => e.type === 'combat:hit');
     expect(hits.length).toBe(3); // three dummies within chain range of each other
     expect(hits.map((h) => (h as { amount: number }).amount)).toEqual([18, 14, 12]);
-    expect(hero.hero.cooldowns['chain-lightning']).toBeGreaterThan(100);
+    expect(hero.hero.cooldowns['chain-lightning']).toBe(8); // 0.3 s fire rate, one tick already counted down
 
     const again = run(1, [act('godAbility')]);
     expect(again).toContainEqual(expect.objectContaining({ type: 'intent:rejected', reason: 'cooling down' }));
   });
 
-  it('fizzles with nothing in range and costs nothing', () => {
+  it('with nothing in range it still fires, striking the ground ahead (M3.1)', () => {
     const { world, hero, run, act } = arena();
     for (const e of Object.values(world.entities)) if (e.creature) e.position = { x: 100, y: 0, z: 100 };
     const stamina = hero.stamina!.current;
     const events = run(1, [act('godAbility')]);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'ability:fizzled' }));
-    expect(hero.hero.cooldowns['chain-lightning']).toBeUndefined();
-    expect(hero.stamina!.current).toBe(stamina);
+    const cast = events.find((e) => e.type === 'ability:cast') as { points: Array<{ x: number; z: number }>; targetIds: string[] } | undefined;
+    expect(cast).toBeDefined();
+    expect(cast!.targetIds).toEqual([]);
+    const end = cast!.points[cast!.points.length - 1];
+    expect(Math.hypot(end.x - hero.position.x, end.z - hero.position.z)).toBeCloseTo(14, 0);
+    expect(hero.hero.cooldowns['chain-lightning']).toBeGreaterThan(0);
+    expect(hero.stamina!.current).toBe(stamina - 8);
   });
 
   it('lock-on picks a target and Q prefers it', () => {

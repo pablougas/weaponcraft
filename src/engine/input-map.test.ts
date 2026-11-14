@@ -21,7 +21,9 @@ describe('InputMap', () => {
     const map = new InputMap({ jump: ['KeyJ'] });
     expect(map.matches('jump', { code: 'KeyJ' })).toBe(true);
     expect(map.matches('jump', { code: 'Space' })).toBe(false);
-    expect(map.actionsFor('Mouse0')).toEqual(['lightAttack']);
+    expect(map.actionsFor('Mouse0')).toEqual(['punch']);
+    expect(map.actionsFor('ArrowUp')).toEqual(['moveForward']);
+    expect(map.actionsFor('KeyW')).toEqual([]);
     map.bind('godAbility', ['KeyR']);
     expect(map.codesFor('godAbility')).toEqual(['KeyR']);
   });

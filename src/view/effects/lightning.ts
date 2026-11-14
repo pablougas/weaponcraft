@@ -23,7 +23,8 @@ export class LightningEffects {
     this.core.translate(0, 0.5, 0);
   }
 
-  spawn(points: Vec3[], seed: number, reduceMotion: boolean): void {
+  /** `thickness` scales the bolt (Sky Strike uses big ones) and its jaggedness. */
+  spawn(points: Vec3[], seed: number, reduceMotion: boolean, thickness = 1): void {
     if (points.length < 2) return;
     const random = rng(seed, 'lightning-shape');
     const group = new THREE.Group();
@@ -35,13 +36,14 @@ export class LightningEffects {
       // Jag each link into a few segments with small sideways kinks.
       const start = new THREE.Vector3(points[i].x, points[i].y, points[i].z);
       const end = new THREE.Vector3(points[i + 1].x, points[i + 1].y, points[i + 1].z);
-      const steps = Math.max(3, Math.round(start.distanceTo(end) / 0.9));
+      const steps = Math.max(3, Math.round(start.distanceTo(end) / (0.9 * Math.max(1, thickness))));
+      const jag = 0.25 * Math.max(1, thickness);
       const path = [start];
       for (let s = 1; s < steps; s += 1) {
         const p = start.clone().lerp(end, s / steps);
-        p.x += random.range(-0.25, 0.25);
-        p.y += random.range(-0.25, 0.25);
-        p.z += random.range(-0.25, 0.25);
+        p.x += random.range(-jag, jag);
+        p.y += random.range(-jag, jag);
+        p.z += random.range(-jag, jag);
         path.push(p);
       }
       path.push(end);
@@ -51,7 +53,7 @@ export class LightningEffects {
         const length = a.distanceTo(b);
         const direction = b.clone().sub(a).normalize();
         const quaternion = new THREE.Quaternion().setFromUnitVectors(this.up, direction);
-        for (const [material, radius] of [[coreMat, 0.035], [glowMat, 0.11]] as const) {
+        for (const [material, radius] of [[coreMat, 0.035 * thickness], [glowMat, 0.11 * thickness]] as const) {
           const mesh = new THREE.Mesh(this.core, material);
           mesh.position.copy(a);
           mesh.quaternion.copy(quaternion);
@@ -62,7 +64,8 @@ export class LightningEffects {
       }
     }
     this.scene.add(group);
-    this.bolts.push({ group, materials: [coreMat, glowMat], age: 0, life: reduceMotion ? 0.3 : 0.45 });
+    const life = (reduceMotion ? 0.3 : 0.45) * (thickness > 1 ? 1.5 : 1);
+    this.bolts.push({ group, materials: [coreMat, glowMat], age: 0, life });
   }
 
   update(dt: number): void {

@@ -48,7 +48,8 @@ export interface Meter {
   max: number;
 }
 
-export type AttackKind = 'light' | 'heavy';
+/** Weapon light/heavy strikes, the unarmed punch combo, and a charged ability punch (Lightning Fist). */
+export type AttackKind = 'light' | 'heavy' | 'punch' | 'fist';
 
 /** The four elements of the counter wheel (SPEC §7). */
 export type Element = 'light' | 'shadow' | 'poison' | 'lightning';
@@ -67,8 +68,11 @@ export interface HeroState {
   dodge: { ticksLeft: number; dir: { x: number; z: number } } | null;
   /** Ticks of invulnerability left. */
   iframes: number;
-  /** Active attack: which, and how many ticks since it started. */
-  attack: { kind: AttackKind; tick: number; hit: boolean } | null;
+  /**
+   * Active attack: which, and how many ticks since it started. `step` is the
+   * punch-combo step (1–3); `power` is a charged move's charge (0–1).
+   */
+  attack: { kind: AttackKind; tick: number; hit: boolean; step?: number; power?: number } | null;
   /** Ticks until each ability can be used again, by ability ID. */
   cooldowns: Record<string, number>;
   /** Locked-on target (Tab), if any. */
@@ -82,6 +86,28 @@ export interface HeroState {
   /** Derived each tick, for the view: moving faster than a stroll, and sprinting. */
   moving: boolean;
   sprinting: boolean;
+  // ---- M3.1 fields. Optional so saves from before M3.1 still load; `heroDefaults` fills them in.
+  /** Camera heading the player is aiming along (radians, same convention as rotationY). */
+  aimYaw?: number;
+  /** Held buttons: god ability (Q), charged move (D), weapon strike (S). */
+  abilityHeld?: boolean;
+  chargeHeld?: boolean;
+  weaponHeld?: boolean;
+  /** Ticks the weapon button has been held (−1 = not counting). Short = light, long = heavy. */
+  weaponHoldTicks?: number;
+  /** Ticks the charged move has been charging, or null when not charging. */
+  charge?: number | null;
+  /** Punch combo: the last step thrown and the ticks left to continue it. */
+  combo?: { step: number; window: number };
+  /** A press made while busy, retried for a few ticks (input buffer). */
+  buffer?: { action: 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack'; ticks: number } | null;
+  /** A called-down ultimate waiting to land (Sky Strike): where, how long, and stamina spent. */
+  ultimate?: { ticksLeft: number; point: Vec3; spent: number } | null;
+  /** Last spot the hero stood safely on, and ticks until it's updated again. */
+  lastSafe?: Vec3 | null;
+  safeTimer?: number;
+  /** Ticks the hero has been trying to move without moving (stuck detection). */
+  stuckTicks?: number;
 }
 
 export interface CreatureState {
@@ -97,6 +123,12 @@ export interface CreatureState {
   flee: number;
   /** Ticks since it was last hit (dummies heal after a while). */
   sinceHit: number;
+  /** Ticks left stunned (can't move). Optional for older saves. */
+  stun?: number;
+  /** Being knocked back: velocity in m/s and ticks left. */
+  knock?: { x: number; z: number; ticks: number } | null;
+  /** Ticks in a row a move was blocked (by a rock, another creature…). */
+  blocked?: number;
 }
 
 export interface PlayerState {

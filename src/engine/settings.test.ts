@@ -16,6 +16,7 @@ describe('settings', () => {
       timeOfDay: 'live',
       mouseSensitivity: 1,
       invertY: false,
+      cameraAutoFollow: true,
     });
     expect(defaultSettings(true).reduceMotion).toBe(true);
   });

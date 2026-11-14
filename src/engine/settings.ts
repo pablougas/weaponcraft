@@ -28,6 +28,8 @@ export interface Settings {
   /** Mouse look speed multiplier (0.2–3). */
   mouseSensitivity: number;
   invertY: boolean;
+  /** Camera swings back behind the god while moving, so the arrow keys steer without a mouse. */
+  cameraAutoFollow: boolean;
 }
 
 export interface QualityParams {
@@ -55,6 +57,7 @@ export function defaultSettings(prefersReducedMotion = false): Settings {
     timeOfDay: 'live',
     mouseSensitivity: 1,
     invertY: false,
+    cameraAutoFollow: true,
   };
 }
 
@@ -73,6 +76,7 @@ export function parseSettings(text: string | null, defaults: Settings): Settings
   if (QUALITY_SETTINGS.includes(value.quality as QualitySetting)) settings.quality = value.quality as QualitySetting;
   if (typeof value.reduceMotion === 'boolean') settings.reduceMotion = value.reduceMotion;
   if (typeof value.invertY === 'boolean') settings.invertY = value.invertY;
+  if (typeof value.cameraAutoFollow === 'boolean') settings.cameraAutoFollow = value.cameraAutoFollow;
   if (typeof value.mouseSensitivity === 'number' && Number.isFinite(value.mouseSensitivity)) {
     settings.mouseSensitivity = Math.min(3, Math.max(0.2, value.mouseSensitivity));
   }

@@ -60,6 +60,23 @@ export function targetsNear(world: WorldState, point: Vec3, range: number, exclu
 }
 
 /**
+ * Knocks a creature away from `from` at `speed` m/s for `ticks`, and stuns it
+ * (it can't walk) for `stunTicks`. Practice dummies don't budge but still flinch.
+ */
+export function knockBack(ctx: SimContext, targetId: EntityId, from: Vec3, speed: number, knockTicks: number, stunTicks: number): void {
+  if (!ctx.isAuthority) return;
+  const creature = ctx.world.entities[targetId]?.creature;
+  if (!creature) return;
+  creature.stun = Math.max(creature.stun ?? 0, stunTicks);
+  if (!creature.wanders) return;
+  const target = ctx.world.entities[targetId];
+  const dx = target.position.x - from.x;
+  const dz = target.position.z - from.z;
+  const length = Math.hypot(dx, dz) || 1;
+  creature.knock = { x: (dx / length) * speed, z: (dz / length) * speed, ticks: knockTicks };
+}
+
+/**
  * The single damage entry point. M4 extends it into the full pipeline
  * (base → element wheel → status → ability boosts). Returns damage dealt.
  */

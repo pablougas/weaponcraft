@@ -1,5 +1,7 @@
 import type { GodDef } from '../../types';
 import { chainLightning } from './chain-lightning';
+import { lightningFist } from './lightning-fist';
+import { skyStrike } from './sky-strike';
 
 /** Zeus, the first playable god (SPEC §5). Model matches the style-test placeholder. */
 export const zeus: GodDef = {
@@ -15,6 +17,8 @@ export const zeus: GodDef = {
   hoverTicks: 21,
   body: { radius: 0.32, height: 1.9 },
   ability: chainLightning,
+  chargedMove: lightningFist,
+  ultimate: skyStrike,
   starterWeaponId: 'starter-spear',
   model: () => import('./model'),
 };

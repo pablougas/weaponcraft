@@ -370,7 +370,18 @@
 .wc-hud-abilities {
   position: absolute;
   right: 22px;
-  bottom: 22px;
+  bottom: 30px;
+  display: flex;
+  gap: 16px;
+}
+
+.wc-ability.wc-no-stamina {
+  opacity: 0.45;
+}
+
+.wc-ability.wc-active {
+  border-color: #8fd8ff;
+  box-shadow: 0 0 14px rgb(110 198 255 / 55%), 0 2px 10px rgb(0 0 0 / 35%);
 }
 
 .wc-ability {
@@ -412,9 +423,12 @@
   top: 100%;
   margin-top: 4px;
   color: var(--wc-muted);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
+  width: 76px;
+  font-size: 10.5px;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: normal;
 }
 
 .wc-ability.wc-cooling .wc-ability-glyph {

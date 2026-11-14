@@ -69,13 +69,16 @@ game day every 4 real hours; frozen at golden hour during the prologue).
 
 | Action | Key |
 | --- | --- |
-| Move | **W A S D** (relative to the camera) |
-| Look | Mouse (or drag if the mouse can't be captured) · scroll to zoom |
+| Move | **Arrow keys** (relative to the camera) |
+| Look | Mouse (or drag if the mouse can't be captured), or **,** / **.** to turn · scroll to zoom. The camera swings back behind Zeus on its own while you move (turn off in Settings). |
 | Sprint | **Shift** (uses stamina) |
 | Jump / hover | **Space**; hold it while falling to hover |
-| Dodge roll | **Alt** (brief invulnerability, uses stamina) |
-| Light / heavy attack | Left / right mouse button |
-| Chain Lightning | **Q** |
+| Dodge roll | **X** (or Alt): fast, brief invulnerability, uses stamina; cancels an attack's follow-through |
+| Punch | **A** or left mouse: jab, cross, uppercut combo |
+| Weapon strike | **S**: tap for a light thrust, hold for a heavy sweep (right mouse = heavy) |
+| Lightning Fist | **D**: hold to charge, release to lunge and punch with lightning |
+| Chain Lightning | **Q**: tap for one bolt, hold to keep firing until stamina runs out |
+| Sky Strike | **R**: needs half stamina and spends all of it; a ring marks the spot, then a huge bolt falls from the sky |
 | Lock on | **Tab** |
 | Settings | **Esc** |
 

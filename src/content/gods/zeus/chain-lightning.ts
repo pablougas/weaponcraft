@@ -2,6 +2,7 @@ import type { AbilityModule } from '../../../sim/abilities';
 import { applyDamage, chestPoint, isHittable, targetsNear } from '../../../sim/combat';
 import { ticks } from '../../../sim/constants';
 import type { EntityId, Vec3 } from '../../../sim/types';
+import { aimPoint, aimYaw } from './aim';
 
 /** First target within this range (or the lock-on target within LOCK_RANGE). */
 const FIRST_RANGE = 14;
@@ -12,17 +13,25 @@ const MAX_TARGETS = 4;
 const BASE_DAMAGE = 18;
 /** Each jump does this fraction of the previous one. */
 const FALLOFF = 0.8;
+/** With nothing to chain to, the bolt strikes the ground ahead and splashes this wide… */
+const GROUND_RANGE = 14;
+const SPLASH_RADIUS = 1.5;
+/** …for this fraction of the base damage. */
+const SPLASH_FRACTION = 0.5;
 
 /**
  * Zeus's Q: a bolt leaps from the spear to the nearest enemy (or the locked
  * target) and chains to up to three more nearby, weakening with each jump.
+ * With no target it still fires, striking the ground ahead along the aim.
+ * Holding Q keeps firing every 0.3 s until stamina runs out (M3.1).
  */
 export const chainLightning: AbilityModule = {
   id: 'chain-lightning',
   name: 'Chain Lightning',
   element: 'lightning',
-  cooldownTicks: ticks(4),
-  staminaCost: 10,
+  cooldownTicks: ticks(0.3),
+  staminaCost: 8,
+  repeatWhileHeld: true,
   cast(ctx, casterId) {
     const { world } = ctx;
     const caster = world.entities[casterId];
@@ -37,11 +46,19 @@ export const chainLightning: AbilityModule = {
       if (Math.hypot(target.position.x - caster.position.x, target.position.z - caster.position.z) <= LOCK_RANGE) first = lock;
     }
     first ??= targetsNear(world, caster.position, FIRST_RANGE, visited)[0];
+
     if (!first) {
-      ctx.emit('ability:fizzled', { casterId, abilityId: this.id, reason: 'no target in range' });
-      return false;
+      // Nothing in range: strike the ground ahead and splash whatever stands there.
+      caster.rotationY = aimYaw(caster);
+      const point = aimPoint(caster, GROUND_RANGE);
+      const splashed = targetsNear(world, point, SPLASH_RADIUS, visited);
+      for (const id of splashed) applyDamage(ctx, id, BASE_DAMAGE * SPLASH_FRACTION, casterId, 'ability');
+      ctx.emit('ability:cast', { casterId, abilityId: this.id, targetIds: splashed, points: [origin, { ...point, y: point.y + 0.05 }] });
+      return true;
     }
 
+    const target = world.entities[first];
+    caster.rotationY = Math.atan2(target.position.x - caster.position.x, target.position.z - caster.position.z);
     const chain: EntityId[] = [];
     let current: EntityId | undefined = first;
     while (current && chain.length < MAX_TARGETS) {

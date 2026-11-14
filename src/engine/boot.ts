@@ -8,8 +8,9 @@ import { createHud } from '../ui/hud';
 import { hideLoadingScreen, setLoadingText, showFatalError } from '../ui/loading-screen';
 import { createSettingsMenu, type SettingsMenu } from '../ui/settings-menu';
 import { showTitleScreen } from '../ui/title-screen';
-import { CameraRig } from '../view/camera-rig';
+import { CAMERA_TURN_SPEED, CameraRig } from '../view/camera-rig';
 import { LightningEffects } from '../view/effects/lightning';
+import { SkyStrikeEffects } from '../view/effects/sky-strike';
 import type { ModelFrame } from '../view/entity-model';
 import { EntityViews, preloadModels } from '../view/entity-views';
 import { Interpolator } from '../view/interpolation';
@@ -204,12 +205,17 @@ export async function boot(): Promise<void> {
   worldView = meadow;
   entityViews = views;
   const lightning = new LightningEffects(meadow.scene);
+  const skyStrikes = new SkyStrikeEffects(meadow.scene, lightning);
+  /** When the player last turned the camera themselves (mouse or , .); auto-follow waits after it. */
+  let lastCameraInputAt = -Infinity;
   view.onResize((width, height) => {
     meadow.resize(width, height);
     dirty = true;
   });
 
   const hud = createHud(document.body);
+  /** Auto-follow waits this long after the player last turned the camera. */
+  const AUTO_FOLLOW_DELAY_MS = 600;
 
   const applySettings = () => {
     const current = settings.get();
@@ -228,16 +234,22 @@ export async function boot(): Promise<void> {
     views.handleEvent(event, frame);
     if (event.type === 'ability:cast' && event.points.length > 1) {
       const points = event.points.map((p) => ({ ...p }));
-      const tip = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
-      if (tip) points[0] = { x: tip.x, y: tip.y, z: tip.z };
+      // Chain Lightning leaves from the spear tip; the Lightning Fist's arc starts at its target.
+      if (event.abilityId === 'chain-lightning') {
+        const tip = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
+        if (tip) points[0] = { x: tip.x, y: tip.y, z: tip.z };
+      }
       lightning.spawn(points, event.tick, settings.get().reduceMotion);
     }
+    if (event.type === 'ability:telegraph') skyStrikes.telegraph(event.point, event.radius, event.ticks / 30);
+    if (event.type === 'ability:strike') skyStrikes.strike(event.point, event.radius, event.tick, settings.get().reduceMotion);
   });
   activeSession.onReset(() => {
     interpolator.clear();
     loop.reset();
     views.clear();
     lightning.clear();
+    skyStrikes.clear();
     cameraRig.reset();
     const hero = localHero();
     if (hero) cameraRig.faceHeading(hero.rotationY);
@@ -270,6 +282,7 @@ export async function boot(): Promise<void> {
   const inputMap = new InputMap();
   const gameplayInput = () => shell.screen === 'playing' && !settingsMenu?.isOpen && !devMenu?.isOpen;
   input = new InputController(inputMap, view.canvas, gameplayInput);
+  hud.setBindings(inputMap);
   if (devMenuEnabled()) {
     devMenu = createDevMenu(document.body, activeSession, settings, loop, newGame);
   }
@@ -309,6 +322,7 @@ export async function boot(): Promise<void> {
     if (document.pointerLockElement === view.canvas || dragging) {
       const current = settings.get();
       cameraRig.look(event.movementX, event.movementY, current.mouseSensitivity, current.invertY);
+      if (event.movementX !== 0 || event.movementY !== 0) lastCameraInputAt = performance.now();
     }
   });
   view.canvas.addEventListener('wheel', (event) => {
@@ -381,9 +395,19 @@ export async function boot(): Promise<void> {
       frame = { time: viewSeconds, dt, world, reduceMotion: settings.get().reduceMotion };
       views.sync(world, interpolator, alpha, frame);
       lightning.update(dt);
+      skyStrikes.update(dt);
 
       const hero = localHero();
       if (cameraMode === 'follow' && hero) {
+        // Keyboard camera (, and .) and auto-follow, so the game plays without a mouse.
+        const turn = (input?.isHeld('cameraRight') ? 1 : 0) - (input?.isHeld('cameraLeft') ? 1 : 0);
+        if (turn !== 0) {
+          cameraRig.turn(turn * CAMERA_TURN_SPEED * dt);
+          lastCameraInputAt = performance.now();
+        } else if (settings.get().cameraAutoFollow && hero.hero?.moving && !hero.hero.lockTarget
+          && performance.now() - lastCameraInputAt > AUTO_FOLLOW_DELAY_MS) {
+          cameraRig.follow(hero.rotationY, dt);
+        }
         interpolator.position(world, hero.id, alpha, heroPoint);
         const lock = hero.hero?.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
         cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null);

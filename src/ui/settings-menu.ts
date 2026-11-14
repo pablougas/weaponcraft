@@ -69,6 +69,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
           <span class="wc-range"><input type="range" min="0.2" max="3" step="0.1" data-setting="mouseSensitivity"><output data-output="mouseSensitivity"></output></span>
         </label>
         <label class="wc-check"><input type="checkbox" data-setting="invertY"> Invert mouse Y</label>
+        <label class="wc-check"><input type="checkbox" data-setting="cameraAutoFollow"> Camera auto-follow (steer with the arrow keys)</label>
       </section>
       <section>
         <h3>Accessibility</h3>
@@ -78,7 +79,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
         <button type="button" class="wc-primary" data-action="resume">Resume</button>
         <button type="button" data-action="new-game">New game</button>
       </div>
-      <p class="wc-hint">Move WASD · Sprint Shift · Jump Space (hold to hover) · Dodge Alt · Attack left/right mouse · Chain Lightning Q · Lock on Tab. Settings are saved in this browser.</p>
+      <p class="wc-hint">Move ↑ ↓ ← → · Sprint Shift · Jump Space (hold to hover) · Roll X · Punch A · Weapon S (hold for heavy) · Lightning Fist D (hold, release) · Chain Lightning Q (hold to keep firing) · Sky Strike R · Lock on Tab · Turn camera , . or mouse. Settings are saved in this browser.</p>
     </div>`;
   parent.append(element);
 
@@ -88,6 +89,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
   const sensitivity = element.querySelector<HTMLInputElement>('[data-setting="mouseSensitivity"]')!;
   const sensitivityOutput = element.querySelector<HTMLOutputElement>('[data-output="mouseSensitivity"]')!;
   const invertY = element.querySelector<HTMLInputElement>('[data-setting="invertY"]')!;
+  const autoFollow = element.querySelector<HTMLInputElement>('[data-setting="cameraAutoFollow"]')!;
   const effectBoxes = [...element.querySelectorAll<HTMLInputElement>('[data-effect]')];
   const newGameButton = element.querySelector<HTMLButtonElement>('[data-action="new-game"]')!;
   const autoOption = quality.querySelector<HTMLOptionElement>('option[value="auto"]')!;
@@ -99,6 +101,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
     sensitivity.value = String(settings.mouseSensitivity);
     sensitivityOutput.textContent = `${settings.mouseSensitivity.toFixed(1)}×`;
     invertY.checked = settings.invertY;
+    autoFollow.checked = settings.cameraAutoFollow;
     for (const box of effectBoxes) box.checked = settings.effects[box.dataset.effect as keyof EffectSettings];
   });
 
@@ -107,6 +110,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
   reduceMotion.addEventListener('change', () => store.update((s) => { s.reduceMotion = reduceMotion.checked; }));
   sensitivity.addEventListener('input', () => store.update((s) => { s.mouseSensitivity = Number(sensitivity.value); }));
   invertY.addEventListener('change', () => store.update((s) => { s.invertY = invertY.checked; }));
+  autoFollow.addEventListener('change', () => store.update((s) => { s.cameraAutoFollow = autoFollow.checked; }));
   for (const box of effectBoxes) {
     box.addEventListener('change', () => store.update((s) => { s.effects[box.dataset.effect as keyof EffectSettings] = box.checked; }));
   }

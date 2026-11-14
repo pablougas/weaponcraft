@@ -5,9 +5,10 @@ import { mouseCode, type InputAction, type InputMap } from './input-map';
 const PRESS_ACTIONS: Partial<Record<InputAction, PlayerAction>> = {
   jump: 'jump',
   dodge: 'dodge',
-  lightAttack: 'lightAttack',
+  punch: 'punch',
   heavyAttack: 'heavyAttack',
   godAbility: 'godAbility',
+  ultimate: 'ultimate',
   lockOn: 'lockOn',
 };
 
@@ -36,7 +37,7 @@ export class InputController {
     });
     window.addEventListener('keyup', (event) => {
       this.held.delete(event.code);
-      // Firefox shows its menu bar on a lone Alt release; Alt is our dodge.
+      // Firefox shows its menu bar on a lone Alt release; Alt is a dodge key.
       if (this.enabled() && event.code.startsWith('Alt')) event.preventDefault();
     });
     canvas.addEventListener('mousedown', (event) => {
@@ -56,13 +57,19 @@ export class InputController {
     }
   }
 
-  private isHeld(action: InputAction): boolean {
+  /** Is a held action's key down right now? (Also used by the view for camera keys.) */
+  isHeld(action: InputAction): boolean {
+    if (!this.enabled()) return false;
+    return this.isHeldRaw(action);
+  }
+
+  private isHeldRaw(action: InputAction): boolean {
     return this.map.codesFor(action).some((code) => this.held.has(code));
   }
 
   /**
-   * Intents for the next tick. `cameraYaw` turns W into "away from the
-   * camera". Held input is resent only when it changes.
+   * Intents for the next tick. `cameraYaw` turns ↑ into "away from the
+   * camera" and is sent as the aim. Held input is resent only when it changes.
    */
   takeIntents(cameraYaw: number): IntentInput[] {
     const intents: IntentInput[] = [];
@@ -71,8 +78,9 @@ export class InputController {
       this.held.clear();
       this.pressed.length = 0;
     }
-    const forward = (on && this.isHeld('moveForward') ? 1 : 0) - (on && this.isHeld('moveBack') ? 1 : 0);
-    const right = (on && this.isHeld('moveRight') ? 1 : 0) - (on && this.isHeld('moveLeft') ? 1 : 0);
+    const held = (action: InputAction) => on && this.isHeldRaw(action);
+    const forward = (held('moveForward') ? 1 : 0) - (held('moveBack') ? 1 : 0);
+    const right = (held('moveRight') ? 1 : 0) - (held('moveLeft') ? 1 : 0);
     let x = Math.sin(cameraYaw) * forward - Math.cos(cameraYaw) * right;
     let z = Math.cos(cameraYaw) * forward + Math.sin(cameraYaw) * right;
     const length = Math.hypot(x, z);
@@ -84,8 +92,12 @@ export class InputController {
       type: 'player:move' as const,
       x: Math.round(x * 1000) / 1000,
       z: Math.round(z * 1000) / 1000,
-      sprint: on && this.isHeld('sprint'),
-      jumpHeld: on && this.isHeld('jump'),
+      sprint: held('sprint'),
+      jumpHeld: held('jump'),
+      abilityHeld: held('godAbility'),
+      chargeHeld: held('chargedMove'),
+      weaponHeld: held('weaponStrike'),
+      aimYaw: Math.round(Math.atan2(Math.sin(cameraYaw), Math.cos(cameraYaw)) * 100) / 100,
     };
     const key = JSON.stringify(move);
     if (key !== this.lastMoveSent) {

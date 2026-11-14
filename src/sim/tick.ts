@@ -38,7 +38,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     input.physics.step();
   }
   updateHeroes(ctx, input.physics);
-  if (input.isAuthority) updateCreatures(ctx);
+  if (input.isAuthority) updateCreatures(ctx, input.physics);
 
   return events;
 }

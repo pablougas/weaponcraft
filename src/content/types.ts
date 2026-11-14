@@ -1,4 +1,4 @@
-import type { AbilityModule } from '../sim/abilities';
+import type { AbilityModule, ChargedMove, UltimateModule } from '../sim/abilities';
 import type { Element } from '../sim/types';
 import type { ModelFactory } from '../view/entity-model';
 
@@ -39,6 +39,10 @@ export interface GodDef extends ContentDef {
   body: BodySize;
   /** God ability on Q. */
   ability: AbilityModule;
+  /** Hold-to-charge move on D (Lightning Fist), if this god has one. */
+  chargedMove?: ChargedMove;
+  /** Called-down ultimate on R (Sky Strike), if this god has one. */
+  ultimate?: UltimateModule;
   starterWeaponId: string;
   model: ModelLoader;
 }

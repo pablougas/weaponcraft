@@ -18,6 +18,16 @@ export interface EventMap {
   /** An ability went off. `points` runs from the caster through each target, for drawing. */
   'ability:cast': { casterId: EntityId; abilityId: string; targetIds: EntityId[]; points: Vec3[] };
   'ability:fizzled': { casterId: EntityId; abilityId: string; reason: string };
+  /** A ground marker before an ability lands (Sky Strike): where, how wide, and how long until it hits. */
+  'ability:telegraph': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; ticks: number };
+  /** A big area strike landed (Sky Strike). */
+  'ability:strike': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; targetIds: EntityId[] };
+  /** Charging a charged move started (Lightning Fist). */
+  'hero:charge': { entityId: EntityId; abilityId: string };
+  /** Ran out of stamina while holding an ability: regen pauses longer. */
+  'hero:exhausted': { entityId: EntityId };
+  /** The hero was put back on safe ground (stuck or fell out of the world). */
+  'hero:recovered': { entityId: EntityId; reason: string };
 }
 
 export type EventType = keyof EventMap;

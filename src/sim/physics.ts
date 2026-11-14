@@ -1,6 +1,6 @@
 import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
-import { heroRockHullPoints, MEADOW_ROCKS } from './terrain/meadow-rocks';
+import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import type { EntityId, Vec3, WorldState } from './types';
 
 export type Rapier = typeof RAPIER_NS;
@@ -66,8 +66,7 @@ export class PhysicsWorld {
     const hull = this.R.ColliderDesc.convexHull(heroRockHullPoints());
     if (hull) this.world.createCollider(hull);
     for (const rock of MEADOW_ROCKS) {
-      // Boulders as squashed balls: close enough for bumping into.
-      const radius = Math.min(rock.scale.x, rock.scale.z) * 0.9;
+      const radius = rockColliderRadius(rock);
       const desc = this.R.ColliderDesc.ball(radius).setTranslation(rock.position.x, rock.position.y, rock.position.z);
       this.world.createCollider(desc);
     }
