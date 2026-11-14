@@ -20,7 +20,7 @@ export function createWorld(seed: number, nowMs: number, playerIds: readonly Pla
     nextEntityId: 1,
     entities: {},
     players,
-    flags: { prologueDone: false, olympusShattered: false },
+    flags: { prologueDone: false, olympusShattered: false, meadowPopulated: false },
     cutscene: null,
     rngStreams: {},
   };

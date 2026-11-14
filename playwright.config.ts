@@ -12,7 +12,9 @@ export function makeConfig(baseURL: string, webServer: PlaywrightTestConfig['web
     timeout: 60_000,
     expect: {
       timeout: 15_000,
-      toHaveScreenshot: { maxDiffPixelRatio: 0.02 },
+      // threshold: per-pixel colour tolerance (Playwright's default 0.2 let a whole
+      // new character on screen pass). SwiftShader renders deterministically.
+      toHaveScreenshot: { maxDiffPixelRatio: 0.02, threshold: 0.1 },
     },
     snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
     fullyParallel: true,

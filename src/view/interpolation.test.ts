@@ -29,4 +29,15 @@ describe('Interpolator', () => {
   it('lerpVec3', () => {
     expect(lerpVec3({ x: 0, y: 2, z: -2 }, { x: 2, y: 4, z: 2 }, 0.5)).toEqual({ x: 1, y: 3, z: 0 });
   });
+
+  it('turns the short way round', () => {
+    const world = createWorld(1, 0);
+    const { ctx } = createSimContext(world, true);
+    const id = spawn(ctx, 'sheep', { rotationY: 3.0 });
+    const interpolator = new Interpolator();
+    interpolator.capture(world);
+    world.entities[id].rotationY = -3.0; // 0.28 rad the other way across ±π
+    const mid = interpolator.rotation(world, id, 0.5)!;
+    expect(Math.abs(Math.atan2(Math.sin(mid), Math.cos(mid)))).toBeGreaterThan(3.1);
+  });
 });

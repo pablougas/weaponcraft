@@ -1,11 +1,12 @@
 import type { GameEvent } from './events';
 import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
+import type { PhysicsWorld } from './physics';
+import { applyHeroIntent, updateHeroes } from './systems/hero';
+import { updateCreatures } from './systems/wildlife';
 import type { WorldState } from './types';
 import { createSimContext, despawn, spawn, type SimContext } from './world';
 
-/** The sim runs at a fixed 30 Hz (CLAUDE.md rule 7). */
-export const TICK_HZ = 30;
-export const TICK_MS = 1000 / TICK_HZ;
+export { TICK_HZ, TICK_MS } from './constants';
 
 export interface TickInput {
   /** Wall-clock time for this tick, stamped by the engine (synced in co-op later). */
@@ -13,6 +14,8 @@ export interface TickInput {
   /** Intents received since the last tick, in arrival order. */
   intents: readonly Intent[];
   isAuthority: boolean;
+  /** Rapier collision. Without it (unit tests) characters walk on the terrain height. */
+  physics?: PhysicsWorld;
 }
 
 /**
@@ -29,7 +32,13 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     applyIntent(ctx, intent);
   }
 
-  // Systems (movement, combat, AI, cutscenes...) run here from M3 on.
+  // Rapier steps with the sim: sync bodies from state, then update queries.
+  if (input.physics) {
+    input.physics.syncFrom(world);
+    input.physics.step();
+  }
+  updateHeroes(ctx, input.physics);
+  if (input.isAuthority) updateCreatures(ctx);
 
   return events;
 }
@@ -61,6 +70,13 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       if (!ctx.isAuthority) return;
       if (!despawn(ctx, intent.entityId)) reject('no such entity');
       return;
+    case 'player:move':
+    case 'player:action': {
+      const reason = applyHeroIntent(ctx, intent);
+      // Held-input updates are sent every tick; only report rejected button presses.
+      if (reason && intent.type === 'player:action') reject(reason);
+      return;
+    }
     default: {
       const unknown: never = intent;
       reject(`unknown intent ${(unknown as { type: string }).type}`);

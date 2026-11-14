@@ -8,14 +8,18 @@ import type { EntityId, Vec3, WorldState } from '../sim';
  */
 export class Interpolator {
   private previous = new Map<EntityId, Vec3>();
+  private previousRotation = new Map<EntityId, number>();
 
   /** Call right before each sim tick to remember where entities were. */
   capture(world: WorldState): void {
     const next = new Map<EntityId, Vec3>();
+    const nextRotation = new Map<EntityId, number>();
     for (const entity of Object.values(world.entities)) {
       next.set(entity.id, { ...entity.position });
+      nextRotation.set(entity.id, entity.rotationY);
     }
     this.previous = next;
+    this.previousRotation = nextRotation;
   }
 
   /** Writes the interpolated position of `id` into `out` (or the current one if it just spawned). */
@@ -25,8 +29,18 @@ export class Interpolator {
     return lerpVec3(this.previous.get(id) ?? current, current, alpha, out);
   }
 
+  /** Interpolated heading of `id`, turning the short way round. */
+  rotation(world: WorldState, id: EntityId, alpha: number): number | undefined {
+    const current = world.entities[id]?.rotationY;
+    if (current === undefined) return undefined;
+    const previous = this.previousRotation.get(id) ?? current;
+    const delta = Math.atan2(Math.sin(current - previous), Math.cos(current - previous));
+    return previous + delta * alpha;
+  }
+
   clear(): void {
     this.previous.clear();
+    this.previousRotation.clear();
   }
 }
 

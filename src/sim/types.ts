@@ -31,6 +31,72 @@ export interface Entity {
   ownerId: PlayerId | null;
   /** Per-entity state owned by the systems that use it. */
   data: Record<string, JsonValue>;
+  /** Collision/hit size: capsule radius and total height in metres. */
+  body?: { radius: number; height: number };
+  /** Hit points, for anything that can be hit. */
+  health?: Meter;
+  /** Stamina (sprint, dodge, hover, attacks). */
+  stamina?: Meter;
+  /** Player-controlled god. */
+  hero?: HeroState;
+  /** Practice dummies and wildlife. */
+  creature?: CreatureState;
+}
+
+export interface Meter {
+  current: number;
+  max: number;
+}
+
+export type AttackKind = 'light' | 'heavy';
+
+/** The four elements of the counter wheel (SPEC §7). */
+export type Element = 'light' | 'shadow' | 'poison' | 'lightning';
+
+export interface HeroState {
+  /** Latest held input: world-space move direction (length ≤ 1), sprint and jump buttons. */
+  move: { x: number; z: number };
+  sprint: boolean;
+  jumpHeld: boolean;
+  /** Vertical speed in m/s (gravity is applied by the sim). */
+  vy: number;
+  grounded: boolean;
+  /** Ticks of hover still available in this jump. */
+  hoverLeft: number;
+  /** Active dodge roll, if any. */
+  dodge: { ticksLeft: number; dir: { x: number; z: number } } | null;
+  /** Ticks of invulnerability left. */
+  iframes: number;
+  /** Active attack: which, and how many ticks since it started. */
+  attack: { kind: AttackKind; tick: number; hit: boolean } | null;
+  /** Ticks until each ability can be used again, by ability ID. */
+  cooldowns: Record<string, number>;
+  /** Locked-on target (Tab), if any. */
+  lockTarget: EntityId | null;
+  /** Equipped weapon definition ID. */
+  weaponId: string;
+  /** Ticks before stamina starts regenerating again. */
+  staminaDelay: number;
+  /** Ticks left of the "just got hurt" reaction. */
+  hurtTicks: number;
+  /** Derived each tick, for the view: moving faster than a stroll, and sprinting. */
+  moving: boolean;
+  sprinting: boolean;
+}
+
+export interface CreatureState {
+  /** Wildlife wanders and flees; practice dummies stay put. */
+  wanders: boolean;
+  /** Where it was placed; dummies stay here, wildlife wanders around it. */
+  home: Vec3;
+  /** Wander destination, if walking somewhere. */
+  target: Vec3 | null;
+  /** Ticks to wait before choosing a new destination. */
+  wait: number;
+  /** Ticks left of running away after being hit. */
+  flee: number;
+  /** Ticks since it was last hit (dummies heal after a while). */
+  sinceHit: number;
 }
 
 export interface PlayerState {
@@ -44,6 +110,8 @@ export interface PlayerState {
 export interface WorldFlags {
   prologueDone: boolean;
   olympusShattered: boolean;
+  /** The meadow's god, dummies and wildlife have been spawned (false/missing in older saves). */
+  meadowPopulated: boolean;
   [flag: string]: boolean;
 }
 

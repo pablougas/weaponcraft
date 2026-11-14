@@ -1,5 +1,6 @@
 import type { PlayerId, WorldState, WorldTime } from '../sim';
 import type { CameraPresetId } from '../view/cameras';
+import type { Expression } from '../view/entity-model';
 import type { QualityPreset, Settings } from './settings';
 import { hashFlags } from './url-flags';
 
@@ -27,7 +28,7 @@ export interface TestState extends ShellState {
 /**
  * Deterministic test API for Playwright (see CLAUDE.md). Mutators resolve
  * after the next rendered frame, so a screenshot taken afterwards shows the
- * change. `face` and `completeTutorialStep` arrive with M3 and M5.
+ * change. `completeTutorialStep` arrives with M5.
  */
 export interface TestApi {
   /** Resolves once the scene is built and a frame has been rendered. */
@@ -44,6 +45,8 @@ export interface TestApi {
   snapCam(presetId: CameraPresetId): Promise<void>;
   /** Starts a new game with this world seed. */
   setSeed(seed: number): Promise<void>;
+  /** Forces the local god's face ('neutral' | 'determined' | 'happy' | 'hurt'); null for automatic. */
+  face(expression: Expression | null): Promise<void>;
 }
 
 declare global {

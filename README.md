@@ -65,9 +65,28 @@ click unlocks audio and captures the mouse (pointer lock). Behind the title is
 the meadow at the foot of Mount Olympus, lit by the real-time world clock (one
 game day every 4 real hours; frozen at golden hour during the prologue).
 
+**Controls** (rebindable in code; a remapping screen comes later):
+
+| Action | Key |
+| --- | --- |
+| Move | **W A S D** (relative to the camera) |
+| Look | Mouse (or drag if the mouse can't be captured) · scroll to zoom |
+| Sprint | **Shift** (uses stamina) |
+| Jump / hover | **Space**; hold it while falling to hover |
+| Dodge roll | **Alt** (brief invulnerability, uses stamina) |
+| Light / heavy attack | Left / right mouse button |
+| Chain Lightning | **Q** |
+| Lock on | **Tab** |
+| Settings | **Esc** |
+
+Zeus starts on the rock. Behind it (south) are three practice dummies and a
+small flock of sheep to try attacks on. Dummies reset a few seconds after you
+stop hitting them.
+
 Press **Esc** to open **Settings**: quality (Auto / Low / Medium / High), time
 of day (Live / Always golden hour / Always night), toggles for bloom, god rays,
-outlines, color grade and particles, **Reduce motion & flashes**, and New game.
+outlines, color grade and particles, mouse sensitivity, invert Y, **Reduce
+motion & flashes**, and New game.
 Settings are saved in your browser. Click **Resume** or the game to recapture
 the mouse.
 
@@ -94,8 +113,8 @@ in a production build, add `#dev` to the URL.
 Add `#test` to the URL (for example `http://localhost:4173/#test`) to expose
 the `window.wc` test API in a production build; development builds always
 expose it. It offers `ready()`, `getState()`, `step(ticks)`, `freeze(seconds)`,
-`setTime(dayFraction)`, `snapCam('vista' | 'hero' | 'wide')` and
-`setSeed(n)`. Combine flags with `&`, e.g. `#test&dev`.
+`setTime(dayFraction)`, `snapCam('vista' | 'hero' | 'wide' | 'yard')`,
+`setSeed(n)` and `face('neutral' | 'determined' | 'happy' | 'hurt')`. Combine flags with `&`, e.g. `#test&dev`.
 
 ## Commands
 

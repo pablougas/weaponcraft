@@ -1,7 +1,7 @@
-import type { ContentDef } from '../types';
+import type { GodDef } from '../types';
+import { zeus } from './zeus';
 
-/** Filled in by M3 (Zeus). */
-export type GodDef = ContentDef;
+export type { GodDef } from '../types';
 
-// Registry: add a file in this folder and one line here. Never edit the engine.
-export const gods: readonly GodDef[] = [];
+// Registry: add a folder here and one line below. Never edit the engine.
+export const gods: readonly GodDef[] = [zeus];

@@ -14,6 +14,8 @@ describe('settings', () => {
       effects: { bloom: true, godRays: true, outlines: true, colorGrade: true, particles: true },
       reduceMotion: false,
       timeOfDay: 'live',
+      mouseSensitivity: 1,
+      invertY: false,
     });
     expect(defaultSettings(true).reduceMotion).toBe(true);
   });
@@ -34,6 +36,10 @@ describe('settings', () => {
     expect(seen).toEqual([true, false]);
     expect(SETTINGS_KEY.startsWith('weaponcraft:')).toBe(true);
     expect(new SettingsStore(storage).get()).toMatchObject({ timeOfDay: 'golden', effects: { bloom: false } });
+  });
+
+  it('clamps mouse sensitivity', () => {
+    expect(parseSettings(JSON.stringify({ mouseSensitivity: 99, invertY: true }), defaultSettings())).toMatchObject({ mouseSensitivity: 3, invertY: true });
   });
 
   it('get() returns a copy', () => {

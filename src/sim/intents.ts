@@ -3,11 +3,16 @@ import type { PlayerId, Vec3 } from './types';
 /**
  * Input never changes state directly. It produces intents tagged with the
  * player who sent them; only the sim applies them (CLAUDE.md rule 2).
- * Gameplay intents (move, attack, cast...) arrive with M3.
  */
 export type Intent =
   | { type: 'dev:spawn'; playerId: PlayerId; defId: string; position?: Vec3 }
-  | { type: 'dev:despawn'; playerId: PlayerId; entityId: string };
+  | { type: 'dev:despawn'; playerId: PlayerId; entityId: string }
+  /** Held input, sent every tick: world-space move direction (length ≤ 1) and held buttons. */
+  | { type: 'player:move'; playerId: PlayerId; x: number; z: number; sprint: boolean; jumpHeld: boolean }
+  /** A button press. */
+  | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
+
+export type PlayerAction = 'jump' | 'dodge' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'lockOn';
 
 export type IntentType = Intent['type'];
 

@@ -22,7 +22,10 @@ test.describe('sim core (M1)', () => {
     expect(s.time).toMatchObject({ source: 'prologue', phase: 'golden', hours: 16, minutes: 48 });
     expect(s.world!.flags).toMatchObject({ prologueDone: false, olympusShattered: false });
     expect(Object.keys(s.world!.players)).toEqual([s.localPlayerId]);
-    expect(s.world!.entities).toEqual({});
+    // The meadow's cast: the local god on the rock, three dummies and five sheep.
+    const defIds = Object.values(s.world!.entities).map((e) => e.defId).sort();
+    expect(defIds).toEqual(['practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'zeus']);
+    expect(s.world!.players[s.localPlayerId!].entityId).toBe(Object.values(s.world!.entities).find((e) => e.defId === 'zeus')!.id);
   });
 
   test('backtick opens the dev menu with live readouts', async ({ page }) => {
@@ -35,12 +38,13 @@ test.describe('sim core (M1)', () => {
     await expect(menu).toBeVisible();
     await expect(menu.locator('[data-field="rate"]')).toHaveText(/^\d+ Hz$/);
     await expect(menu.locator('[data-field="time"]')).toHaveText('16:48 · golden (prologue)');
-    await expect(menu.locator('[data-field="entities"]')).toHaveText('0');
+    const before = Number(await menu.locator('[data-field="entities"]').textContent());
+    expect(before).toBeGreaterThanOrEqual(9);
 
     await menu.getByRole('button', { name: 'Spawn marker' }).click();
-    await expect(menu.locator('[data-field="entities"]')).toHaveText('1');
+    await expect(menu.locator('[data-field="entities"]')).toHaveText(String(before + 1));
     const world = (await state(page)).world!;
-    expect(world.entities.e1).toMatchObject({ id: 'e1', defId: 'dev:marker' });
+    expect(Object.values(world.entities).filter((e) => e.defId === 'dev:marker')).toHaveLength(1);
 
     await page.keyboard.press('Backquote');
     await expect(menu).toBeHidden();
@@ -51,24 +55,26 @@ test.describe('sim core (M1)', () => {
     await page.locator('#wc-title').click();
     await page.keyboard.press('Backquote');
     await page.getByRole('button', { name: 'Spawn marker' }).click();
-    await expect(page.locator('[data-field="entities"]')).toHaveText('1');
+    await expect.poll(async () => Object.values((await state(page)).world!.entities).some((e) => e.defId === 'dev:marker')).toBe(true);
     const before = (await state(page)).world!;
+    const marker = Object.values(before.entities).find((e) => e.defId === 'dev:marker')!;
 
     await page.reload(); // the page saves on pagehide
     await page.waitForFunction(() => window.wc !== undefined);
     await page.evaluate(() => window.wc!.ready());
     const after = (await state(page)).world!;
     expect(after.seed).toBe(before.seed);
-    expect(after.entities).toEqual(before.entities);
+    expect(after.entities[marker.id]).toEqual(marker);
+    expect(Object.keys(after.entities)).toEqual(expect.arrayContaining(Object.keys(before.entities).filter((id) => before.entities[id].defId !== 'sheep')));
     expect(after.tick).toBeGreaterThanOrEqual(before.tick);
 
     await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
     await page.getByRole('button', { name: 'New game' }).click();
     await expect(page.locator('#wc-title')).toHaveCount(0);
     const fresh = (await state(page)).world!;
-    expect(fresh.entities).toEqual({});
+    expect(Object.values(fresh.entities).some((e) => e.defId === 'dev:marker')).toBe(false);
     expect(fresh.flags.prologueDone).toBe(false);
-    expect(fresh.nextEntityId).toBe(1);
+    expect(fresh.seed).not.toBe(before.seed);
     expect(await page.evaluate(() => Object.keys(localStorage).every((key) => key.startsWith('weaponcraft:')))).toBe(true);
   });
 });

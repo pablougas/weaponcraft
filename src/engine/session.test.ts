@@ -55,7 +55,7 @@ describe('Session', () => {
     session.sendIntent({ type: 'dev:spawn', defId: 'marker' });
     expect(spawned).toEqual([]);
     session.step();
-    expect(spawned).toEqual(['e1']);
+    expect(spawned).toEqual([`e${session.world.nextEntityId - 1}`]);
     expect(session.world).toMatchObject({ tick: 1, nowMs: 50 });
   });
 
@@ -106,7 +106,11 @@ describe('Session', () => {
     second.session.newGame(33);
     expect(resetSeed).toBe(33);
     second.session.step();
-    expect(second.session.world).toMatchObject({ seed: 33, tick: 1, entities: {}, flags: { prologueDone: false } });
+    expect(second.session.world).toMatchObject({ seed: 33, tick: 1, flags: { prologueDone: false, meadowPopulated: true } });
+    // A fresh meadow: the god, three dummies, five sheep; the stale spawn intent was dropped.
+    expect(Object.values(second.session.world.entities).map((e) => e.defId).sort()).toEqual(
+      ['practice-dummy', 'practice-dummy', 'practice-dummy', 'sheep', 'sheep', 'sheep', 'sheep', 'sheep', 'zeus'],
+    );
     expect(openSession(storage, () => 44, () => 0).session.world.seed).toBe(33);
   });
 

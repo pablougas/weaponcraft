@@ -1,7 +1,7 @@
-import type { ContentDef } from '../types';
+import type { WeaponDef } from '../types';
+import { starterSpear } from './starter-spear';
 
-/** Filled in by M4 (weapons and fusion). */
-export type WeaponDef = ContentDef;
+export type { WeaponDef } from '../types';
 
-// Registry: add a file in this folder and one line here. Never edit the engine.
-export const weapons: readonly WeaponDef[] = [];
+// Registry: add a file here and one line below. Never edit the engine.
+export const weapons: readonly WeaponDef[] = [starterSpear];

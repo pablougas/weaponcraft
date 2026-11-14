@@ -25,6 +25,9 @@ export interface Settings {
   /** No camera shake, softened flashes, calmer particles and wind. */
   reduceMotion: boolean;
   timeOfDay: TimeOfDayLock;
+  /** Mouse look speed multiplier (0.2–3). */
+  mouseSensitivity: number;
+  invertY: boolean;
 }
 
 export interface QualityParams {
@@ -50,6 +53,8 @@ export function defaultSettings(prefersReducedMotion = false): Settings {
     effects: { bloom: true, godRays: true, outlines: true, colorGrade: true, particles: true },
     reduceMotion: prefersReducedMotion,
     timeOfDay: 'live',
+    mouseSensitivity: 1,
+    invertY: false,
   };
 }
 
@@ -67,6 +72,10 @@ export function parseSettings(text: string | null, defaults: Settings): Settings
   const value = raw as Record<string, unknown>;
   if (QUALITY_SETTINGS.includes(value.quality as QualitySetting)) settings.quality = value.quality as QualitySetting;
   if (typeof value.reduceMotion === 'boolean') settings.reduceMotion = value.reduceMotion;
+  if (typeof value.invertY === 'boolean') settings.invertY = value.invertY;
+  if (typeof value.mouseSensitivity === 'number' && Number.isFinite(value.mouseSensitivity)) {
+    settings.mouseSensitivity = Math.min(3, Math.max(0.2, value.mouseSensitivity));
+  }
   if (TIME_OF_DAY_LOCKS.includes(value.timeOfDay as TimeOfDayLock)) settings.timeOfDay = value.timeOfDay as TimeOfDayLock;
   if (typeof value.effects === 'object' && value.effects !== null) {
     const effects = value.effects as Record<string, unknown>;

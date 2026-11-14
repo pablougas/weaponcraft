@@ -64,6 +64,13 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
         </div>
       </section>
       <section>
+        <h3>Controls</h3>
+        <label class="wc-row">Mouse sensitivity
+          <span class="wc-range"><input type="range" min="0.2" max="3" step="0.1" data-setting="mouseSensitivity"><output data-output="mouseSensitivity"></output></span>
+        </label>
+        <label class="wc-check"><input type="checkbox" data-setting="invertY"> Invert mouse Y</label>
+      </section>
+      <section>
         <h3>Accessibility</h3>
         <label class="wc-check"><input type="checkbox" data-setting="reduceMotion"> Reduce motion &amp; flashes</label>
       </section>
@@ -71,13 +78,16 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
         <button type="button" class="wc-primary" data-action="resume">Resume</button>
         <button type="button" data-action="new-game">New game</button>
       </div>
-      <p class="wc-hint">Esc opens this menu. Settings are saved in this browser.</p>
+      <p class="wc-hint">Move WASD · Sprint Shift · Jump Space (hold to hover) · Dodge Alt · Attack left/right mouse · Chain Lightning Q · Lock on Tab. Settings are saved in this browser.</p>
     </div>`;
   parent.append(element);
 
   const quality = element.querySelector<HTMLSelectElement>('[data-setting="quality"]')!;
   const timeOfDay = element.querySelector<HTMLSelectElement>('[data-setting="timeOfDay"]')!;
   const reduceMotion = element.querySelector<HTMLInputElement>('[data-setting="reduceMotion"]')!;
+  const sensitivity = element.querySelector<HTMLInputElement>('[data-setting="mouseSensitivity"]')!;
+  const sensitivityOutput = element.querySelector<HTMLOutputElement>('[data-output="mouseSensitivity"]')!;
+  const invertY = element.querySelector<HTMLInputElement>('[data-setting="invertY"]')!;
   const effectBoxes = [...element.querySelectorAll<HTMLInputElement>('[data-effect]')];
   const newGameButton = element.querySelector<HTMLButtonElement>('[data-action="new-game"]')!;
   const autoOption = quality.querySelector<HTMLOptionElement>('option[value="auto"]')!;
@@ -86,12 +96,17 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
     quality.value = settings.quality;
     timeOfDay.value = settings.timeOfDay;
     reduceMotion.checked = settings.reduceMotion;
+    sensitivity.value = String(settings.mouseSensitivity);
+    sensitivityOutput.textContent = `${settings.mouseSensitivity.toFixed(1)}×`;
+    invertY.checked = settings.invertY;
     for (const box of effectBoxes) box.checked = settings.effects[box.dataset.effect as keyof EffectSettings];
   });
 
   quality.addEventListener('change', () => store.update((s) => { s.quality = quality.value as QualitySetting; }));
   timeOfDay.addEventListener('change', () => store.update((s) => { s.timeOfDay = timeOfDay.value as TimeOfDayLock; }));
   reduceMotion.addEventListener('change', () => store.update((s) => { s.reduceMotion = reduceMotion.checked; }));
+  sensitivity.addEventListener('input', () => store.update((s) => { s.mouseSensitivity = Number(sensitivity.value); }));
+  invertY.addEventListener('change', () => store.update((s) => { s.invertY = invertY.checked; }));
   for (const box of effectBoxes) {
     box.addEventListener('change', () => store.update((s) => { s.effects[box.dataset.effect as keyof EffectSettings] = box.checked; }));
   }

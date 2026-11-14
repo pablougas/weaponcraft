@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { EffectSettings, QualityParams } from '../engine/settings';
 import { rng } from '../sim/rng';
+import { MEADOW_LAYOUT_STATE_AFTER_ROCKS } from '../sim/terrain/meadow-rocks';
 import { smoothstep } from '../sim/terrain/noise';
 import { CAMERA_PRESETS, type CameraPresetId } from './cameras';
-import { createLook } from './look';
+import { createLook, type Look } from './look';
 import { buildBirds } from './meadow/birds';
 import { buildFlowers, buildGrass } from './meadow/foliage';
 import { buildOlympus } from './meadow/olympus';
@@ -20,6 +21,7 @@ import { lerp, lightingSegment } from './time-of-day';
  */
 export interface WorldView {
   readonly scene: THREE.Scene;
+  readonly look: Look;
   readonly camera: THREE.PerspectiveCamera;
   /** Advance animation to `timeSeconds` and light the scene for `dayFraction`. */
   update(timeSeconds: number, dayFraction: number): void;
@@ -30,9 +32,6 @@ export interface WorldView {
   setReduceMotion(reduce: boolean): void;
   setQuality(params: QualityParams): void;
 }
-
-/** Seed of the style test's RNG; the meadow layout is hand-tuned, not world-seeded. */
-const MEADOW_LAYOUT_SEED = 1337;
 
 export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -46,7 +45,8 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const { U } = look;
 
   // Same generator and starting state as the style test, so placements match.
-  const layout = rng(0, 'meadow', MEADOW_LAYOUT_SEED);
+  // The sim already placed the rocks (the first draws); continue from there.
+  const layout = rng(0, 'meadow', MEADOW_LAYOUT_STATE_AFTER_ROCKS);
   const rand = () => layout.next();
 
   const sun = new THREE.DirectionalLight(0xffffff, 3);
@@ -68,7 +68,7 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   scene.add(water);
   scene.add(buildOlympus(look));
   // Build order matters: each builder draws from the shared layout RNG.
-  scene.add(buildRocks(look, rand));
+  scene.add(buildRocks(look));
   scene.add(buildTrees(look, rand));
   const grass = buildGrass(look, rand);
   scene.add(grass);
@@ -157,6 +157,7 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const target = new THREE.Vector3();
   const view: WorldView = {
     scene,
+    look,
     camera,
     update(timeSeconds, dayFraction) {
       U.time.value = timeSeconds;

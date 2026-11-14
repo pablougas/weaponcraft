@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLADE_CENTER, MEADOW_ORIGIN_HEIGHT, meadowHeightAt, WATER_LEVEL } from '../../sim/terrain/meadow';
+import { MEADOW_ROCKS } from '../../sim/terrain/meadow-rocks';
 import { hash2 } from '../../sim/terrain/noise';
 import type { Look } from '../look';
 
@@ -26,19 +27,15 @@ function makeRockGeometry(seed: number, flatTop = false): THREE.BufferGeometry {
 }
 
 /** The hero rock Zeus stands on (top at HERO_ROCK_TOP) and 14 scattered boulders. */
-export function buildRocks(look: Look, rand: Rand): THREE.Group {
+export function buildRocks(look: Look): THREE.Group {
   const group = new THREE.Group();
   const rockMat = look.toon({ color: '#8a8f9c' });
   group.add(look.M(makeRockGeometry(1, true), rockMat, [0, MEADOW_ORIGIN_HEIGHT + 0.7, 0], { scale: [3.2, 2.5, 2.9], outline: 0.01 }));
-  for (let i = 0; i < 14; i += 1) {
-    const a = rand() * Math.PI * 2;
-    const r = 6 + rand() * 60;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    const s = 0.4 + rand() * 1.6;
-    group.add(look.M(makeRockGeometry(i + 5), rockMat, [x, meadowHeightAt(x, z) + s * 0.25, z], {
-      scale: [s * 1.3, s, s * 1.1],
-      rot: [0, rand() * 6, 0],
+  // Positions come from the sim so the colliders match what you see.
+  for (const rock of MEADOW_ROCKS) {
+    group.add(look.M(makeRockGeometry(rock.index + 5), rockMat, [rock.position.x, rock.position.y, rock.position.z], {
+      scale: [rock.scale.x, rock.scale.y, rock.scale.z],
+      rot: [0, rock.rotationY, 0],
       outline: 0.03,
     }));
   }
