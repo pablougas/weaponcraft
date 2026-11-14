@@ -33,3 +33,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - 2026-11-14 — Pause behaviour: Esc, losing pointer lock, or the window losing focus opens the settings menu; clicking Resume or the game recaptures the mouse. This is also the itch.io "click to resume" overlay. "New game" in settings asks for a second click.
 - 2026-11-14 — `PCFSoftShadowMap` was removed in three 0.187 (it logs a warning), so shadows use `PCFShadowMap`.
 - 2026-11-14 — While the test clock is frozen, the view only re-renders when something changes (time, camera, settings, resize); software WebGL is too slow to redraw every frame for screenshots.
+- 2026-11-14 — Team approved the M2 visual baselines (vista at golden/dusk/night/dawn/noon, wide, effects off, settings menu), including the new dawn and noon looks.
