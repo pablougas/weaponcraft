@@ -2,13 +2,16 @@ import '@fontsource/cinzel/600.css';
 import '@fontsource/cinzel/700.css';
 import * as THREE from 'three';
 import '../ui/ui.css';
-import { cloneWorld, type Entity } from '../sim';
+import { cloneWorld, MEADOW_RADIUS, type Entity } from '../sim';
+import { godDef } from '../sim/defs';
 import { createDevMenu, type DevMenu } from '../ui/dev-menu';
+import { createCaptions } from '../ui/captions';
 import { createHud } from '../ui/hud';
 import { hideLoadingScreen, setLoadingText, showFatalError } from '../ui/loading-screen';
 import { createSettingsMenu, type SettingsMenu } from '../ui/settings-menu';
 import { showTitleScreen } from '../ui/title-screen';
 import { CAMERA_TURN_SPEED, CameraRig } from '../view/camera-rig';
+import { DustEffects } from '../view/effects/dust';
 import { LightningEffects } from '../view/effects/lightning';
 import { SkyStrikeEffects } from '../view/effects/sky-strike';
 import type { ModelFrame } from '../view/entity-model';
@@ -23,6 +26,7 @@ import { loadPhysics } from './physics';
 import { requestPointerLockSafely } from './pointer-lock';
 import { createFullWindowRenderer, type FullWindowRenderer } from './renderer';
 import { browserStorage } from './save';
+import { Sfx } from './sfx';
 import { openSession, randomSeed, type Session } from './session';
 import { defaultSettings, pickAutoQuality, QUALITY_PRESETS, SettingsStore, type QualityPreset } from './settings';
 import { devMenuEnabled, installTestApi, isTestRun, type ShellState, type TestState } from './test-api';
@@ -157,6 +161,18 @@ export async function boot(): Promise<void> {
       dirty = true;
       return nextFrame();
     },
+    teleport(x, z, rotationY) {
+      if (!session) return nextFrame();
+      session.sendIntent({ type: 'dev:teleport', x, z, rotationY });
+      tick();
+      loop.recordTick(performance.now());
+      interpolator.capture(session.world);
+      const hero = localHero();
+      if (hero) cameraRig.faceHeading(hero.rotationY);
+      cameraRig.reset();
+      dirty = true;
+      return nextFrame();
+    },
   });
 
   const fail = (title: string, detail: string, error: unknown) => {
@@ -214,6 +230,9 @@ export async function boot(): Promise<void> {
   });
 
   const hud = createHud(document.body);
+  const captions = createCaptions(document.body);
+  const dust = new DustEffects(meadow.scene);
+  const sfx = new Sfx((entityId) => !!entityId && entityId === localHero()?.id, (text) => captions.show(text));
   /** Auto-follow waits this long after the player last turned the camera. */
   const AUTO_FOLLOW_DELAY_MS = 600;
 
@@ -232,6 +251,11 @@ export async function boot(): Promise<void> {
   let frame: ModelFrame = { time: 0, dt: 0, world: activeSession.world, reduceMotion: false };
   activeSession.bus.onAny((event) => {
     views.handleEvent(event, frame);
+    sfx.handle(event);
+    if (event.type === 'hero:dodge') {
+      const roller = activeSession.world.entities[event.entityId];
+      if (roller) dust.spawn(roller.position, roller.rotationY, settings.get().reduceMotion);
+    }
     if (event.type === 'ability:cast' && event.points.length > 1) {
       const points = event.points.map((p) => ({ ...p }));
       // Chain Lightning leaves from the spear tip; the Lightning Fist's arc starts at its target.
@@ -250,6 +274,7 @@ export async function boot(): Promise<void> {
     views.clear();
     lightning.clear();
     skyStrikes.clear();
+    dust.clear();
     cameraRig.reset();
     const hero = localHero();
     if (hero) cameraRig.faceHeading(hero.rotationY);
@@ -396,8 +421,15 @@ export async function boot(): Promise<void> {
       views.sync(world, interpolator, alpha, frame);
       lightning.update(dt);
       skyStrikes.update(dt);
+      dust.update(dt);
 
       const hero = localHero();
+      sfx.updateCharge(shell.screen === 'playing' ? hero : undefined, hero ? godDef(hero.defId).chargedMove?.fullChargeTicks ?? 30 : 30);
+      // The meadow's edge during the prologue (the wider world opens after the rocket, M6).
+      if (hero && shell.screen === 'playing' && !world.flags.prologueDone
+        && Math.hypot(hero.position.x, hero.position.z) > MEADOW_RADIUS - 3) {
+        captions.show('The rest of the world can wait. For now.');
+      }
       if (cameraMode === 'follow' && hero) {
         // Keyboard camera (, and .) and auto-follow, so the game plays without a mouse.
         const turn = (input?.isHeld('cameraRight') ? 1 : 0) - (input?.isHeld('cameraLeft') ? 1 : 0);

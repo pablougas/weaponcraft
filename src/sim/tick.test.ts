@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Intent } from './intents';
 import { serialize } from './serialize';
 import { tickWorld } from './tick';
+import { ensureMeadowPopulated } from './populate';
+import { groundHeightAt } from './terrain/meadow-rocks';
 import { createSimContext, createWorld, despawn, spawn } from './world';
 
 const spawnIntent = (defId: string): Intent => ({ type: 'dev:spawn', playerId: 'p1', defId });
@@ -75,5 +77,15 @@ describe('tickWorld', () => {
     world.players.p1.entityId = id;
     despawn(ctx, id);
     expect(world.players.p1.entityId).toBeNull();
+  });
+
+  it('dev:teleport puts the hero on the ground at the requested spot', () => {
+    const world = createWorld(1, 0);
+    ensureMeadowPopulated(world);
+    tickWorld(world, { nowMs: 0, isAuthority: true, intents: [{ type: 'dev:teleport', playerId: 'p1', x: 30.5, z: -12.25, rotationY: 1 }] });
+    const hero = world.entities[world.players.p1.entityId!];
+    expect(hero.position.x).toBeCloseTo(30.5, 5);
+    expect(hero.position.y).toBeCloseTo(groundHeightAt(30.5, -12.25), 2);
+    expect(hero.rotationY).toBe(1);
   });
 });

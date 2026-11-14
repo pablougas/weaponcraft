@@ -132,6 +132,7 @@ Run these from the project directory:
 | `npm run package` | Build the game and create `artifacts/game.zip` for itch.io. |
 | `npm run test:e2e` | Run all Playwright browser tests against the dev server (starts it if needed). |
 | `npm run test:ship` | Build, serve `dist/` like itch.io does, and run the smoke suite. Run before every upload. |
+| `npm run test:visual:review` | Render every screenshot test into `artifacts/review/` for the team to look at, without changing the approved baselines. |
 | `npm run test:visual:update` | Re-record screenshot baselines. Only after the team approves the new look. |
 | `npm run doctor` | Check required tools, Node.js version, and installed dependencies. |
 

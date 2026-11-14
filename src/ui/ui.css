@@ -421,6 +421,8 @@
 .wc-ability-name {
   position: absolute;
   top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
   margin-top: 4px;
   color: var(--wc-muted);
   width: 76px;
@@ -473,4 +475,36 @@
 #wc-settings input[type="range"] {
   width: 160px;
   accent-color: var(--wc-gold);
+}
+
+/* Captions for dialogue and important sound cues. */
+#wc-captions {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  z-index: 6;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  width: min(640px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+#wc-captions p {
+  margin: 0;
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: var(--wc-text);
+  background: rgb(6 10 24 / 72%);
+  font: 500 15px/1.35 Inter, ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+}
+
+/* One option per row in the settings menu. */
+#wc-settings .wc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
 }

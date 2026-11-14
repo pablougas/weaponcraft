@@ -69,7 +69,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
           <span class="wc-range"><input type="range" min="0.2" max="3" step="0.1" data-setting="mouseSensitivity"><output data-output="mouseSensitivity"></output></span>
         </label>
         <label class="wc-check"><input type="checkbox" data-setting="invertY"> Invert mouse Y</label>
-        <label class="wc-check"><input type="checkbox" data-setting="cameraAutoFollow"> Camera auto-follow (steer with the arrow keys)</label>
+        <label class="wc-check"><input type="checkbox" data-setting="cameraAutoFollow"> Camera auto-follow</label>
       </section>
       <section>
         <h3>Accessibility</h3>

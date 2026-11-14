@@ -83,8 +83,14 @@ test.describe('Zeus (M3)', () => {
 
   test('X rolls at least 4 m', async ({ page }) => {
     await play(page);
+    // Walk off the rock and wait until Zeus is on the meadow: a roll needs solid ground,
+    // and a press while falling only waits in the input buffer for 0.15 s.
     await page.keyboard.down('ArrowUp');
-    await page.evaluate(() => window.wc!.step(20)); // step off the rock first
+    await page.evaluate(() => window.wc!.step(45));
+    await expect.poll(async () => {
+      await page.evaluate(() => window.wc!.step(1));
+      return hero(await state(page)).hero!.grounded;
+    }, { timeout: 30_000 }).toBe(true);
     const start = hero(await state(page)).position;
     await page.keyboard.press('KeyX');
     await page.evaluate(() => window.wc!.step(9));
@@ -134,5 +140,27 @@ test.describe('Zeus (M3)', () => {
     await expect.poll(async () => hero(await state(page)).hero!.lockTarget).not.toBeNull();
     await expect(page.locator('[data-hud="target"]')).toBeVisible();
     await expect(page.locator('[data-hud="target-name"]')).toHaveText(/Practice Dummy|Sheep/);
+  });
+
+  test('walking into the meadow edge for 5 s stays above ground, shows the edge caption, and you can walk back (M3.1)', async ({ page }) => {
+    await play(page);
+    // A gentle slope out to the edge (MEADOW_RADIUS = 140 m), facing outward.
+    const bearing = (110 * Math.PI) / 180;
+    await page.evaluate((b) => window.wc!.teleport(Math.sin(b) * 128, Math.cos(b) * 128, b), bearing);
+    await page.keyboard.down('ArrowUp');
+    await page.evaluate(() => window.wc!.step(150)); // 5 s of sim time pushing outward
+    const atEdge = hero(await state(page));
+    const r = Math.hypot(atEdge.position.x, atEdge.position.z);
+    expect(r).toBeGreaterThan(134);
+    expect(r).toBeLessThan(141);
+    expect(atEdge.hero!.grounded).toBe(true);
+    await expect(page.locator('#wc-captions')).toContainText('The rest of the world can wait. For now.');
+    await page.keyboard.up('ArrowUp');
+
+    await page.keyboard.down('ArrowDown');
+    await page.evaluate(() => window.wc!.step(60));
+    await page.keyboard.up('ArrowDown');
+    const back = hero(await state(page));
+    expect(Math.hypot(back.position.x, back.position.z)).toBeLessThan(r - 4);
   });
 });

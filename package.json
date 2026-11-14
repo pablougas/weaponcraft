@@ -16,7 +16,8 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:visual:update": "playwright test --grep @visual --update-snapshots --pass-with-no-tests",
-    "test:ship": "npm run build && playwright test --config playwright.ship.config.ts"
+    "test:ship": "npm run build && playwright test --config playwright.ship.config.ts",
+    "test:visual:review": "playwright test --config playwright.review.config.ts --workers=2"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

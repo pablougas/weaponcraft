@@ -47,6 +47,8 @@ export interface TestApi {
   setSeed(seed: number): Promise<void>;
   /** Forces the local god's face ('neutral' | 'determined' | 'happy' | 'hurt'); null for automatic. */
   face(expression: Expression | null): Promise<void>;
+  /** Moves the local god onto the ground at (x, z) via a `dev:teleport` intent, camera behind it. */
+  teleport(x: number, z: number, rotationY?: number): Promise<void>;
 }
 
 declare global {

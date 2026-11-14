@@ -3,6 +3,7 @@ import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
 import type { PhysicsWorld } from './physics';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
 import { updateCreatures } from './systems/wildlife';
+import { groundHeightAt } from './terrain/meadow-rocks';
 import type { WorldState } from './types';
 import { createSimContext, despawn, spawn, type SimContext } from './world';
 
@@ -70,6 +71,23 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       if (!ctx.isAuthority) return;
       if (!despawn(ctx, intent.entityId)) reject('no such entity');
       return;
+    case 'dev:teleport': {
+      if (!ctx.isAuthority) return;
+      const heroId = world.players[intent.playerId].entityId;
+      const hero = heroId ? world.entities[heroId] : undefined;
+      if (!hero?.hero || !Number.isFinite(intent.x) || !Number.isFinite(intent.z)) {
+        reject('no hero to move');
+        return;
+      }
+      const position = { x: intent.x, y: groundHeightAt(intent.x, intent.z), z: intent.z };
+      hero.position = position;
+      if (intent.rotationY !== undefined && Number.isFinite(intent.rotationY)) hero.rotationY = intent.rotationY;
+      hero.hero.vy = 0;
+      hero.hero.grounded = true;
+      hero.hero.dodge = null;
+      hero.hero.lastSafe = { ...position };
+      return;
+    }
     case 'player:move':
     case 'player:action': {
       const reason = applyHeroIntent(ctx, intent);

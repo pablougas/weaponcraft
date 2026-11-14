@@ -7,6 +7,8 @@ import type { PlayerId, Vec3 } from './types';
 export type Intent =
   | { type: 'dev:spawn'; playerId: PlayerId; defId: string; position?: Vec3 }
   | { type: 'dev:despawn'; playerId: PlayerId; entityId: string }
+  /** Dev/test: move the sender's hero onto the ground at (x, z), facing `rotationY`. M6 uses it for "teleport to biome". */
+  | { type: 'dev:teleport'; playerId: PlayerId; x: number; z: number; rotationY?: number }
   /**
    * Held input, sent when it changes: world-space move direction (length ≤ 1),
    * held buttons, and the camera heading the player aims along.
