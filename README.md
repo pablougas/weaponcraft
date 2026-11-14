@@ -61,9 +61,15 @@ The default page is the **Weaponcraft 3D game**
 ([http://localhost:5173](http://localhost:5173)). It fills the browser window,
 shows a loading screen while the physics engine starts, then a
 **WEAPONCRAFT** title screen. Click it (or press **Enter**) to start. The first
-click unlocks audio and captures the mouse (pointer lock); press **Esc** to
-release the mouse. The world behind the title is a placeholder until the
-meadow scene arrives in milestone M2 (see `docs/ROADMAP.md`).
+click unlocks audio and captures the mouse (pointer lock). Behind the title is
+the meadow at the foot of Mount Olympus, lit by the real-time world clock (one
+game day every 4 real hours; frozen at golden hour during the prologue).
+
+Press **Esc** to open **Settings**: quality (Auto / Low / Medium / High), time
+of day (Live / Always golden hour / Always night), toggles for bloom, god rays,
+outlines, color grade and particles, **Reduce motion & flashes**, and New game.
+Settings are saved in your browser. Click **Resume** or the game to recapture
+the mouse.
 
 The original Phaser 2D starter is still available at
 [http://localhost:5173/?demo=2d](http://localhost:5173/?demo=2d). Collect the
@@ -87,7 +93,9 @@ in a production build, add `#dev` to the URL.
 
 Add `#test` to the URL (for example `http://localhost:4173/#test`) to expose
 the `window.wc` test API in a production build; development builds always
-expose it. Combine flags with `&`, e.g. `#test&dev`.
+expose it. It offers `ready()`, `getState()`, `step(ticks)`, `freeze(seconds)`,
+`setTime(dayFraction)`, `snapCam('vista' | 'hero' | 'wide')` and
+`setSeed(n)`. Combine flags with `&`, e.g. `#test&dev`.
 
 ## Commands
 
@@ -124,6 +132,12 @@ console errors, makes no requests outside its own origin (no CDNs), draws a
 non-blank canvas, starts on click, follows window resizes, and that the 2D demo
 still loads. Chromium runs headless with SwiftShader WebGL at 1280×720. After a
 failure, open the report with `npx playwright show-report`.
+
+The visual suite (`tests/e2e/visual.spec.ts`) compares screenshots with the
+approved baselines in `tests/e2e/__screenshots__/`: the vista at golden hour,
+dusk, night, dawn and noon, the wide shot, every effect off, and the settings
+menu. A baseline is how a look is signed off, so only re-record them with
+`npm run test:visual:update` after the team approves the new look.
 
 To try the optimized build in a browser:
 

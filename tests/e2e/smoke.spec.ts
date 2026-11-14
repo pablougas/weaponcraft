@@ -81,4 +81,15 @@ test.describe('smoke', { tag: '@smoke' }, () => {
     await page.keyboard.press('Backquote');
     await expect(page.locator('#wc-dev')).toBeVisible();
   });
+
+  test('Esc opens settings', async ({ page }) => {
+    await openGame(page);
+    await page.locator('#wc-title').click();
+    await expect(page.locator('#wc-title')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#wc-settings')).toBeVisible();
+    await expect(page.locator('#wc-settings')).toContainText('Settings');
+    await page.locator('#wc-settings').getByRole('button', { name: 'Resume' }).click();
+    await expect(page.locator('#wc-settings')).toBeHidden();
+  });
 });

@@ -3,11 +3,12 @@
  * hard-codes keys (CLAUDE.md accessibility rules). Gameplay actions (move,
  * attack, abilities...) are added in M3; remapping UI comes with settings.
  */
-export type InputAction = 'devMenu';
+export type InputAction = 'devMenu' | 'settings';
 
 /** Default bindings as `KeyboardEvent.code` values (layout-independent). */
 export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> = {
   devMenu: ['Backquote'],
+  settings: ['Escape'],
 };
 
 export class InputMap {

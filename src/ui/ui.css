@@ -188,3 +188,117 @@
   border-color: var(--wc-line);
   background: rgb(242 196 90 / 14%);
 }
+
+/* Esc settings menu. */
+#wc-settings {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(6 10 24 / 55%);
+}
+
+#wc-settings[hidden] {
+  display: none;
+}
+
+#wc-settings .wc-panel {
+  width: min(440px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--wc-line);
+  border-radius: 14px;
+  padding: 18px 20px 16px;
+  color: var(--wc-text);
+  background: var(--wc-glass);
+  backdrop-filter: blur(10px);
+  font: 14px/1.4 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+#wc-settings h2 {
+  margin: 0 0 10px;
+  color: var(--wc-gold);
+  font-family: var(--wc-display);
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+#wc-settings h3 {
+  margin: 14px 0 6px;
+  color: var(--wc-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#wc-settings .wc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+#wc-settings select {
+  min-width: 190px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: var(--wc-text);
+  background: rgb(12 18 38 / 85%);
+  font: inherit;
+}
+
+#wc-settings .wc-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px 12px;
+}
+
+#wc-settings input[type="checkbox"] {
+  accent-color: var(--wc-gold);
+}
+
+#wc-settings .wc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+#wc-settings button {
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  padding: 8px 16px;
+  color: var(--wc-text);
+  background: rgb(255 255 255 / 6%);
+  font: 500 13px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+#wc-settings button:hover,
+#wc-settings button:focus-visible {
+  border-color: var(--wc-line);
+  background: rgb(242 196 90 / 14%);
+}
+
+#wc-settings button.wc-primary {
+  border-color: var(--wc-gold-dim);
+  color: #ffe6a6;
+  background: rgb(242 196 90 / 20%);
+}
+
+#wc-settings button.wc-danger {
+  border-color: #e88b6e;
+  color: #ffd2c4;
+}
+
+#wc-settings .wc-hint {
+  margin: 12px 0 0;
+  color: var(--wc-muted);
+  font-size: 12px;
+}

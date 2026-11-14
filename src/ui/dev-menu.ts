@@ -1,5 +1,6 @@
 import type { FixedStepLoop } from '../engine/loop';
 import type { Session } from '../engine/session';
+import type { SettingsStore } from '../engine/settings';
 import { entityCount, formatWorldTime, TIME_OF_DAY_LOCKS, type TimeOfDayLock } from '../sim';
 
 export interface DevMenu {
@@ -21,7 +22,13 @@ const LOCK_LABELS: Record<TimeOfDayLock, string> = {
  * with `#dev` in the URL. Every change it makes goes through intents or the
  * session, never by editing sim state directly.
  */
-export function createDevMenu(parent: HTMLElement, session: Session, loop: FixedStepLoop, onNewGame: () => void): DevMenu {
+export function createDevMenu(
+  parent: HTMLElement,
+  session: Session,
+  settings: SettingsStore,
+  loop: FixedStepLoop,
+  onNewGame: () => void,
+): DevMenu {
   const element = document.createElement('aside');
   element.id = 'wc-dev';
   element.hidden = true;
@@ -54,9 +61,11 @@ export function createDevMenu(parent: HTMLElement, session: Session, loop: Fixed
   const lockSelect = element.querySelector<HTMLSelectElement>('[data-control="lock"]')!;
   const scrub = element.querySelector<HTMLInputElement>('[data-control="scrub"]')!;
 
-  lockSelect.value = session.timeLock;
+  settings.subscribe((current) => {
+    lockSelect.value = current.timeOfDay;
+  });
   lockSelect.addEventListener('change', () => {
-    session.timeLock = lockSelect.value as TimeOfDayLock;
+    settings.update((draft) => { draft.timeOfDay = lockSelect.value as TimeOfDayLock; });
   });
   scrub.addEventListener('input', () => {
     session.timeOverride = Number(scrub.value);
@@ -91,7 +100,6 @@ export function createDevMenu(parent: HTMLElement, session: Session, loop: Fixed
       field('entities').textContent = String(entityCount(world));
       field('players').textContent = String(Object.keys(world.players).length);
       field('seed').textContent = String(world.seed);
-      if (document.activeElement !== lockSelect) lockSelect.value = session.timeLock;
     },
   };
   return menu;

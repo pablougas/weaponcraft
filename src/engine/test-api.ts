@@ -1,4 +1,6 @@
 import type { PlayerId, WorldState, WorldTime } from '../sim';
+import type { CameraPresetId } from '../view/cameras';
+import type { QualityPreset, Settings } from './settings';
 import { hashFlags } from './url-flags';
 
 /** App-shell state (not part of the sim). */
@@ -14,12 +16,18 @@ export interface TestState extends ShellState {
   world: WorldState | null;
   time: WorldTime | null;
   devMenuOpen: boolean;
+  settingsOpen: boolean;
+  settings: Settings | null;
+  /** The quality preset actually in use (what "auto" resolved to). */
+  quality: QualityPreset | null;
+  /** Seconds the view clock is frozen at, or null if running. */
+  frozenAt: number | null;
 }
 
 /**
- * Deterministic test API for Playwright (see CLAUDE.md). `freeze`, `setTime`,
- * `snapCam` and `setSeed` arrive in M2; `face` and `completeTutorialStep` with
- * the systems they drive.
+ * Deterministic test API for Playwright (see CLAUDE.md). Mutators resolve
+ * after the next rendered frame, so a screenshot taken afterwards shows the
+ * change. `face` and `completeTutorialStep` arrive with M3 and M5.
  */
 export interface TestApi {
   /** Resolves once the scene is built and a frame has been rendered. */
@@ -28,6 +36,14 @@ export interface TestApi {
   getState(): TestState;
   /** Runs `ticks` sim ticks immediately, then returns the new state. */
   step(ticks?: number): TestState;
+  /** Stops the real-time clock: animation shows `timeSeconds` and the sim stops ticking on its own. */
+  freeze(timeSeconds: number): Promise<void>;
+  /** Overrides the time of day (0 = midnight, 0.5 = noon, 0.7 = golden hour). */
+  setTime(dayFraction: number): Promise<void>;
+  /** Moves the camera to a preset shot: 'vista', 'hero' or 'wide'. */
+  snapCam(presetId: CameraPresetId): Promise<void>;
+  /** Starts a new game with this world seed. */
+  setSeed(seed: number): Promise<void>;
 }
 
 declare global {
@@ -38,6 +54,11 @@ declare global {
 
 export function testApiEnabled(): boolean {
   return import.meta.env.DEV || hashFlags().has('test');
+}
+
+/** Automated test run (`#test`): skip timing-dependent behaviour like the auto-quality probe. */
+export function isTestRun(): boolean {
+  return hashFlags().has('test');
 }
 
 export function devMenuEnabled(): boolean {
