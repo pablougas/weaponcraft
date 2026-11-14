@@ -173,3 +173,42 @@ address is temporary; commit and push changes to save them in GitHub.
 
 AI coding tools are optional. If you use one, sign in with your own account and
 never put credentials or API keys in the project files.
+
+## Use Claude Code (optional)
+
+Claude Code is a terminal-based coding assistant. On macOS or Linux, install it
+using Anthropic's [official instructions](https://code.claude.com/docs/en/setup):
+
+```sh
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+Open a new terminal and verify the installation:
+
+```sh
+claude --version
+```
+
+If the installer says `~/.local/bin` is not on your PATH, add it to zsh and
+reload the shell:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+From the Weaponcraft project directory, start Claude Code and follow its
+interactive sign-in prompts in your browser:
+
+```sh
+cd weaponcraft
+claude
+```
+
+Claude Code reads the repository's `CLAUDE.md` for project-specific development
+guidance. On Windows or for other installation methods, use the
+[official setup guide](https://code.claude.com/docs/en/setup). Claude Code
+requires an eligible Anthropic account or supported provider; check the
+[authentication guide](https://code.claude.com/docs/en/authentication) for
+current account options. Each developer signs in with their own account.
+Never paste passwords, login codes, or API keys into project files or chat.
