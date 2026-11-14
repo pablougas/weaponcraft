@@ -76,9 +76,18 @@ five glowing ore pieces:
 Choose **3D game** in that page's navigation to go back. Both run from the same
 development server.
 
+The game saves to your browser automatically (every 10 seconds and when you
+leave the page). When a save exists, the title screen shows **Continue** and
+**New game**; New game wipes the save and starts the prologue again.
+
+Press **`** (backtick) to open the **dev menu**: tick rate, tick count, world
+time, entity count and seed, plus a time-of-day lock, a time scrub slider, a
+test spawn button, Save now and New game. It's always available in development;
+in a production build, add `#dev` to the URL.
+
 Add `#test` to the URL (for example `http://localhost:4173/#test`) to expose
 the `window.wc` test API in a production build; development builds always
-expose it.
+expose it. Combine flags with `&`, e.g. `#test&dev`.
 
 ## Commands
 

@@ -1,23 +1,33 @@
+import type { PlayerId, WorldState, WorldTime } from '../sim';
 import { hashFlags } from './url-flags';
 
-/** Plain-data snapshot of the app shell, returned by `wc.getState()`. */
+/** App-shell state (not part of the sim). */
 export interface ShellState {
   screen: 'loading' | 'title' | 'playing' | 'error';
   pointerLocked: boolean;
   physicsReady: boolean;
 }
 
+/** What `wc.getState()` returns: a detached, serialized copy. */
+export interface TestState extends ShellState {
+  localPlayerId: PlayerId | null;
+  world: WorldState | null;
+  time: WorldTime | null;
+  devMenuOpen: boolean;
+}
+
 /**
- * Deterministic test API for Playwright (see CLAUDE.md). M0 is a stub with
- * `ready()` and `getState()`; `freeze`, `step`, `setTime`, `snapCam`,
- * `setSeed`, `face` and `completeTutorialStep` arrive with the milestones that
- * build those systems.
+ * Deterministic test API for Playwright (see CLAUDE.md). `freeze`, `setTime`,
+ * `snapCam` and `setSeed` arrive in M2; `face` and `completeTutorialStep` with
+ * the systems they drive.
  */
 export interface TestApi {
   /** Resolves once the scene is built and a frame has been rendered. */
   ready(): Promise<void>;
   /** A serialized copy of the current state (safe to mutate). */
-  getState(): ShellState;
+  getState(): TestState;
+  /** Runs `ticks` sim ticks immediately, then returns the new state. */
+  step(ticks?: number): TestState;
 }
 
 declare global {
@@ -28,6 +38,10 @@ declare global {
 
 export function testApiEnabled(): boolean {
   return import.meta.env.DEV || hashFlags().has('test');
+}
+
+export function devMenuEnabled(): boolean {
+  return import.meta.env.DEV || hashFlags().has('dev');
 }
 
 export function installTestApi(api: TestApi): void {

@@ -34,9 +34,12 @@ export const test = base.extend<{ consoleErrors: string[]; offOriginRequests: st
 
 export { expect };
 
-/** Opens the game with the test API enabled and waits until it has rendered. */
-export async function openGame(page: Page, path = '/'): Promise<void> {
-  await page.goto(`${path}#test`);
+/**
+ * Opens the game with the test API enabled (plus any extra hash flags, e.g.
+ * `['dev']` for the dev menu in production) and waits until it has rendered.
+ */
+export async function openGame(page: Page, path = '/', flags: string[] = []): Promise<void> {
+  await page.goto(`${path}#${['test', ...flags].join('&')}`);
   await page.waitForFunction(() => window.wc !== undefined);
   await page.evaluate(() => window.wc!.ready());
 }

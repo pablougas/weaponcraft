@@ -94,3 +94,97 @@
     transition: none;
   }
 }
+
+.wc-title-new {
+  display: block;
+  margin: 14px auto 0;
+  border: 0;
+  padding: 6px 12px;
+  color: var(--wc-muted);
+  background: none;
+  font: 500 13px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.wc-title-new:hover,
+.wc-title-new:focus-visible {
+  color: var(--wc-text);
+  outline: none;
+}
+
+/* Dev menu (backtick; production only with #dev). */
+#wc-dev {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 30;
+  width: min(300px, calc(100vw - 24px));
+  border: 1px solid var(--wc-line);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  color: var(--wc-text);
+  background: rgb(10 16 34 / 88%);
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+#wc-dev h2 {
+  margin: 0 0 6px;
+  color: var(--wc-gold);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+#wc-dev dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 8px;
+}
+
+#wc-dev dt {
+  color: var(--wc-muted);
+}
+
+#wc-dev dd {
+  margin: 0;
+  text-align: right;
+}
+
+#wc-dev label {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 6px;
+  color: var(--wc-muted);
+}
+
+#wc-dev select,
+#wc-dev input {
+  width: 100%;
+  font: inherit;
+}
+
+.wc-dev-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#wc-dev button {
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--wc-text);
+  background: rgb(255 255 255 / 6%);
+  font: inherit;
+  cursor: pointer;
+}
+
+#wc-dev button:hover {
+  border-color: var(--wc-line);
+  background: rgb(242 196 90 / 14%);
+}

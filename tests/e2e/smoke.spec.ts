@@ -65,4 +65,20 @@ test.describe('smoke', { tag: '@smoke' }, () => {
     await expect(page.locator('#wc-title')).toBeVisible();
     expect(await page.evaluate(() => 'wc' in window)).toBe(false);
   });
+
+  test('production hides the dev menu unless the URL has #dev', async ({ page }) => {
+    test.skip(!process.env.WC_SHIP, 'Dev builds always allow the dev menu.');
+    await openGame(page);
+    await page.locator('#wc-title').click();
+    await page.keyboard.press('Backquote');
+    await expect(page.locator('#wc-dev')).toHaveCount(0);
+
+    await page.goto('/#test&dev');
+    await page.reload(); // a hash-only change doesn't reload the page
+    await page.waitForFunction(() => window.wc !== undefined);
+    await page.evaluate(() => window.wc!.ready());
+    await page.locator('#wc-title').click();
+    await page.keyboard.press('Backquote');
+    await expect(page.locator('#wc-dev')).toBeVisible();
+  });
 });
