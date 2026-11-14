@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111827" />
+    <meta
+      name="description"
+      content="A browser game starter built with Phaser, Three.js, and Vite."
+    />
+    <title>Weaponcraft · Game Studio</title>
+  </head>
+  <body>
+    <main>
+      <nav aria-label="Game demos">
+        <a href="?demo=2d">Phaser 2D game</a>
+        <a href="?demo=3d">Three.js 3D demo</a>
+      </nav>
+      <header>
+        <p class="eyebrow" id="demo-label">WEAPONCRAFT / PHASER 2D</p>
+        <h1>Weapon<span>craft</span></h1>
+        <p class="lead" id="demo-description">
+          Gather the glowing ore. Move with the arrow keys or WASD.
+        </p>
+      </header>
+      <div class="toolbar">
+        <p id="score" role="status" aria-live="polite">Ore: 0 / 5</p>
+        <button id="restart" type="button">Restart game</button>
+      </div>
+      <div
+        id="game"
+        role="application"
+        aria-label="Weaponcraft game. Move with arrow keys or W A S D, or touch the game area."
+      ></div>
+      <p class="instructions" id="instructions">
+        Move with <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> or
+        <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>. On touch screens,
+        tap where you want to go.
+      </p>
+      <footer id="edit-hint">Start creating in <code>src/game.ts</code>.</footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
