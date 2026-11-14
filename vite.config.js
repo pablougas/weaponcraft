@@ -11,6 +11,7 @@ export default defineConfig({
         },
       },
     },
-    chunkSizeWarningLimit: 1500,
+    // Rapier-compat inlines its WASM (~4.3 MB, ~1.6 MB gzipped) so it needs no extra request.
+    chunkSizeWarningLimit: 4500,
   },
 });

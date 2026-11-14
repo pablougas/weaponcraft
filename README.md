@@ -57,15 +57,28 @@ Codespaces configures the forwarded port as private.
 
 ## Play the demos
 
-The default page opens the Phaser 2D game. Collect the five glowing ore pieces:
+The default page is the **Weaponcraft 3D game**
+([http://localhost:5173](http://localhost:5173)). It fills the browser window,
+shows a loading screen while the physics engine starts, then a
+**WEAPONCRAFT** title screen. Click it (or press **Enter**) to start. The first
+click unlocks audio and captures the mouse (pointer lock); press **Esc** to
+release the mouse. The world behind the title is a placeholder until the
+meadow scene arrives in milestone M2 (see `docs/ROADMAP.md`).
+
+The original Phaser 2D starter is still available at
+[http://localhost:5173/?demo=2d](http://localhost:5173/?demo=2d). Collect the
+five glowing ore pieces:
 
 - Move with **arrow keys** or **W A S D**.
 - Click or tap a location in the game to move there.
 - Select **Restart game** to start over.
 
-Choose **Three.js 3D demo** in the page navigation to open the 3D scene. Drag
-inside the scene to rotate it and scroll to zoom. Select **Phaser 2D game** to
-return to the game. Both demos run from the same development server.
+Choose **3D game** in that page's navigation to go back. Both run from the same
+development server.
+
+Add `#test` to the URL (for example `http://localhost:4173/#test`) to expose
+the `window.wc` test API in a production build; development builds always
+expose it.
 
 ## Commands
 
@@ -74,10 +87,13 @@ Run these from the project directory:
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Start the development server at `http://localhost:5173`. |
-| `npm test` | Run the Node.js test suite for the game ZIP packager. |
+| `npm test` | Run the fast unit tests: Node's runner (`tests/*.test.mjs`) and Vitest (`src/**/*.test.ts`). |
 | `npm run build` | Type-check the TypeScript and create the production site in `dist/`. |
 | `npm run preview` | Serve the latest production build at `http://localhost:4173`. Run `npm run build` first. |
 | `npm run package` | Build the game and create `artifacts/game.zip` for itch.io. |
+| `npm run test:e2e` | Run all Playwright browser tests against the dev server (starts it if needed). |
+| `npm run test:ship` | Build, serve `dist/` like itch.io does, and run the smoke suite. Run before every upload. |
+| `npm run test:visual:update` | Re-record screenshot baselines. Only after the team approves the new look. |
 | `npm run doctor` | Check required tools, Node.js version, and installed dependencies. |
 
 For a complete local check before sharing changes, run:
@@ -87,10 +103,18 @@ npm test
 npm run build
 ```
 
-The tests use Node's built-in test runner; no separate test framework or browser
-installation is needed. They verify that packaging puts `index.html` at the
-root of the ZIP and rejects a build without a root `index.html`. There are
-currently no automated browser-interaction tests.
+Browser tests need Playwright's Chromium once per machine (the devcontainer
+installs it automatically):
+
+```sh
+npx playwright install chromium
+```
+
+The smoke suite (`tests/e2e/smoke.spec.ts`) checks that the game loads with no
+console errors, makes no requests outside its own origin (no CDNs), draws a
+non-blank canvas, starts on click, follows window resizes, and that the 2D demo
+still loads. Chromium runs headless with SwiftShader WebGL at 1280×720. After a
+failure, open the report with `npx playwright show-report`.
 
 To try the optimized build in a browser:
 
@@ -104,10 +128,16 @@ server with **Ctrl+C**.
 
 ## Make and package a game
 
-- `src/game.ts` — Phaser 2D scene, movement, and collecting ore.
-- `src/three-game.ts` — Three.js 3D scene.
-- `src/main.ts` — Selects which demo to load from the page navigation.
-- `index.html` and `src/style.css` — Page content and styling.
+- `docs/SPEC.md` and `docs/ROADMAP.md` — The game design and the build order.
+- `src/main.ts` — Loads the 3D game, or the Phaser demo for `?demo=2d`.
+- `src/engine/` — Boot sequence, renderer, Rapier physics, audio unlock, pointer lock, test API.
+- `src/sim/` — Game state and rules (from milestone M1).
+- `src/view/` — Three.js scenes, materials, and effects.
+- `src/content/` — Content registries (biomes, gods, spirits, weapons, enemies, mechs, structures).
+- `src/ui/` — Loading screen, title screen, and later the HUD and menus.
+- `src/demo2d/` — The Phaser 2D starter game and its page styling.
+- `index.html` — Page shell with the inline loading screen.
+- `tests/e2e/` — Playwright browser tests and screenshot baselines.
 - `public/` — Static images, audio, and other game assets.
 - `public/ASSETS.md` — Record asset creators, source links, licenses, and required credits.
 

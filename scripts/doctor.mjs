@@ -20,7 +20,7 @@ if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 12)) {
   missing = true;
 }
 
-for (const dependency of ['phaser', 'three', 'typescript', 'vite', 'fflate']) {
+for (const dependency of ['phaser', 'three', '@dimforge/rapier3d-compat', 'typescript', 'vite', 'vitest', '@playwright/test', 'fflate']) {
   if (!existsSync(`node_modules/${dependency}`)) {
     console.log(`MISSING ${dependency}: run npm ci`);
     missing = true;

@@ -12,16 +12,23 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
     "package": "npm run build && node scripts/package-game.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs && vitest run",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:visual:update": "playwright test --grep @visual --update-snapshots --pass-with-no-tests",
+    "test:ship": "npm run build && playwright test --config playwright.ship.config.ts"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "0.21.0",
     "phaser": "3.90.0",
     "three": "0.187.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/three": "0.187.0",
     "fflate": "0.8.2",
     "typescript": "5.9.3",
-    "vite": "7.3.8"
+    "vite": "7.3.8",
+    "vitest": "4.1.12"
   }
 }
