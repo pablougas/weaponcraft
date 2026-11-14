@@ -26,6 +26,8 @@ export interface EventMap {
   'hero:dodge': { entityId: EntityId };
   /** An ability went off. `points` runs from the caster through each target, for drawing. */
   'ability:cast': { casterId: EntityId; abilityId: string; targetIds: EntityId[]; points: Vec3[] };
+  /** A teleport (Bolt Step): from where to where, and who the landing burst hit. */
+  'ability:blink': { casterId: EntityId; abilityId: string; from: Vec3; to: Vec3; targetIds: EntityId[] };
   'ability:fizzled': { casterId: EntityId; abilityId: string; reason: string };
   /** A ground marker before an ability lands (Sky Strike): where, how wide, and how long until it hits. */
   'ability:telegraph': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; ticks: number };

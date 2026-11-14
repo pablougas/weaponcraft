@@ -1,4 +1,4 @@
-import type { AbilityModule, ChargedMove, UltimateModule } from '../sim/abilities';
+import type { AbilityModule, ChargedMove, UltimateModule, BlinkMove } from '../sim/abilities';
 import type { Element, WeaponData } from '../sim/types';
 import type { ModelFactory } from '../view/entity-model';
 
@@ -43,6 +43,8 @@ export interface GodDef extends ContentDef {
   ability: AbilityModule;
   /** Hold-to-charge move on D (Lightning Fist), if this god has one. */
   chargedMove?: ChargedMove;
+  /** Short-range teleport on W (Zeus's Bolt Step), if this god has one. */
+  blink?: BlinkMove;
   /** Called-down ultimate on R (Sky Strike), if this god has one. */
   ultimate?: UltimateModule;
   starterWeaponId: string;

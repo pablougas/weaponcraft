@@ -259,6 +259,13 @@ export async function boot(): Promise<void> {
     altarScreen.handleEvent(event);
     labels.handleEvent(event, activeSession.world, (id) => !!id && id === localHero()?.id);
     if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
+    if (event.type === 'ability:blink') {
+      // A bolt along the path, one strike down onto the landing spot, and dust where he left.
+      const lift = (p: { x: number; y: number; z: number }, h: number) => ({ x: p.x, y: p.y + h, z: p.z });
+      lightning.spawn([lift(event.from, 1.1), lift(event.to, 1.1)], event.tick, settings.get().reduceMotion);
+      lightning.spawn([lift(event.to, 7), lift(event.to, 0.1)], event.tick + 1, settings.get().reduceMotion);
+      dust.spawn(event.from, 0, settings.get().reduceMotion);
+    }
     if (event.type === 'hero:dodge') {
       const roller = activeSession.world.entities[event.entityId];
       if (roller) dust.spawn(roller.position, roller.rotationY, settings.get().reduceMotion);

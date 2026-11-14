@@ -1,6 +1,7 @@
 import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
+import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
 
 export type Rapier = typeof RAPIER_NS;
@@ -62,12 +63,19 @@ export class PhysicsWorld {
     this.world.createCollider(desc);
   }
 
+  /** Static colliders: the hero rock, boulders and tree trunks. */
   private addRocks(): void {
     const hull = this.R.ColliderDesc.convexHull(heroRockHullPoints());
     if (hull) this.world.createCollider(hull);
     for (const rock of MEADOW_ROCKS) {
       const radius = rockColliderRadius(rock);
       const desc = this.R.ColliderDesc.ball(radius).setTranslation(rock.position.x, rock.position.y, rock.position.z);
+      this.world.createCollider(desc);
+    }
+    // Tree trunks (the canopies are high enough to walk under).
+    for (const tree of MEADOW_TREES) {
+      const halfHeight = 1.6 * tree.scale;
+      const desc = this.R.ColliderDesc.cylinder(halfHeight, trunkRadius(tree)).setTranslation(tree.x, tree.y + halfHeight, tree.z);
       this.world.createCollider(desc);
     }
   }

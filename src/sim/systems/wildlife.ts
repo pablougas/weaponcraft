@@ -4,6 +4,7 @@ import { enemyDef } from '../defs';
 import { worldRng } from '../rng';
 import { WATER_LEVEL } from '../terrain/meadow';
 import { groundHeightAt, HERO_ROCK, MEADOW_ROCKS, rockColliderRadius } from '../terrain/meadow-rocks';
+import { MEADOW_TREES, trunkRadius } from '../terrain/meadow-trees';
 import type { Entity, Vec3, Element } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 
@@ -38,13 +39,14 @@ export function spawnCreature(ctx: SimContext, defId: string, x: number, z: numb
   return id;
 }
 
-/** True if (x, z) is on or right next to a rock (the hero rock or a boulder). */
+/** True if (x, z) is on or right next to an obstacle: the hero rock, a boulder or a tree trunk. */
 export function nearRock(x: number, z: number, margin = ROCK_MARGIN): boolean {
   const { center, scale } = HERO_ROCK;
   const hx = (x - center.x) / (scale.x + margin);
   const hz = (z - center.z) / (scale.z + margin);
   if (hx * hx + hz * hz <= 1) return true;
-  return MEADOW_ROCKS.some((rock) => Math.hypot(x - rock.position.x, z - rock.position.z) <= rockColliderRadius(rock) + margin);
+  return MEADOW_ROCKS.some((rock) => Math.hypot(x - rock.position.x, z - rock.position.z) <= rockColliderRadius(rock) + margin)
+    || MEADOW_TREES.some((tree) => Math.hypot(x - tree.x, z - tree.z) <= trunkRadius(tree) + margin);
 }
 
 /** A random dry spot within `radius` of `centre`, from the world's wildlife RNG stream. */

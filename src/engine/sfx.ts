@@ -81,6 +81,12 @@ export class Sfx {
         this.noiseBurst(ctx, { duration: 0.18, volume: 0.35, type: 'highpass', freq: 2500 });
         this.tone(ctx, { from: 1800, to: 220, duration: 0.22, volume: 0.12, type: 'sawtooth' });
         return;
+      case 'ability:blink':
+        if (!this.isLocal(event.casterId) || !ctx) return;
+        // A sharp crack, then a short rising zap as he lands.
+        this.noiseBurst(ctx, { duration: 0.12, volume: 0.45, type: 'highpass', freq: 3000 });
+        this.tone(ctx, { from: 300, to: 2400, duration: 0.14, volume: 0.1, type: 'sawtooth', delay: 0.03 });
+        return;
       case 'ability:telegraph':
         if (!this.isLocal(event.casterId)) return;
         this.onCaption('[Storm clouds gather]');

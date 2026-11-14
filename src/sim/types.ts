@@ -121,6 +121,8 @@ export interface HeroState {
   buffer?: { action: 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack'; ticks: number } | null;
   /** A called-down ultimate waiting to land (Sky Strike): where, how long, and stamina spent. */
   ultimate?: { ticksLeft: number; point: Vec3; spent: number } | null;
+  /** A Bolt Step waiting to happen this tick: the horizontal jump in metres. */
+  blink?: { dx: number; dz: number } | null;
   /** Last spot the hero stood safely on, and ticks until it's updated again. */
   lastSafe?: Vec3 | null;
   safeTimer?: number;

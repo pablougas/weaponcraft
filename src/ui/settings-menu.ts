@@ -79,7 +79,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
         <button type="button" class="wc-primary" data-action="resume">Resume</button>
         <button type="button" data-action="new-game">New game</button>
       </div>
-      <p class="wc-hint">Move ↑ ↓ ← → · Sprint Shift · Jump Space (hold to hover) · Roll X · Punch A · Weapon S (hold for heavy) · Lightning Fist D (hold, release) · Chain Lightning Q (hold to keep firing) · Sky Strike R · Lock on Tab · Turn camera , . or mouse. Settings are saved in this browser.</p>
+      <p class="wc-hint">Move ↑ ↓ ← → · Sprint Shift · Jump Space (hold to hover) · Roll X · Punch A · Weapon S (hold for heavy) · Lightning Fist D (hold, release) · Chain Lightning Q (hold to keep firing) · Sky Strike R · Bolt Step W · Lock on Tab · Pick up / use F · Inventory I · Codex C · Turn camera , . or mouse. Settings are saved in this browser.</p>
     </div>`;
   parent.append(element);
 

@@ -10,6 +10,7 @@ const PRESS_ACTIONS: Partial<Record<InputAction, PlayerAction>> = {
   godAbility: 'godAbility',
   ultimate: 'ultimate',
   lockOn: 'lockOn',
+  blink: 'blink',
   interact: 'interact',
 };
 

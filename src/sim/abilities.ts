@@ -43,6 +43,27 @@ export interface ChargedMove {
 }
 
 /**
+ * A short-range lightning teleport (Zeus's Bolt Step on W): flash forward,
+ * or to the locked-on target, briefly untouchable, landing with a small
+ * lightning burst. The sim moves the god with the character controller, so
+ * it can't pass through rocks or trees, and keeps it inside the meadow.
+ */
+export interface BlinkMove {
+  id: string;
+  name: string;
+  element: 'light' | 'shadow' | 'poison' | 'lightning';
+  /** Distance without a lock-on target, metres. */
+  range: number;
+  /** A locked-on target closer than this is jumped to (landing just in front of it). */
+  lockRange: number;
+  staminaCost: number;
+  cooldownTicks: number;
+  iframeTicks: number;
+  burstRadius: number;
+  burstDamage: number;
+}
+
+/**
  * A called-down ultimate (Zeus's Sky Strike on R): marks a point, then lands
  * after `telegraphTicks`. It spends all current stamina; damage scales with it.
  */

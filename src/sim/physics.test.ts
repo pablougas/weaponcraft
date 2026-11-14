@@ -17,3 +17,30 @@ describe('PhysicsWorld', () => {
     physics.free();
   });
 });
+
+describe('tree trunks', () => {
+  it('block the hero: walking into a trunk never passes through it', async () => {
+    const { MEADOW_TREES, trunkRadius } = await import('./terrain/meadow-trees');
+    const { createWorld } = await import('./world');
+    const { ensureMeadowPopulated } = await import('./populate');
+    const { tickWorld } = await import('./tick');
+    const physics = new PhysicsWorld(await loadPhysics());
+    // A tree on fairly level ground near the middle of the meadow.
+    const tree = [...MEADOW_TREES].sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z))
+      .find((t) => Math.abs(meadowHeightAt(t.x - 4, t.z) - meadowHeightAt(t.x, t.z)) < 1)!;
+    const world = createWorld(1, 0);
+    ensureMeadowPopulated(world);
+    for (const e of Object.values(world.entities)) if (!e.hero) delete world.entities[e.id];
+    tickWorld(world, { nowMs: 0, isAuthority: true, physics, intents: [{ type: 'dev:teleport', playerId: 'p1', x: tree.x - 4, z: tree.z }] });
+    const hero = world.entities[world.players.p1.entityId!];
+    let closest = Infinity;
+    for (let t = 0; t < 60; t += 1) {
+      tickWorld(world, { nowMs: 0, isAuthority: true, physics, intents: [{ type: 'player:move', playerId: 'p1', x: 1, z: 0, sprint: false, jumpHeld: false }] });
+      closest = Math.min(closest, Math.hypot(hero.position.x - tree.x, hero.position.z - tree.z));
+    }
+    // Walking straight at the trunk: the hero may slide around it, but never through it.
+    // (Without trunk colliders the closest approach is ~0 m.)
+    expect(closest).toBeGreaterThan(trunkRadius(tree) + hero.body!.radius - 0.1);
+    physics.free();
+  });
+});

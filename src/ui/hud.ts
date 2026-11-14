@@ -10,6 +10,7 @@ const GLYPHS: Record<string, string> = {
   fist: '<path d="M7 9.5V7a1.5 1.5 0 0 1 3 0V6a1.5 1.5 0 0 1 3 0v.5a1.5 1.5 0 0 1 3 0V8a1.5 1.5 0 0 1 3 0v5.5c0 4-2.7 7.5-6.5 7.5S7 18 7 15.5V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
   sky: '<path d="M4 9a5 5 0 0 1 9.6-2A4 4 0 1 1 17 15H6a3 3 0 0 1-2-6z" fill="currentColor" opacity=".55"/><path d="M12.5 12 9 17h3l-1 5 4.5-6.5h-3l1-3.5z" fill="currentColor"/>',
   punch: '<circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3" stroke="currentColor" stroke-width="2"/>',
+  blink: '<path d="M3 15h6M2 11h5M4 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".7"/><path d="M16.5 2 10 11.5h4.2L12.5 22l8-12h-4.4z" fill="currentColor"/>',
   roll: '<path d="M18 8a7 7 0 1 0 1.2 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m19.5 3.5-.8 5.3-5.2-1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
 };
 
@@ -87,6 +88,10 @@ export function createHud(parent: HTMLElement): Hud {
     if (god.chargedMove) {
       const move = god.chargedMove;
       defs.push({ hud: 'charged', action: 'chargedMove', glyph: 'fist', name: move.name, cooldownId: move.id, cooldownTicks: move.cooldownTicks, staminaNeeded: () => move.staminaMin, element: move.element });
+    }
+    if (god.blink) {
+      const blink = god.blink;
+      defs.push({ hud: 'blink', action: 'blink', glyph: 'blink', name: blink.name, cooldownId: blink.id, cooldownTicks: blink.cooldownTicks, staminaNeeded: () => blink.staminaCost, element: blink.element });
     }
     defs.push({ hud: 'ability', action: 'godAbility', glyph: 'bolt', name: god.ability.name, cooldownId: god.ability.id, cooldownTicks: god.ability.cooldownTicks, staminaNeeded: () => god.ability.staminaCost, element: god.ability.element });
     if (god.ultimate) {

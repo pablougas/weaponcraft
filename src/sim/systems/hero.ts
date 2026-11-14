@@ -1,5 +1,5 @@
 import type { AttackSpec } from '../../content/types';
-import { applyDamage, isHittable, targetsInArc } from '../combat';
+import { applyDamage, isHittable, targetsInArc, targetsNear } from '../combat';
 import { DT, GRAVITY, MEADOW_RADIUS, perTick, ticks } from '../constants';
 import { godDef } from '../defs';
 import { weaponData } from '../weapons';
@@ -20,9 +20,10 @@ const DODGE_SPEED = 17; // ≈4.5 m
 export const DODGE_STAMINA = 4;
 const SPRINT_DRAIN_PER_SEC = 18;
 const HOVER_DRAIN_PER_SEC = 10;
-const STAMINA_REGEN_PER_SEC = 28;
+/** Stamina refills fast (team request): empty to full in about 2 s. */
+const STAMINA_REGEN_PER_SEC = 50;
 /** Pause before stamina refills after spending it. */
-const STAMINA_DELAY = ticks(0.5);
+const STAMINA_DELAY = ticks(0.3);
 /** Longer pause after running dry while holding an ability, or after an ultimate. */
 const EXHAUSTED_DELAY = ticks(1.2);
 /** Slowest fall while hovering, m/s. */
@@ -210,6 +211,32 @@ function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): st
     }
     case 'godAbility':
       return castAbility(ctx, entity);
+    case 'blink': {
+      const blink = god.blink;
+      if (!blink) return 'no blink';
+      if (hero.ultimate || hero.blink) return 'busy';
+      if ((hero.cooldowns[blink.id] ?? 0) > 0) return 'cooling down';
+      if (!spendStamina(entity, blink.staminaCost)) return 'no stamina';
+      // Jump to the lock-on target (stopping just in front of it), else where you're steering, else ahead.
+      const lock = hero.lockTarget ? ctx.world.entities[hero.lockTarget] : undefined;
+      const toLock = lock ? Math.hypot(lock.position.x - entity.position.x, lock.position.z - entity.position.z) : Infinity;
+      let dir: { x: number; z: number };
+      let distance = blink.range;
+      if (lock && toLock <= blink.lockRange && toLock > 0.01) {
+        dir = { x: (lock.position.x - entity.position.x) / toLock, z: (lock.position.z - entity.position.z) / toLock };
+        distance = Math.max(0, toLock - (lock.body?.radius ?? 0.4) - 1);
+      } else {
+        const length = Math.hypot(hero.move.x, hero.move.z);
+        dir = length > 0.1 ? { x: hero.move.x / length, z: hero.move.z / length } : { x: Math.sin(entity.rotationY), z: Math.cos(entity.rotationY) };
+      }
+      hero.blink = { dx: dir.x * distance, dz: dir.z * distance };
+      hero.cooldowns[blink.id] = blink.cooldownTicks;
+      hero.iframes = Math.max(hero.iframes, blink.iframeTicks);
+      hero.attack = null;
+      hero.dodge = null;
+      entity.rotationY = Math.atan2(dir.x, dir.z);
+      return null;
+    }
     case 'ultimate': {
       const ultimate = god.ultimate;
       if (!ultimate) return 'no ultimate';
@@ -394,6 +421,8 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
     }
   }
 
+  if (hero.blink) performBlink(ctx, entity, physics);
+
   // Horizontal velocity from the current state.
   const moveLength = Math.hypot(hero.move.x, hero.move.z);
   let vx = 0;
@@ -563,4 +592,46 @@ function keepOutOfTheGround(ctx: SimContext, entity: HeroEntity, before: Vec3, t
     hero.dodge = null;
     ctx.emit('hero:recovered', { entityId: entity.id, reason: fellOut ? 'fell out of the world' : 'stuck' });
   }
+}
+
+/**
+ * Bolt Step: moves the god through the character controller (so rocks,
+ * trees and creatures stop it), keeps the landing inside the meadow, then
+ * bursts lightning around the landing spot.
+ */
+function performBlink(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld | undefined): void {
+  const hero = entity.hero;
+  const blink = godDef(entity.defId).blink;
+  const jump = hero.blink;
+  hero.blink = null;
+  if (!blink || !jump) return;
+  const from = { ...entity.position };
+  let tx = from.x + jump.dx;
+  let tz = from.z + jump.dz;
+  const limit = MEADOW_RADIUS - 2;
+  const r = Math.hypot(tx, tz);
+  if (r > limit) {
+    tx *= limit / r;
+    tz *= limit / r;
+  }
+  const dx = tx - from.x;
+  const dz = tz - from.z;
+  if (physics) {
+    // Half-metre steps: one long sweep stops at the first bump in the terrain,
+    // while short steps climb and step up like walking does.
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.5));
+    for (let i = 0; i < steps; i += 1) {
+      const moved = physics.moveCharacter(entity.id, { x: dx / steps, y: -0.05, z: dz / steps });
+      if (moved) entity.position = moved.position;
+    }
+  } else {
+    entity.position = { x: tx, y: groundHeightAt(tx, tz), z: tz };
+  }
+  // Never end up under the terrain (the M3.1 safety rule).
+  const ground = groundHeightAt(entity.position.x, entity.position.z);
+  if (entity.position.y < ground) entity.position.y = ground;
+  const to = { ...entity.position };
+  const targetIds = targetsNear(ctx.world, to, blink.burstRadius, new Set([entity.id]));
+  for (const id of targetIds) applyDamage(ctx, id, blink.burstDamage, entity.id, 'ability', blink.element);
+  ctx.emit('ability:blink', { casterId: entity.id, abilityId: blink.id, from, to, targetIds });
 }

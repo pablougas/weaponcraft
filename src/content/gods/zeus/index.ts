@@ -1,4 +1,5 @@
 import type { GodDef } from '../../types';
+import { boltStep } from './bolt-step';
 import { chainLightning } from './chain-lightning';
 import { lightningFist } from './lightning-fist';
 import { skyStrike } from './sky-strike';
@@ -18,6 +19,7 @@ export const zeus: GodDef = {
   hoverTicks: 21,
   body: { radius: 0.32, height: 1.9 },
   ability: chainLightning,
+  blink: boltStep,
   chargedMove: lightningFist,
   ultimate: skyStrike,
   starterWeaponId: 'starter-spear',

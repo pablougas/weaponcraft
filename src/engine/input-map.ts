@@ -18,6 +18,7 @@ export type InputAction =
   | 'godAbility'
   | 'ultimate'
   | 'lockOn'
+  | 'blink'
   | 'interact'
   | 'inventory'
   | 'codex'
@@ -47,6 +48,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   godAbility: ['KeyQ'],
   ultimate: ['KeyR'],
   lockOn: ['Tab'],
+  // Bolt Step: W is free since the arrow keys move (M3.1), and sits next to Q and R.
+  blink: ['KeyW'],
   interact: ['KeyF'],
   inventory: ['KeyI'],
   codex: ['KeyC'],

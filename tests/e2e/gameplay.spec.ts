@@ -44,14 +44,21 @@ test.describe('Zeus (M3)', () => {
     await expect.poll(async () => hero(await state(page)).hero!.grounded, { timeout: 30_000 }).toBe(true);
   });
 
-  test('W no longer moves: letters are actions (M3.1)', async ({ page }) => {
+  test('W is Bolt Step: holding it does not walk, a press teleports about 8 m once', async ({ page }) => {
     await play(page);
+    // Off the rock, on open meadow, facing away from everything.
+    await page.evaluate(() => window.wc!.teleport(-20, -20, Math.PI));
     const start = hero(await state(page)).position;
     await page.keyboard.down('KeyW');
-    await page.evaluate(() => window.wc!.step(30));
+    await page.evaluate(() => window.wc!.step(30)); // held for a second: one flash, no walking
     await page.keyboard.up('KeyW');
-    const p = hero(await state(page)).position;
-    expect(Math.hypot(p.x - start.x, p.z - start.z)).toBeLessThan(0.05);
+    const s = await state(page);
+    const p = hero(s).position;
+    const moved = Math.hypot(p.x - start.x, p.z - start.z);
+    expect(moved).toBeGreaterThan(6);
+    expect(moved).toBeLessThan(9);
+    expect(hero(s).hero!.cooldowns['bolt-step'] ?? 0).toBeGreaterThanOrEqual(0);
+    await expect(page.locator('[data-hud="blink"] kbd')).toHaveText('W');
   });
 
   test('holding Q keeps firing Chain Lightning until stamina runs out', async ({ page }) => {

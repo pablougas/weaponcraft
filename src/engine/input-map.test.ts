@@ -23,7 +23,8 @@ describe('InputMap', () => {
     expect(map.matches('jump', { code: 'Space' })).toBe(false);
     expect(map.actionsFor('Mouse0')).toEqual(['punch']);
     expect(map.actionsFor('ArrowUp')).toEqual(['moveForward']);
-    expect(map.actionsFor('KeyW')).toEqual([]);
+    // W doesn't move any more (arrow keys do); it's Bolt Step.
+    expect(map.actionsFor('KeyW')).toEqual(['blink']);
     map.bind('godAbility', ['KeyR']);
     expect(map.codesFor('godAbility')).toEqual(['KeyR']);
   });
