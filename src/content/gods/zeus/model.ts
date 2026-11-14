@@ -129,6 +129,22 @@ export const createModel: ModelFactory = (look, entityId) => {
     leaf.rotation.y = -a;
     head.add(leaf);
   }
+  // Gold lightning bolts on the crown, one above each ear. The flat zigzag faces
+  // front/back (angled ~35° outward) so it reads from the close-up and the follow camera.
+  const boltShape = new THREE.Shape([
+    new THREE.Vector2(0.025, 0.085),
+    new THREE.Vector2(-0.03, 0.005),
+    new THREE.Vector2(0.0, 0.005),
+    new THREE.Vector2(-0.025, -0.085),
+    new THREE.Vector2(0.035, -0.005),
+    new THREE.Vector2(0.005, -0.005),
+  ]);
+  const crownBoltGeo = new THREE.ExtrudeGeometry(boltShape, { depth: 0.014, bevelEnabled: false });
+  crownBoltGeo.center();
+  const crownGold = toon({ color: '#f2c45a', emissive: '#ffb340', emissiveIntensity: 0.35 });
+  for (const sx of [-1, 1]) {
+    head.add(M(crownBoltGeo, crownGold, [sx * 0.22, 0.19, -0.02], { rot: [0, sx * 0.6, sx * -0.28], scale: [1.3, 1.3, 1.3], outline: 0.006 }));
+  }
 
   const capePivot = new THREE.Group();
   capePivot.position.set(0, 0.62, -0.02);
