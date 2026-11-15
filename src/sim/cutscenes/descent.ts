@@ -14,25 +14,29 @@ import { spawn, type SimContext } from '../world';
  */
 export const DESCENT_ID = 'descent';
 
+/** The scene plays at this pace (team request, Nov 15: slower, so the captions can be read in time). */
+const PACE = 1.5;
+const at = (seconds: number) => ticks(seconds * PACE);
+
 export const DESCENT_BEATS = {
   /** A shadow portal opens in front of Zeus. */
   portal: 0,
   /** Hades steps out and walks up to Zeus. */
-  hades: ticks(1.5),
-  lineHades1: ticks(3.5),
-  lineZeus: ticks(7.5),
-  lineHades2: ticks(10.5),
+  hades: at(1.5),
+  lineHades1: at(3.5),
+  lineZeus: at(7.5),
+  lineHades2: at(10.5),
   /** Hades opens the way down behind them. */
-  portalDown: ticks(14),
+  portalDown: at(14),
   /** They step through; the screen fades calmly to black. */
-  fadeOut: ticks(16),
+  fadeOut: at(16),
   /** Both gods arrive in the Outer Grotto (still black, then fading in). */
-  arrive: ticks(17.5),
-  lineGrotto: ticks(19.5),
+  arrive: at(17.5),
+  lineGrotto: at(19.5),
   /** The dispatch by the humans' conduit rig: Cerberus is chained to power the Mk. II. */
-  dispatch: ticks(22),
-  lineFree: ticks(26.5),
-  end: ticks(30),
+  dispatch: at(22),
+  lineFree: at(26.5),
+  end: at(30),
 } as const;
 
 export type DescentBeat = keyof typeof DESCENT_BEATS;

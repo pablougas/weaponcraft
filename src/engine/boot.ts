@@ -345,7 +345,8 @@ export async function boot(): Promise<void> {
     sfx.handle(event);
     if (event.type === 'cutscene:beat' && ROCKET_CAPTIONS[event.beat]) captions.show(ROCKET_CAPTIONS[event.beat], event.beat === 'pan' ? 5 : 3.5);
     if (event.type === 'cutscene:beat' && event.cutsceneId === 'descent' && DESCENT_CAPTIONS[event.beat]) {
-      captions.show(DESCENT_CAPTIONS[event.beat], event.beat === 'dispatch' ? 6 : 3.8);
+      // Long enough to read comfortably (the scene is paced to match).
+      captions.show(DESCENT_CAPTIONS[event.beat], event.beat === 'dispatch' ? 8 : 5.5);
     }
     if (event.type === 'cutscene:end') {
       // This browser remembers what it has seen, so later games may skip it.

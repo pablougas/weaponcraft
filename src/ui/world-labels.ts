@@ -6,8 +6,8 @@ import type { EntityId, PlayerId, WorldState } from '../sim/types';
 import { isKnownWeapon, weaponData } from '../sim/weapons';
 
 const NUMBER_SECONDS = 0.9;
-const STATUS_LABELS = { poison: 'Poisoned', blind: 'Blinded', stun: 'Stunned', crush: 'Caged' } as const;
-const STATUS_COLORS = { poison: ELEMENT_INFO.poison.color, blind: ELEMENT_INFO.light.color, stun: ELEMENT_INFO.lightning.color, crush: ELEMENT_INFO.shadow.color } as const;
+const STATUS_LABELS = { poison: 'Poisoned', blind: 'Blinded', stun: 'Stunned', crush: 'Crushed', caged: 'Caged', dread: 'Dread' } as const;
+const STATUS_COLORS = { poison: ELEMENT_INFO.poison.color, blind: ELEMENT_INFO.light.color, stun: ELEMENT_INFO.lightning.color, crush: ELEMENT_INFO.shadow.color, caged: ELEMENT_INFO.shadow.color, dread: '#9fe8ff' } as const;
 
 interface FloatingNumber {
   el: HTMLElement;

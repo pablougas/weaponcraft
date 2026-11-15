@@ -382,3 +382,37 @@ describe('starting the level over (falling, or "Reset level")', () => {
   });
 
 });
+
+describe('Skull Cage and Three-Fold Howl (team tuning, Nov 15)', () => {
+  it('Skull Cage slams and crushes what is inside, holds even the Warden briefly, and recovers in 8 s', async () => {
+    const { skullCage } = await import('../content/gods/hades/skull-cage');
+    expect(skullCage.cooldownTicks).toBe(240);
+    const { world, run, plating } = atTheGates();
+    plating().health!.current = 0;
+    run([], 2);
+    run([], WARDEN_BEATS.end + 2);
+    const warden = findWarden(world)!;
+    const before = warden.health.current;
+    const { ctx } = createSimContext(world, true);
+    const zeus = world.entities[world.players.p1.entityId!];
+    skullCage.land(ctx, zeus.id, { ...warden.position }, 100);
+    // The slam lands at once; the crush keeps going.
+    expect(warden.health.current).toBeLessThanOrEqual(before - 60);
+    const pos = { ...warden.position };
+    run([], 30);
+    expect(Math.hypot(warden.position.x - pos.x, warden.position.z - pos.z)).toBeLessThan(0.05);
+    expect(warden.health.current).toBeLessThan(before - 60);
+  });
+
+  it('Three-Fold Howl leaves dread: enemies in range keep taking damage for a few seconds', async () => {
+    const { world, run, zeus, plating, near } = atTheGates();
+    world.flags.cerberusFreed = true;
+    near(MECH_SIZE.halfZ + 3, Math.PI);
+    zeus().stamina!.current = zeus().stamina!.max;
+    const before = plating().health!.current;
+    run([{ type: 'player:action', playerId: 'p1', action: 'spiritAbility' }]);
+    expect(plating().statuses?.some((s) => s.kind === 'dread')).toBe(true);
+    run([], 4 * 30 + 2);
+    expect(plating().health!.current).toBeLessThanOrEqual(before - 4 * HOWL.dreadPerSecond);
+  });
+});

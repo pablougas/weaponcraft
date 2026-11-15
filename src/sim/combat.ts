@@ -207,13 +207,14 @@ export function applyDamage(
   return dealt;
 }
 
-/** Ticks down status effects and applies poison damage once a second. */
+/** Ticks down status effects and applies damage over time (poison, crush, dread) once a second. */
 export function updateStatuses(ctx: SimContext): void {
   for (const entity of Object.values(ctx.world.entities)) {
     if (!entity.statuses?.length) continue;
     for (const status of entity.statuses) {
       status.ticksLeft -= 1;
-      if ((status.kind === 'poison' || status.kind === 'crush') && status.ticksLeft % TICK_HZ === 0 && status.ticksLeft >= 0) {
+      // Damage over time, once a second: poison, the Skull Cage's crush, the howl's dread.
+      if ((status.kind === 'poison' || status.kind === 'crush' || status.kind === 'dread') && status.ticksLeft % TICK_HZ === 0 && status.ticksLeft >= 0) {
         applyDamage(ctx, entity.id, status.power, status.sourceId, 'status');
       }
     }

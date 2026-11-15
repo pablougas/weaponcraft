@@ -1,4 +1,4 @@
-import { applyDamage, isHittable } from '../combat';
+import { applyDamage, hasStatus, isHittable } from '../combat';
 import { DT, ticks } from '../constants';
 import type { PhysicsWorld } from '../physics';
 import { groundAt } from '../regions';
@@ -109,6 +109,12 @@ export function updateWarden(ctx: SimContext, physics?: PhysicsWorld): void {
   w.dashReady = Math.max(0, w.dashReady - 1);
   if (e.creature) e.creature.sinceHit += 1;
 
+  // Held in Hades's Skull Cage: he can't move or attack until it lets go.
+  if (hasStatus(e, 'caged')) {
+    w.attack = null;
+    move(e, 0, 0, physics);
+    return;
+  }
   if (w.attack) {
     advanceAttack(ctx, e, physics);
     return;

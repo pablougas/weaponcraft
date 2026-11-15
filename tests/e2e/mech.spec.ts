@@ -1,9 +1,8 @@
 import type { Page } from '@playwright/test';
-import { expect, openGame, test } from './fixtures';
+import { expect, openGame, test, STEPS, TO_GROTTO } from './fixtures';
 
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
-const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 /** "Cerberus Freed" length in ticks (sim/cutscenes/freed.ts FREED_BEATS.end = 33 s). */
 const FREED_TICKS = 990;
 /** "The Warden" length in ticks (sim/cutscenes/warden.ts WARDEN_BEATS.end = 10 s). */
@@ -14,7 +13,7 @@ async function inGrotto(page: Page) {
   await page.evaluate(() => window.wc!.setSeed(7));
   await page.locator('#wc-title').click();
   for (const step of STEPS) await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
-  await page.evaluate(() => window.wc!.step(541 + 905));
+  await page.evaluate((n) => window.wc!.step(n), TO_GROTTO);
   await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
 }
 

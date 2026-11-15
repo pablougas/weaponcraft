@@ -1,10 +1,9 @@
-import { expect, openGame, test } from './fixtures';
+import { expect, openGame, test, STEPS, TO_GROTTO } from './fixtures';
 
 declare global {
   interface Window { __oscillators?: number; __noises?: number }
 }
 
-const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 const oscillators = (page: import('@playwright/test').Page) => page.evaluate(() => window.__oscillators ?? 0);
 const noises = (page: import('@playwright/test').Page) => page.evaluate(() => window.__noises ?? 0);
 
@@ -45,7 +44,7 @@ test.describe('audio (M8)', () => {
 
     // Into the Underworld: its own music keeps playing there.
     for (const step of STEPS) await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
-    await page.evaluate(() => window.wc!.step(541 + 905));
+    await page.evaluate((n) => window.wc!.step(n), TO_GROTTO);
     await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
     const underworld = await oscillators(page);
     await expect.poll(() => oscillators(page), { timeout: 20_000 }).toBeGreaterThan(underworld + 3);

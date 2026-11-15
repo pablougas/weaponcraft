@@ -1,4 +1,11 @@
 import { test as base, expect, type Page } from '@playwright/test';
+import { DESCENT_LENGTH } from '../../src/sim/cutscenes/descent';
+import { TUTORIAL_STEPS } from '../../src/sim/tutorial';
+
+/** Every prologue tutorial step (the game's own list). */
+export const STEPS: readonly string[] = TUTORIAL_STEPS;
+/** Ticks from the tutorial's end until play resumes in the Outer Grotto: the rocket (541) and the descent, plus a few. */
+export const TO_GROTTO = 541 + DESCENT_LENGTH + 5;
 
 /**
  * Shared fixtures for every browser test:

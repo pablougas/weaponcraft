@@ -33,8 +33,12 @@ describe('prologue tutorial', () => {
     expect(world.tutorial.done).toContain('sprint');
     run([{ type: 'player:move', playerId: 'p1', x: 0, z: 0, sprint: false, jumpHeld: false }], 45); // stop and land (he walked off the rock)
     const events = run([{ type: 'player:action', playerId: 'p1', action: 'jump' }], 2);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'tutorial:step', stepId: 'jump', next: 'attack' }));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'tutorial:step', stepId: 'jump', next: 'roll' }));
     expect(hero().hero!.grounded === false || world.tutorial.done.includes('jump')).toBe(true);
+    // Land, then roll → roll.
+    run([], 45);
+    const rolled = run([{ type: 'player:action', playerId: 'p1', action: 'dodge' }], 2);
+    expect(rolled).toContainEqual(expect.objectContaining({ type: 'tutorial:step', stepId: 'roll', next: 'attack' }));
   });
 
   it('the rocket starts the tick after the last step, and only once every step is done', () => {

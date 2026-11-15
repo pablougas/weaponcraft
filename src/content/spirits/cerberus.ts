@@ -1,9 +1,9 @@
-import { isHittable } from '../../sim/combat';
+import { addStatus, isHittable } from '../../sim/combat';
 import { ticks } from '../../sim/constants';
 import type { Entity } from '../../sim/types';
 import type { SpiritDef } from './index';
 
-/** Three-Fold Howl's numbers (SPEC §6 table: AoE fear + lifesteal for 6 s). */
+/** Three-Fold Howl's numbers (SPEC §6 table: AoE fear + lifesteal for 6 s; plus lingering dread damage). */
 export const HOWL = {
   radius: 10,
   /** Enemies in range run in fear (soldiers break and flee; wildlife bolts). */
@@ -13,6 +13,9 @@ export const HOWL = {
   lifestealTicks: ticks(6),
   cooldownTicks: ticks(20),
   staminaCost: 30,
+  /** Dread: every enemy in range keeps taking this much a second for a while after (team request, Nov 15). */
+  dreadPerSecond: 6,
+  dreadTicks: ticks(4),
 } as const;
 
 /**
@@ -37,6 +40,8 @@ export const cerberus: SpiritDef = {
         if (e.id === casterId || e.hero || !isHittable(e) || (e.region ?? 'surface') !== (caster.region ?? 'surface')) continue;
         if (Math.hypot(e.position.x - caster.position.x, e.position.z - caster.position.z) > HOWL.radius) continue;
         if (fear(e)) feared.push(e.id);
+        // Dread lingers on everything it reached, machines included (they don't flee, but they still hurt).
+        addStatus(e, { kind: 'dread', ticksLeft: HOWL.dreadTicks, power: HOWL.dreadPerSecond, sourceId: casterId });
       }
       caster.hero.howl = HOWL.lifestealTicks;
       ctx.emit('ability:cast', { casterId, abilityId: 'three-fold-howl', targetIds: feared, points: [{ ...caster.position }] });

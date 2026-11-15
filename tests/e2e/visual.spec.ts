@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, openGame, test } from './fixtures';
+import { expect, openGame, test, STEPS, TO_GROTTO } from './fixtures';
 
 // Approved screenshots are how a look gets signed off (CLAUDE.md). If one of
 // these fails after an intended change, show the team `npx playwright
@@ -137,7 +137,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   /** Completes the tutorial and steps the (frozen) rocket cinematic to `ticks` after it starts. */
   async function cinematicAt(page: Page, ticks: number) {
     await frozenScene(page, 0.7, 'follow');
-    for (const step of ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse']) {
+    for (const step of STEPS) {
       await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
     }
     await page.evaluate(async (n) => { window.wc!.step(n); await window.wc!.freeze(12); }, ticks);
@@ -156,8 +156,8 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await expect(page).toHaveScreenshot('vista-shattered.png', SHOT);
   });
 
-  // M5.1: Hades's arrival, the portal down, and the grotto (ticks after the rocket starts; it lasts 540).
-  for (const [name, ticks] of [['hades-arrival', 541 + 140], ['hades-portal', 541 + 470], ['grotto-discovery', 541 + 735]] as const) {
+  // M5.1: Hades's arrival, the portal down, and the grotto (ticks after the rocket starts; it lasts 540; the descent is paced 1.5×).
+  for (const [name, ticks] of [['hades-arrival', 541 + 210], ['hades-portal', 541 + 705], ['grotto-discovery', 541 + 1103]] as const) {
     test(`descent: ${name}`, async ({ page }) => {
       await cinematicAt(page, ticks);
       await expect(page).toHaveScreenshot(`${name}.png`, SHOT);
@@ -165,12 +165,12 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   }
 
   test('the Outer Grotto as the Refuge', async ({ page }) => {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     await expect(page).toHaveScreenshot('grotto-refuge.png', SHOT);
   });
 
   test('resting on the grotto bed', async ({ page }) => {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     // Stand beside the bed (grotto spot 7.5, 4; the grotto is 2 km down) and press F.
     await page.evaluate(() => window.wc!.teleport(7.5 - 1.6, 4 - 0.9));
     await page.keyboard.press('KeyF');
@@ -180,7 +180,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
 
   for (const expression of ['neutral', 'determined', 'happy', 'hurt'] as const) {
     test(`Hades close-up, ${expression}`, async ({ page }) => {
-      await cinematicAt(page, 541 + 905);
+      await cinematicAt(page, TO_GROTTO);
       await page.keyboard.press('KeyV');
       await page.evaluate(async (e) => { window.wc!.step(2); await window.wc!.freeze(12); await window.wc!.snapCam('closeup'); await window.wc!.face(e); }, expression);
       await expect(page).toHaveScreenshot(`hades-${expression}.png`, SHOT);
@@ -188,7 +188,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   }
 
   test('the barricade torn down: the tunnel to the Asphodel Fields', async ({ page }) => {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     await page.evaluate(async () => {
       await window.wc!.breakBarricade();
       await window.wc!.teleport(0, -9, Math.PI);
@@ -199,7 +199,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   });
 
   test('the Asphodel Fields vista toward the Gates', async ({ page }) => {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     await page.evaluate(async () => {
       await window.wc!.teleport(-2, -95, Math.PI);
       window.wc!.step(90);
@@ -209,7 +209,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   });
 
   test('a human fort in the Asphodel Fields', async ({ page }) => {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     // Outside the first fort's gate, looking in (fort-asphodel sits west of the path at z −185).
     await page.evaluate(async () => {
       await window.wc!.teleport(-4, -160, Math.PI + 0.75);
@@ -222,7 +222,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
 
   // Behind-left of a sentry squad's leader, out of its cone, looking at the squad.
   async function behindSquad(page: Page, squadId: string) {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     await page.evaluate(async (id) => {
       const w = window.wc!.getState().world!;
       const leader = Object.values(w.entities).find((e) => e.soldier?.squadId === id && e.soldier.leader)!;
@@ -248,7 +248,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
 
   // Cerberus Mk. II (M7). The mech walks its watch loop, so shots are framed from where it is.
   async function atTheGates(page: Page) {
-    await cinematicAt(page, 541 + 905);
+    await cinematicAt(page, TO_GROTTO);
     await page.evaluate(async () => {
       await window.wc!.breakBarricade();
       window.wc!.step(150);

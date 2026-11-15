@@ -16,6 +16,7 @@ const STEP_NAMES: Record<TutorialStepId, string> = {
   move: 'Move',
   sprint: 'Sprint',
   jump: 'Jump',
+  roll: 'Roll',
   attack: 'Attack',
   ability: 'Chain Lightning',
   pickup: 'Pick up a weapon',
@@ -27,6 +28,7 @@ const STEP_ACTIONS: Record<TutorialStepId, readonly InputAction[]> = {
   move: ['moveForward', 'moveBack', 'moveLeft', 'moveRight'],
   sprint: ['sprint'],
   jump: ['jump'],
+  roll: ['dodge'],
   attack: ['punch', 'weaponStrike'],
   ability: ['godAbility'],
   pickup: ['interact'],
@@ -58,6 +60,7 @@ export function createTutorialPanel(parent: HTMLElement, key: (action: InputActi
     switch (step) {
       case 'move': return `Move with ${k('moveForward')} ${k('moveBack')} ${k('moveLeft')} ${k('moveRight')}. Look around with the mouse, or ${k('cameraLeft')} and ${k('cameraRight')}.`;
       case 'sprint': return `Hold ${k('sprint')} while moving to sprint.`;
+      case 'roll': return `Press ${k('dodge')} to roll out of harm's way. You can't be hit mid-roll.`;
       case 'jump': return `Press ${k('jump')} to jump. Hold it while falling to hover.`;
       case 'attack': return `Hit a practice dummy or a sheep behind the rock: ${k('punch')} to punch, ${k('weaponStrike')} for your spear.`;
       case 'ability': return `Press ${k('godAbility')} to call Chain Lightning.`;

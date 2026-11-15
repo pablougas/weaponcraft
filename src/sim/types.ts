@@ -127,7 +127,8 @@ export interface MechState {
   platingId: EntityId | null;
 }
 
-export type StatusKind = 'blind' | 'poison' | 'stun' | 'crush';
+/** 'caged': held in Hades's Skull Cage (even bosses, briefly). 'dread': Three-Fold Howl's lingering damage. */
+export type StatusKind = 'blind' | 'poison' | 'stun' | 'crush' | 'caged' | 'dread';
 
 export interface StatusEffect {
   kind: StatusKind;

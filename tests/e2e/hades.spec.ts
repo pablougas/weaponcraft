@@ -1,10 +1,9 @@
 import type { Page } from '@playwright/test';
-import { expect, openGame, test } from './fixtures';
+import { expect, openGame, test, STEPS, TO_GROTTO } from './fixtures';
 
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
 const active = (s: State) => s.world!.entities[s.world!.players[s.localPlayerId!].entityId!];
-const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 
 /** A new game played through the prologue and the descent: Zeus in the grotto, Hades in the party. */
 async function inGrotto(page: Page) {
@@ -12,7 +11,7 @@ async function inGrotto(page: Page) {
   await page.evaluate(() => window.wc!.setSeed(7));
   await page.locator('#wc-title').click();
   for (const step of STEPS) await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
-  await page.evaluate(() => window.wc!.step(541 + 905));
+  await page.evaluate((n) => window.wc!.step(n), TO_GROTTO);
   await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
 }
 

@@ -1,10 +1,9 @@
 import type { Page } from '@playwright/test';
-import { expect, openGame, test } from './fixtures';
+import { expect, openGame, test, STEPS } from './fixtures';
 
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
 const hero = (s: State) => s.world!.entities[s.world!.players[s.localPlayerId!].entityId!];
-const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 
 async function start(page: Page) {
   await openGame(page);
@@ -60,7 +59,7 @@ test.describe('prologue and the rocket (M5)', () => {
   test('finishing the last tutorial item closes the altar and starts the rocket without movement', async ({ page }) => {
     await start(page);
     await page.evaluate(() => window.wc!.freeze(1));
-    for (const step of ['move', 'sprint', 'jump', 'attack', 'ability']) {
+    for (const step of ['move', 'sprint', 'jump', 'roll', 'attack', 'ability']) {
       await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
     }
 

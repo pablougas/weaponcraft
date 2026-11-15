@@ -1,12 +1,13 @@
 import type { Page } from '@playwright/test';
-import { expect, openGame, test } from './fixtures';
+import { DESCENT_LENGTH } from '../../src/sim/cutscenes/descent';
+import { expect, openGame, test, STEPS } from './fixtures';
 
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
 const hero = (s: State) => s.world!.entities[s.world!.players[s.localPlayerId!].entityId!];
-const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 const ROCKET_TICKS = 541;
-const DESCENT_TICKS = 900;
+/** The descent's length (sim/cutscenes/descent.ts), so this follows its pacing. */
+const DESCENT_TICKS = DESCENT_LENGTH;
 
 test.describe('Hades and the descent (M5.1)', () => {
   test('rocket → Hades scene → grotto → objective; control returns as Zeus; reload keeps it', { tag: '@smoke' }, async ({ page, consoleErrors }) => {
@@ -21,7 +22,8 @@ test.describe('Hades and the descent (M5.1)', () => {
     let s = await state(page);
     expect(s.world!.cutscene).toMatchObject({ id: 'descent' });
     await expect(page.locator('#wc-hud')).toBeHidden();
-    await page.evaluate(() => window.wc!.step(60));
+    // Hades steps out a little after the portal opens (2.25 s in).
+    await page.evaluate(() => window.wc!.step(90));
     s = await state(page);
     expect(Object.values(s.world!.entities).some((e) => e.defId === 'hades' && e.npc)).toBe(true);
     const before = hero(s).position;

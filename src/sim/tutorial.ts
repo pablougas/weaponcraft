@@ -7,7 +7,7 @@ import type { SimContext } from './world';
  * Each is completed by doing it; any order counts, and the prompt shows the
  * first step not done yet. When all are done, the rocket cinematic starts.
  */
-export const TUTORIAL_STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'] as const;
+export const TUTORIAL_STEPS = ['move', 'sprint', 'jump', 'roll', 'attack', 'ability', 'pickup', 'fuse'] as const;
 export type TutorialStepId = (typeof TUTORIAL_STEPS)[number];
 
 /** Walking this long completes "move" (about 2 s). */
@@ -53,6 +53,9 @@ export function updateTutorial(ctx: SimContext, events: readonly GameEvent[]): v
     switch (event.type) {
       case 'hero:jump':
         if (heroIds.has(event.entityId)) completeStep(ctx, 'jump');
+        break;
+      case 'hero:dodge':
+        if (heroIds.has(event.entityId)) completeStep(ctx, 'roll');
         break;
       case 'combat:hit':
         // A light or heavy weapon strike, a punch or the Lightning Fist on anything.
