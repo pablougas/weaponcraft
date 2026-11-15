@@ -17,6 +17,7 @@ describe('settings', () => {
       mouseSensitivity: 1,
       invertY: false,
       cameraAutoFollow: true,
+      volume: { master: 0.8, music: 0.6, sfx: 0.8 },
     });
     expect(defaultSettings(true).reduceMotion).toBe(true);
   });
@@ -41,6 +42,12 @@ describe('settings', () => {
 
   it('clamps mouse sensitivity', () => {
     expect(parseSettings(JSON.stringify({ mouseSensitivity: 99, invertY: true }), defaultSettings())).toMatchObject({ mouseSensitivity: 3, invertY: true });
+  });
+
+  it('volumes default sensibly, clamp to 0–1 and keep missing levels', () => {
+    expect(defaultSettings().volume).toEqual({ master: 0.8, music: 0.6, sfx: 0.8 });
+    const parsed = parseSettings(JSON.stringify({ volume: { master: 2, music: -1, sfx: 'loud' } }), defaultSettings());
+    expect(parsed.volume).toEqual({ master: 1, music: 0, sfx: 0.8 });
   });
 
   it('get() returns a copy', () => {

@@ -31,7 +31,11 @@ export interface SettingsMenuOptions {
   onNewGame(): void;
 }
 
-/** Esc settings menu: effects, reduce motion, quality, time of day, New game. */
+type VolumeKey = 'master' | 'music' | 'sfx';
+const VOLUME_KEYS: readonly VolumeKey[] = ['master', 'music', 'sfx'];
+const VOLUME_LABELS: Readonly<Record<VolumeKey, string>> = { master: 'Master volume', music: 'Music', sfx: 'Sound effects' };
+
+/** Esc settings menu: effects, audio volumes, reduce motion, quality, time of day, New game. */
 export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOptions): SettingsMenu {
   const { store } = options;
   const element = document.createElement('div');
@@ -72,6 +76,13 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
         <label class="wc-check"><input type="checkbox" data-setting="cameraAutoFollow"> Camera auto-follow</label>
       </section>
       <section>
+        <h3>Audio</h3>
+        ${VOLUME_KEYS.map((key) => `
+        <label class="wc-row">${VOLUME_LABELS[key]}
+          <span class="wc-range"><input type="range" min="0" max="1" step="0.05" data-volume="${key}"><output data-volume-output="${key}"></output></span>
+        </label>`).join('')}
+      </section>
+      <section>
         <h3>Accessibility</h3>
         <label class="wc-check"><input type="checkbox" data-setting="reduceMotion"> Reduce motion &amp; flashes</label>
       </section>
@@ -91,6 +102,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
   const invertY = element.querySelector<HTMLInputElement>('[data-setting="invertY"]')!;
   const autoFollow = element.querySelector<HTMLInputElement>('[data-setting="cameraAutoFollow"]')!;
   const effectBoxes = [...element.querySelectorAll<HTMLInputElement>('[data-effect]')];
+  const volumeSliders = [...element.querySelectorAll<HTMLInputElement>('[data-volume]')];
   const newGameButton = element.querySelector<HTMLButtonElement>('[data-action="new-game"]')!;
   const autoOption = quality.querySelector<HTMLOptionElement>('option[value="auto"]')!;
 
@@ -103,6 +115,11 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
     invertY.checked = settings.invertY;
     autoFollow.checked = settings.cameraAutoFollow;
     for (const box of effectBoxes) box.checked = settings.effects[box.dataset.effect as keyof EffectSettings];
+    for (const slider of volumeSliders) {
+      const key = slider.dataset.volume as VolumeKey;
+      slider.value = String(settings.volume[key]);
+      element.querySelector<HTMLOutputElement>(`[data-volume-output="${key}"]`)!.textContent = `${Math.round(settings.volume[key] * 100)}%`;
+    }
   });
 
   quality.addEventListener('change', () => store.update((s) => { s.quality = quality.value as QualitySetting; }));
@@ -111,6 +128,9 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
   sensitivity.addEventListener('input', () => store.update((s) => { s.mouseSensitivity = Number(sensitivity.value); }));
   invertY.addEventListener('change', () => store.update((s) => { s.invertY = invertY.checked; }));
   autoFollow.addEventListener('change', () => store.update((s) => { s.cameraAutoFollow = autoFollow.checked; }));
+  for (const slider of volumeSliders) {
+    slider.addEventListener('input', () => store.update((s) => { s.volume[slider.dataset.volume as VolumeKey] = Number(slider.value); }));
+  }
   for (const box of effectBoxes) {
     box.addEventListener('change', () => store.update((s) => { s.effects[box.dataset.effect as keyof EffectSettings] = box.checked; }));
   }

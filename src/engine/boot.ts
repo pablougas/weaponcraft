@@ -34,7 +34,8 @@ import type { ModelFrame } from '../view/entity-model';
 import { EntityViews, preloadModels } from '../view/entity-views';
 import { Interpolator } from '../view/interpolation';
 import { createWorldView, type WorldView } from '../view/world-view';
-import { unlockAudio } from './audio';
+import { setVolumes, unlockAudio } from './audio';
+import { Music } from './music';
 import { InputController } from './input';
 import { InputMap, keyLabel } from './input-map';
 import { FixedStepLoop } from './loop';
@@ -287,7 +288,15 @@ export async function boot(): Promise<void> {
   const captions = createCaptions(document.body);
   const progress = loadProgress(storage);
   const dust = new DustEffects(meadow.scene);
-  const sfx = new Sfx((entityId) => !!entityId && entityId === localHero()?.id, (text) => captions.show(text));
+  const sfx = new Sfx(
+    (entityId) => !!entityId && entityId === localHero()?.id,
+    (text) => captions.show(text),
+    (playerId) => playerId === activeSession.localPlayerId,
+  );
+  const music = new Music();
+  /** Footsteps: metres walked since the last step, and where the god was last frame. */
+  let strideLeft = 0;
+  let lastStepPos: { x: number; z: number } | null = null;
   /** Auto-follow waits this long after the player last turned the camera. */
   const AUTO_FOLLOW_DELAY_MS = 600;
 
@@ -297,6 +306,7 @@ export async function boot(): Promise<void> {
     meadow.setReduceMotion(current.reduceMotion);
     meadow.setQuality(QUALITY_PRESETS[activeQuality()]);
     activeSession.timeLock = current.timeOfDay;
+    setVolumes(current.volume);
     document.documentElement.classList.toggle('wc-reduce-motion', current.reduceMotion);
     dirty = true;
   };
@@ -603,6 +613,23 @@ export async function boot(): Promise<void> {
 
       const hero = localHero();
       sfx.updateCharge(shell.screen === 'playing' ? hero : undefined, hero ? godDef(hero.defId).chargedMove?.fullChargeTicks ?? 30 : 30);
+      // Music follows the local god's region and dips under cinematics.
+      music.update(shell.screen === 'playing' && hero ? (regionOf(hero) === 'underworld' ? 'underworld' : 'meadow') : null, !!world.cutscene);
+      // A footstep every stride while the god walks on the ground.
+      if (hero?.hero && shell.screen === 'playing' && !frozen) {
+        const moved = lastStepPos ? Math.hypot(hero.position.x - lastStepPos.x, hero.position.z - lastStepPos.z) : 0;
+        lastStepPos = { x: hero.position.x, z: hero.position.z };
+        if (hero.hero.grounded && moved > 0 && moved < 5) { // (bigger jumps are teleports)
+          strideLeft -= moved;
+          if (strideLeft <= 0) {
+            const sprinting = hero.hero.sprint;
+            strideLeft = sprinting ? 2.2 : 1.5;
+            sfx.footstep(regionOf(hero) === 'underworld' ? 'stone' : 'grass', sprinting);
+          }
+        }
+      } else {
+        lastStepPos = null;
+      }
       // The meadow's edge during the prologue (the wider world opens after the rocket, M6).
       if (hero && shell.screen === 'playing' && !world.flags.prologueDone
         && Math.hypot(hero.position.x, hero.position.z) > MEADOW_RADIUS - 3) {
