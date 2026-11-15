@@ -472,6 +472,24 @@
   background: linear-gradient(90deg, #b8442e, #e88b6e);
 }
 
+/* The Warden's boss bar (M7): wider, darker red; deeper red once he rages. */
+.wc-hud-target.wc-boss {
+  width: min(560px, 82vw);
+}
+
+.wc-hud-target.wc-boss h3 {
+  font-size: 17px;
+  color: #f3d9a4;
+}
+
+.wc-hud-target.wc-boss .wc-bar-fill {
+  background: linear-gradient(90deg, #6e1414, #c2412b);
+}
+
+.wc-hud-target.wc-boss.wc-enraged .wc-bar-fill {
+  background: linear-gradient(90deg, #8c0e0e, #ff4a2a);
+}
+
 .wc-range {
   display: flex;
   align-items: center;

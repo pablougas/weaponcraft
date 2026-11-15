@@ -13,8 +13,8 @@ export type Intent =
   | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean; seenCutscenes?: string[] }
   /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
   | { type: 'dev:breakBarricade'; playerId: PlayerId }
-  /** Dev/test: wear the Mk. II's rear plating down to a fraction of its durability. */
-  | { type: 'dev:weakenMech'; playerId: PlayerId; fraction: number }
+  /** Dev/test: wear the Mk. II's rear plating (or the Warden) down to a fraction of its durability. */
+  | { type: 'dev:weakenMech'; playerId: PlayerId; fraction: number; target?: 'plating' | 'warden' }
   | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }

@@ -13,8 +13,9 @@ export const zeus: GodDef = {
   approved: true,
   maxHealth: 100,
   maxStamina: 100,
-  walkSpeed: 4.6,
-  sprintSpeed: 8,
+  // ~25% faster (team request, Nov 15).
+  walkSpeed: 5.8,
+  sprintSpeed: 10,
   jumpSpeed: 7.6,
   hoverTicks: 21,
   body: { radius: 0.32, height: 1.9 },

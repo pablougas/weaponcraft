@@ -49,7 +49,7 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' | 'chains' };
   /** A soldier or sentry (M6). */
   soldier?: SoldierState;
   /** An arrow in flight: velocity in m/s, life, damage and who shot it. */
@@ -64,8 +64,32 @@ export interface Entity {
   region?: RegionId;
   /** Cerberus Mk. II (M7): the war machine at the Gates. */
   mech?: MechState;
+  /** The Warden (M7): the Mk. II's pilot, the boss who climbs out when it breaks down. */
+  warden?: WardenState;
   /** A hittable part of a mech (its rear plating): which mech it belongs to. */
   mechPart?: { mechId: EntityId; part: 'rear-plating' };
+}
+
+/** The Warden's attacks: a two-hit maul combo, a leap slam, and a shoulder dash. */
+export type WardenAttackKind = 'swing' | 'leap' | 'dash';
+
+/** The Warden's state (M7 boss). */
+export interface WardenState {
+  /** 'emerging' while the cutscene walks him out; 'defeated' once he falls. */
+  mode: 'emerging' | 'fight' | 'defeated';
+  targetId: EntityId | null;
+  /** An attack in progress: warning ticks left, then active ticks; from/to for the leap; who it already hit. */
+  attack: { kind: WardenAttackKind; windup: number; active: number; total: number; from: Vec3; to: Vec3; yaw: number; hit: EntityId[] } | null;
+  /** Ticks before the next attack, and before the next leap and dash are allowed. */
+  cooldown: number;
+  leapReady: number;
+  dashReady: number;
+  /** Swings thrown in the current combo. */
+  combo: number;
+  /** Below half health: faster, shorter warnings. */
+  enraged: boolean;
+  /** Walking this tick (for the view's stride). */
+  walking: boolean;
 }
 
 /** The Mk. II's attacks: a stomp all round, fire breath down its cone, and a charge at you. */
@@ -289,6 +313,9 @@ export interface WorldFlags {
   armoryPlaced?: boolean;
   /** M7: Cerberus Mk. II is standing watch at the Gates. */
   mechPlaced?: boolean;
+  /** M7: the Warden climbed out of the broken Mk. II, and later fell. */
+  wardenEmerged?: boolean;
+  wardenDefeated?: boolean;
   /** M7: the Mk. II is down and Cerberus is free (Three-Fold Howl unlocked for both gods). */
   cerberusFreed?: boolean;
   [flag: string]: boolean | undefined;

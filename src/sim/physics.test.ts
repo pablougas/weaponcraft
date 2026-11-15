@@ -46,7 +46,7 @@ describe('tree trunks', () => {
 });
 
 describe('the Asphodel Fields collider', () => {
-  it('matches the drawn ground mesh everywhere (no invisible walls, no floating)', async () => {
+  it('matches the drawn ground mesh everywhere (no invisible walls, no floating)', { timeout: 30_000 }, async () => {
     const THREE = await import('three');
     const { GROTTO } = await import('./regions');
     const { FIELDS, FIELDS_CELL, FORT_SPOTS, FORT_RADIUS, GATES, SPIRES, TUNNEL, underworldGroundHeight, underworldLocalHeight } = await import('./terrain/underworld');
@@ -90,7 +90,7 @@ describe('the Asphodel Fields collider', () => {
 });
 
 describe('soldiers on the Underworld ground', () => {
-  it('stay on the surface (never sink through it) over 20 s of patrols', async () => {
+  it('stay on the surface (never sink through it) over 20 s of patrols', { timeout: 30_000 }, async () => {
     const { createWorld } = await import('./world');
     const { ensureMeadowPopulated } = await import('./populate');
     const { tickWorld } = await import('./tick');

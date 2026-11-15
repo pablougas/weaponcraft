@@ -6,6 +6,8 @@ const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.get
 const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
 /** "Cerberus Freed" length in ticks (sim/cutscenes/freed.ts FREED_BEATS.end = 13.5 s). */
 const FREED_TICKS = 405;
+/** "The Warden" length in ticks (sim/cutscenes/warden.ts WARDEN_BEATS.end = 10 s). */
+const WARDEN_TICKS = 300;
 
 async function inGrotto(page: Page) {
   await openGame(page);
@@ -16,8 +18,8 @@ async function inGrotto(page: Page) {
   await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
 }
 
-test.describe('Cerberus Mk. II and freeing Cerberus (M7)', () => {
-  test('sneak behind the Mk. II, break its plating, watch Cerberus go free; E howls for Zeus and for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
+test.describe('Cerberus Mk. II, the Warden, and freeing Cerberus (M7)', () => {
+  test('sneak behind the Mk. II, break its plating, the Warden climbs out; beat him, break the chains, Cerberus goes free; E howls for Zeus and for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
     test.setTimeout(300_000);
     await inGrotto(page);
     await page.evaluate(() => window.wc!.breakBarricade());
@@ -43,10 +45,10 @@ test.describe('Cerberus Mk. II and freeing Cerberus (M7)', () => {
       await page.evaluate(() => window.wc!.step(10));
     }
     s = await state(page);
-    expect(s.world!.cutscene?.id).toBe('cerberus-freed');
+    expect(s.world!.cutscene?.id).toBe('warden-emerges');
     expect(Object.values(s.world!.entities).find((e) => e.mech)!.mech!.mode).toBe('down');
 
-    // The scene: input is locked (arrow keys don't move the god), then control returns.
+    // The scene: input is locked (arrow keys don't move the god), then the Warden fights.
     const heroId = s.world!.players.p1.entityId!;
     const before = s.world!.entities[heroId].position;
     await page.keyboard.down('ArrowUp');
@@ -54,6 +56,43 @@ test.describe('Cerberus Mk. II and freeing Cerberus (M7)', () => {
     await page.keyboard.up('ArrowUp');
     s = await state(page);
     expect(Math.hypot(s.world!.entities[heroId].position.x - before.x, s.world!.entities[heroId].position.z - before.z)).toBeLessThan(0.3);
+    await expect(page.locator('#wc-captions')).toContainText('hatch');
+    await page.evaluate((n) => window.wc!.step(n), WARDEN_TICKS);
+    s = await state(page);
+    expect(s.world!.cutscene).toBeNull();
+    expect(s.world!.objective).toBe('defeat-the-warden');
+    // His boss bar.
+    await expect(page.locator('[data-hud="target"].wc-boss')).toBeVisible();
+    await expect(page.locator('[data-hud="target-name"]')).toHaveText('The Warden');
+
+    // Worn down (the full fight is unit-tested); the last blows are real punches.
+    await page.evaluate(() => window.wc!.weakenMech(0.01, 'warden'));
+    for (let i = 0; i < 60; i += 1) {
+      s = await state(page);
+      const w = Object.values(s.world!.entities).find((e) => e.warden)!;
+      if (w.warden!.mode === 'defeated') break;
+      const god = s.world!.entities[s.world!.players.p1.entityId!];
+      const d = Math.hypot(god.position.x - w.position.x, god.position.z - w.position.z) || 1;
+      if (d > 2.2) {
+        const x = w.position.x + ((god.position.x - w.position.x) / d) * 1.8;
+        const z = w.position.z + ((god.position.z - w.position.z) / d) * 1.8;
+        await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x, z, yaw: Math.atan2(w.position.x - x, w.position.z - z) });
+      }
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(8));
+    }
+    s = await state(page);
+    expect(Object.values(s.world!.entities).find((e) => e.warden)!.warden!.mode).toBe('defeated');
+    expect(s.world!.objective).toBe('release-cerberus');
+
+    // F at Cerberus's chains: the freeing scene.
+    const chains = Object.values(s.world!.entities).find((e) => e.structure?.kind === 'chains')!;
+    await page.evaluate(({ x, z }) => window.wc!.teleport(x, z, 0), { x: chains.position.x + 1.2, z: chains.position.z });
+    await expect(page.locator('#wc-prompt, .wc-prompt').first()).toContainText('chains');
+    await page.keyboard.press('KeyF');
+    await page.evaluate(() => window.wc!.step(2));
+    s = await state(page);
+    expect(s.world!.cutscene?.id).toBe('cerberus-freed');
     await page.evaluate((n) => window.wc!.step(n), FREED_TICKS);
     s = await state(page);
     expect(s.world!.cutscene).toBeNull();

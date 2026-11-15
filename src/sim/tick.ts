@@ -9,6 +9,8 @@ import { updateSoldiers } from './systems/soldiers';
 import { findMech, updateMech } from './systems/mech';
 import { updateSpirits } from './systems/spirits';
 import { FREED_ID, skipFreed, updateFreed } from './cutscenes/freed';
+import { skipWardenScene, updateWardenScene, WARDEN_ID } from './cutscenes/warden';
+import { findWarden, updateWarden } from './systems/warden';
 import { updateReveal } from './systems/reveal';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
@@ -57,6 +59,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   if (input.isAuthority) updateCreatures(ctx, input.physics);
   updateSoldiers(ctx, input.physics);
   updateMech(ctx);
+  updateWarden(ctx, input.physics);
   updateSpirits(ctx);
   updateReveal(ctx);
   updateRoute(ctx, events.filter((e): e is Extract<typeof e, { type: 'entity:defeated' }> => e.type === 'entity:defeated'));
@@ -68,6 +71,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     else if (rocketTicks(world) !== null) updateRocket(ctx);
     else if (world.cutscene?.id === DESCENT_ID) updateDescent(ctx);
     else if (world.cutscene?.id === FREED_ID) updateFreed(ctx);
+    else if (world.cutscene?.id === WARDEN_ID) updateWardenScene(ctx);
   }
 
   return events;
@@ -126,7 +130,7 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     case 'dev:weakenMech': {
       if (!ctx.isAuthority) return;
       const mech = findMech(world);
-      const plating = mech?.mech.platingId ? world.entities[mech.mech.platingId] : undefined;
+      const plating = intent.target === 'warden' ? findWarden(world) : mech?.mech.platingId ? world.entities[mech.mech.platingId] : undefined;
       if (!plating?.health || !Number.isFinite(intent.fraction)) {
         reject('no mech');
         return;
@@ -136,7 +140,7 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     }
     case 'cutscene:skip': {
       const id = world.cutscene?.id;
-      const reason = id === DESCENT_ID ? skipDescent(ctx) : id === FREED_ID ? skipFreed(ctx) : skipRocket(ctx);
+      const reason = id === DESCENT_ID ? skipDescent(ctx) : id === FREED_ID ? skipFreed(ctx) : id === WARDEN_ID ? skipWardenScene(ctx) : skipRocket(ctx);
       if (reason) reject(reason);
       return;
     }

@@ -1,8 +1,8 @@
 import { applyDamage, isHittable } from '../combat';
 import { ticks } from '../constants';
-import { startFreed } from '../cutscenes/freed';
+import { startWardenScene } from '../cutscenes/warden';
 import { GROTTO, groundAt } from '../regions';
-import { MECH_PATROL, MECH_SIZE, MECH_WATCH } from '../terrain/underworld';
+import { CERBERUS_POST, MECH_PATROL, MECH_SIZE, MECH_WATCH } from '../terrain/underworld';
 import type { Entity, EntityId, MechAttackKind, MechState, Vec3 } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 import { isResting } from './rest';
@@ -14,7 +14,8 @@ import { isResting } from './rest';
  * Then it charges at you, and turns — slowly — to fight: a stomp that hits
  * everything around it (a red ring warns first), a fire breath down its sensor
  * cone (the heads glow first), and more charges when you keep your distance. Its only weak spot is the plating on its back, a separate
- * hittable entity. When the plating breaks it powers down and Cerberus is freed.
+ * hittable entity. When the plating breaks it powers down and its pilot, the
+ * Warden, climbs out to fight (systems/warden.ts); beat him to free Cerberus.
  */
 export const MECH = {
   plating: 520,
@@ -83,7 +84,16 @@ export function ensureMech(ctx: SimContext): void {
   } satisfies Partial<Entity>);
   mech.mech.platingId = platingId;
   placePlating(mech as MechEntity, plating);
+  ensureChains(ctx);
   world.flags.mechPlaced = true;
+}
+
+/** Cerberus's chains (F breaks them once the Warden has fallen). Also added to saves from before they existed. */
+export function ensureChains(ctx: SimContext): void {
+  if (Object.values(ctx.world.entities).some((e) => e.structure?.kind === 'chains')) return;
+  const chains = spawn(ctx, 'cerberus-chains', { position: local(CERBERUS_POST.x + 2.5, CERBERUS_POST.z + 1.5) });
+  ctx.world.entities[chains].structure = { kind: 'chains' };
+  ctx.world.entities[chains].region = 'underworld';
 }
 
 /** Where the plating sits: on the back of the mech, at ground level so gods can reach it. */
@@ -384,7 +394,7 @@ function pushOut(ctx: SimContext, e: MechEntity): void {
   }
 }
 
-/** The plating broke: the Mk. II powers down, and Cerberus is freed. */
+/** The plating broke: the Mk. II powers down and its pilot, the Warden, climbs out. */
 function powerDown(ctx: SimContext, e: MechEntity, plating: Entity | undefined): void {
   const m = e.mech;
   m.mode = 'down';
@@ -394,7 +404,7 @@ function powerDown(ctx: SimContext, e: MechEntity, plating: Entity | undefined):
   if (plating) despawn(ctx, plating.id);
   m.platingId = null;
   ctx.emit('mech:down', { entityId: e.id });
-  startFreed(ctx, e.id);
+  startWardenScene(ctx, e.id);
 }
 
 /** For tests and the dev menu: the mech entity, if placed. */

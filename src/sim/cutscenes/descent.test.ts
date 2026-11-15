@@ -59,7 +59,8 @@ describe('the descent (M5.1)', () => {
     expect(hades()).toMatchObject({ region: 'underworld', npc: { name: 'Hades' } });
     expect(world.flags.descended).toBe(true);
     const grottoKinds = Object.values(world.entities).filter((e) => e.region === 'underworld' && e.structure).map((e) => e.structure!.kind).sort();
-    expect(grottoKinds.filter((k) => k !== 'chest')).toEqual(['barricade', 'bed', 'dispatch', 'fusion-altar']);
+    // (Fort chests and Cerberus's chains stand out in the fields.)
+    expect(grottoKinds.filter((k) => k !== 'chest' && k !== 'chains')).toEqual(['barricade', 'bed', 'dispatch', 'fusion-altar']);
 
     const events = run([], DESCENT_BEATS.end);
     expect(events).toContainEqual(expect.objectContaining({ type: 'cutscene:beat', beat: 'dispatch' }));

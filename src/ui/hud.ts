@@ -197,8 +197,12 @@ export function createHud(parent: HTMLElement): Hud {
         slot.el.classList.toggle('wc-boosted', !!slot.element && slot.element === weapon?.element);
       }
 
-      const locked = hero.hero.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
+      // The Warden's fight (M7) takes over the bar as a boss bar; otherwise it follows your lock-on.
+      const boss = Object.values(world.entities).find((e) => e.warden?.mode === 'fight' && (e.health?.current ?? 0) > 0 && e.region === hero.region);
+      const locked = boss ?? (hero.hero.lockTarget ? world.entities[hero.hero.lockTarget] : undefined);
       target.hidden = !locked;
+      target.classList.toggle('wc-boss', !!boss);
+      target.classList.toggle('wc-enraged', !!boss?.warden?.enraged);
       if (locked?.health) {
         targetName.textContent = enemyName(locked.defId);
         targetHealth.style.transform = `scaleX(${locked.health.current / locked.health.max})`;
@@ -207,7 +211,11 @@ export function createHud(parent: HTMLElement): Hud {
   };
 }
 
+/** Names for hittable things that aren't in the enemy registry. */
+const PART_NAMES: Readonly<Record<string, string>> = { 'mech-plating': 'Mk. II rear plating', barricade: 'Barricade' };
+
 function enemyName(defId: string): string {
+  if (PART_NAMES[defId]) return PART_NAMES[defId];
   try {
     return enemyDef(defId).name;
   } catch {

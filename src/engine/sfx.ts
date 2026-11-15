@@ -253,6 +253,34 @@ export class Sfx {
         this.tone(ctx, { from: 420, to: 40, duration: 2.6, volume: 0.12, type: 'sawtooth' });
         this.noiseBurst(ctx, { duration: 2, volume: 0.2, type: 'highpass', freq: 2500, freqEnd: 600, delay: 0.4 });
         return;
+      case 'warden:windup':
+        if (!ctx) return;
+        if (event.kind === 'swing') this.tone(ctx, { from: 110, to: 70, duration: event.ticks / 30, volume: 0.12, type: 'sawtooth' });
+        else if (event.kind === 'leap') this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.16, type: 'bandpass', freq: 300, freqEnd: 900 });
+        else this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.14, type: 'lowpass', freq: 600 });
+        return;
+      case 'warden:strike':
+        if (!ctx) return;
+        if (event.kind === 'swing') {
+          this.noiseBurst(ctx, { duration: 0.25, volume: 0.3, type: 'bandpass', freq: 600, freqEnd: 200 });
+          this.tone(ctx, { from: 90, to: 40, duration: 0.4, volume: 0.3, type: 'sine', delay: 0.05 });
+        } else if (event.kind === 'leap') {
+          this.noiseBurst(ctx, { duration: 0.7, volume: 0.2, type: 'bandpass', freq: 500, freqEnd: 1500 });
+          // The landing (after the flight).
+          this.noiseBurst(ctx, { duration: 1.2, volume: 0.6, type: 'lowpass', freq: 500, freqEnd: 50, delay: 0.62 });
+          this.tone(ctx, { from: 70, to: 28, duration: 0.9, volume: 0.4, type: 'sine', delay: 0.62 });
+        } else {
+          this.noiseBurst(ctx, { duration: 0.5, volume: 0.3, type: 'lowpass', freq: 900, freqEnd: 200 });
+        }
+        return;
+      case 'warden:enraged':
+        if (ctx) this.roar(ctx, 1.2);
+        return;
+      case 'warden:defeated':
+        if (!ctx) return;
+        this.tone(ctx, { from: 160, to: 50, duration: 1.4, volume: 0.15, type: 'sawtooth' });
+        this.noiseBurst(ctx, { duration: 0.9, volume: 0.45, type: 'lowpass', freq: 400, freqEnd: 60, delay: 0.9 });
+        return;
       case 'hero:exhausted':
         if (!this.isLocal(event.entityId)) return;
         this.onCaption('[Out of breath]');
@@ -292,6 +320,28 @@ export class Sfx {
       osc.stop(start + 1.7);
     });
     this.noiseBurst(ctx, { duration: 1.2, volume: 0.08 * volume, type: 'bandpass', freq: 700, freqEnd: 300 });
+  }
+
+  /** The Warden's roar: a low, rough, wavering voice. */
+  private roar(ctx: AudioContext, volume: number): void {
+    const start = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(95, start);
+    osc.frequency.linearRampToValueAtTime(120, start + 0.4);
+    osc.frequency.exponentialRampToValueAtTime(70, start + 1.6);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 500;
+    filter.Q.value = 1.5;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.25 * volume, start + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.7);
+    osc.connect(filter).connect(gain).connect(this.master!);
+    osc.start(start);
+    osc.stop(start + 1.8);
+    this.noiseBurst(ctx, { duration: 1.4, volume: 0.15 * volume, type: 'bandpass', freq: 800, freqEnd: 300 });
   }
 
   /** A reedy horn note (sentries' alarm). */
@@ -368,6 +418,25 @@ export class Sfx {
         return;
       case 'return':
         for (const [i, f] of [220, 277, 330].entries()) this.tone(ctx, { from: f, to: f, duration: 2.4, volume: 0.06, type: 'sine', delay: i * 0.08 });
+        return;
+      // "The Warden" (M7).
+      case 'hatch':
+        this.noiseBurst(ctx, { duration: 0.3, volume: 0.55, type: 'highpass', freq: 900 });
+        this.noiseBurst(ctx, { duration: 1.6, volume: 0.2, type: 'highpass', freq: 3000, freqEnd: 800, delay: 0.2 });
+        return;
+      case 'breakdown':
+        this.tone(ctx, { from: 180, to: 45, duration: 2.2, volume: 0.14, type: 'sawtooth' });
+        this.noiseBurst(ctx, { duration: 2, volume: 0.5, type: 'lowpass', freq: 500, freqEnd: 60, delay: 0.5 });
+        return;
+      case 'emerge':
+        for (let i = 0; i < 3; i += 1) this.tone(ctx, { from: 300, to: 200, duration: 0.15, volume: 0.1, type: 'square', delay: i * 0.35 });
+        return;
+      case 'land':
+        this.noiseBurst(ctx, { duration: 0.8, volume: 0.5, type: 'lowpass', freq: 400, freqEnd: 60 });
+        this.tone(ctx, { from: 80, to: 30, duration: 0.7, volume: 0.35, type: 'sine' });
+        return;
+      case 'roar':
+        this.roar(ctx, 1);
         return;
       // "Cerberus Freed" (M7).
       case 'conduits':

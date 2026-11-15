@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { HOWL } from '../content/spirits/cerberus';
 import { applyDamage } from './combat';
 import { FREED_BEATS, FREED_ID } from './cutscenes/freed';
+import { WARDEN_BEATS, WARDEN_ID } from './cutscenes/warden';
+import { findWarden, WARDEN } from './systems/warden';
 import type { Intent } from './intents';
 import { ensureMeadowPopulated } from './populate';
 import { GROTTO } from './regions';
@@ -140,7 +142,7 @@ describe('Cerberus Mk. II (M7)', () => {
     expect(Math.hypot(mech().position.x - start.x, mech().position.z - start.z)).toBeGreaterThan(12);
   });
 
-  it('only the rear plating can be hurt; breaking it powers the Mk. II down and frees Cerberus (E: Three-Fold Howl)', () => {
+  it('only the rear plating can be hurt; breaking it brings out the Warden; beat him, break the chains, Cerberus is free (E: Three-Fold Howl)', () => {
     const { world, run, zeus, mech, plating, near } = atTheGates();
     // E does nothing before Cerberus is free.
     const rejected = run([{ type: 'player:action', playerId: 'p1', action: 'spiritAbility' }]);
@@ -157,13 +159,34 @@ describe('Cerberus Mk. II (M7)', () => {
     run([{ type: 'player:action', playerId: 'p1', action: 'punch' }], 20);
     expect(plating().health!.current).toBeLessThan(MECH.plating);
 
-    // Finish it (as if the fight went on), then watch the scene through.
+    // Breaking the plating: the Mk. II powers down and the Warden climbs out (first time: not skippable).
     plating().health!.current = 0;
     const events = run([], 2);
     expect(events.some((e) => e.type === 'mech:down')).toBe(true);
     expect(mech().mech.mode).toBe('down');
-    expect(world.cutscene?.id).toBe(FREED_ID);
+    expect(world.cutscene?.id).toBe(WARDEN_ID);
     expect(world.cutscene?.skippable).toBe(false);
+    // F on the chains now: the Warden isn't beaten yet (after the scene).
+    run([], WARDEN_BEATS.end + 2);
+    expect(world.cutscene).toBeNull();
+    const warden = findWarden(world)!;
+    expect(warden.warden.mode).toBe('fight');
+    expect(world.objective).toBe('defeat-the-warden');
+    const chains = Object.values(world.entities).find((e) => e.structure?.kind === 'chains')!;
+    const toChains = () => run([{ type: 'dev:teleport', playerId: 'p1', x: chains.position.x + 1, z: chains.position.z, rotationY: 0 }], 1);
+    warden.position = { ...warden.position, x: warden.position.x + 200 }; // (out of the way for this check)
+    toChains();
+    const early = run([{ type: 'player:action', playerId: 'p1', action: 'interact' }]);
+    expect(early.some((e) => e.type === 'chains:examined' && e.reason === 'warden')).toBe(true);
+
+    // He falls: the objective is to release Cerberus; F on the chains plays the freeing scene.
+    warden.health.current = 0;
+    const fell = run([], 2);
+    expect(fell.some((e) => e.type === 'warden:defeated')).toBe(true);
+    expect(world.objective).toBe('release-cerberus');
+    toChains();
+    run([{ type: 'player:action', playerId: 'p1', action: 'interact' }]);
+    expect(world.cutscene?.id).toBe(FREED_ID);
     const rest = run([], FREED_BEATS.end + 2);
     expect(rest.some((e) => e.type === 'spirit:freed' && e.spiritId === 'cerberus')).toBe(true);
     expect(world.flags.cerberusFreed).toBe(true);
@@ -216,5 +239,75 @@ describe('health regeneration', () => {
     // About 2 a second.
     expect(z.health!.current).toBeGreaterThan(41.5);
     expect(z.health!.current).toBeLessThan(42.5);
+  });
+});
+
+describe('the Warden (M7 boss)', () => {
+  function fight() {
+    const g = atTheGates();
+    g.plating().health!.current = 0;
+    g.run([], 2);
+    g.run([], WARDEN_BEATS.end + 2);
+    return { ...g, warden: () => findWarden(g.world)! };
+  }
+
+  it('climbs out of the broken Mk. II, then runs at you faster than a god walks', () => {
+    const { world, run, zeus, warden } = fight();
+    expect(warden().warden.mode).toBe('fight');
+    expect(warden().health.max).toBe(WARDEN.health);
+    // Zeus 20 m away: the Warden closes the gap at his run speed (faster than Zeus walks).
+    const w = warden();
+    const away = { x: w.position.x + 20, z: w.position.z };
+    run([{ type: 'dev:teleport', playerId: 'p1', x: away.x, z: away.z, rotationY: 0 }], 1);
+    w.warden.leapReady = 999;
+    w.warden.dashReady = 999;
+    const before = Math.hypot(zeus().position.x - w.position.x, zeus().position.z - w.position.z);
+    run([], 30);
+    const after = Math.hypot(zeus().position.x - warden().position.x, zeus().position.z - warden().position.z);
+    expect(before - after).toBeGreaterThan(5.8);
+    expect(world.cutscene).toBeNull();
+  });
+
+  it('every attack has a visible wind-up: the maul lands after its warning, and hurts', () => {
+    const { run, zeus, warden } = fight();
+    const w = warden();
+    const near = () => run([{ type: 'dev:teleport', playerId: 'p1', x: w.position.x + Math.sin(w.rotationY) * 3, z: w.position.z + Math.cos(w.rotationY) * 3, rotationY: w.rotationY + Math.PI }], 1);
+    w.warden.cooldown = 0;
+    const before = zeus().health!.current;
+    let windupTick = -1;
+    let hitTick = -1;
+    for (let t = 0; t < 90 && hitTick < 0; t += 1) {
+      for (const e of near()) {
+        if (e.type === 'warden:windup' && windupTick < 0) windupTick = t;
+        if (e.type === 'combat:hit' && e.targetId === zeus().id && e.attackerId === w.id) hitTick = t;
+      }
+    }
+    expect(windupTick).toBeGreaterThanOrEqual(0);
+    expect(hitTick - windupTick).toBeGreaterThanOrEqual(WARDEN.swing.windup - 1);
+    expect(zeus().health!.current).toBeLessThan(before);
+  });
+
+  it('rages below half health (shorter warnings), and leaps at you from range with the landing marked', () => {
+    const { run, warden } = fight();
+    const w = warden();
+    w.health.current = w.health.max * 0.4;
+    const raged = run([], 1);
+    expect(raged.some((e) => e.type === 'warden:enraged')).toBe(true);
+    // 15 m away, leap ready: he crouches and the landing point is announced.
+    w.warden.leapReady = 0;
+    w.warden.cooldown = 0;
+    w.warden.attack = null;
+    let leap: { ticks: number } | undefined;
+    for (let t = 0; t < 20 && !leap; t += 1) {
+      // (The first tick is the teleport itself; its events count too.)
+      const tick = t === 0
+        ? run([{ type: 'dev:teleport', playerId: 'p1', x: w.position.x + Math.sin(w.rotationY) * 15, z: w.position.z + Math.cos(w.rotationY) * 15, rotationY: 0 }], 1)
+        : run([], 1);
+      const e = tick.find((x) => x.type === 'warden:windup' && x.kind === 'leap');
+      if (e && e.type === 'warden:windup') leap = e;
+    }
+    expect(leap).toBeDefined();
+    expect(leap!.ticks).toBeLessThan(WARDEN.leap.windup);
+    expect(leap!.ticks).toBeGreaterThanOrEqual(Math.round(WARDEN.leap.windup * WARDEN.rageWindup));
   });
 });

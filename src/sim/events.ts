@@ -1,4 +1,4 @@
-import type { AttackKind, Element, EntityId, MechAttackKind, PlayerId, Vec3 } from './types';
+import type { AttackKind, Element, EntityId, MechAttackKind, PlayerId, Vec3, WardenAttackKind } from './types';
 
 /**
  * Events the sim emits each tick. Payloads are plain data and carry IDs, never
@@ -101,6 +101,16 @@ export interface EventMap {
   'mech:strike': { entityId: EntityId; kind: MechAttackKind };
   /** Its rear plating broke: the Mk. II powers down. */
   'mech:down': { entityId: EntityId };
+  /** The Warden winds up an attack (the warning lasts `ticks`); `point` is where a leap will land. */
+  'warden:windup': { entityId: EntityId; kind: WardenAttackKind; ticks: number; point: Vec3 };
+  /** The Warden's attack lands (the maul hits, the leap lands, the dash starts). */
+  'warden:strike': { entityId: EntityId; kind: WardenAttackKind };
+  /** Below half health the Warden goes into a rage. */
+  'warden:enraged': { entityId: EntityId };
+  /** The Warden falls: Cerberus's chains can be broken. */
+  'warden:defeated': { entityId: EntityId };
+  /** F on Cerberus's chains before they can be broken: why not yet. */
+  'chains:examined': { playerId: PlayerId; reason: 'machine' | 'warden' | 'freed' };
   /** A spirit was freed and bonded with the gods (its ability is unlocked). */
   'spirit:freed': { spiritId: string };
 }

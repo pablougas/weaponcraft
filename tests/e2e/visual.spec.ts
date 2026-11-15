@@ -255,6 +255,41 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     });
   }
 
+  /** Wears the plating down and lands the last punches from behind: the Warden's scene starts. */
+  async function breakPlating(page: Page) {
+    await page.evaluate(() => window.wc!.weakenMech(0.02));
+    for (let i = 0; i < 40; i += 1) {
+      const s = await page.evaluate(() => window.wc!.getState());
+      if (s.world!.cutscene) break;
+      const m = Object.values(s.world!.entities).find((e) => e.mech)!;
+      const plating = s.world!.entities[m.mech!.platingId!];
+      const back = { x: -Math.sin(m.rotationY), z: -Math.cos(m.rotationY) };
+      await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x: plating.position.x + back.x * 3.2, z: plating.position.z + back.z * 3.2, yaw: Math.atan2(-back.x, -back.z) });
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(10));
+    }
+  }
+
+  /** Plays the Warden's scene out, wears him down and finishes him with real punches. */
+  async function beatWarden(page: Page) {
+    await page.evaluate(() => window.wc!.step(305));
+    await page.evaluate(() => window.wc!.weakenMech(0.01, 'warden'));
+    for (let i = 0; i < 60; i += 1) {
+      const s = await page.evaluate(() => window.wc!.getState());
+      const w = Object.values(s.world!.entities).find((e) => e.warden)!;
+      if (w.warden!.mode === 'defeated') break;
+      const god = s.world!.entities[s.world!.players.p1.entityId!];
+      const d = Math.hypot(god.position.x - w.position.x, god.position.z - w.position.z) || 1;
+      if (d > 2.2) {
+        const x = w.position.x + ((god.position.x - w.position.x) / d) * 1.8;
+        const z = w.position.z + ((god.position.z - w.position.z) / d) * 1.8;
+        await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x, z, yaw: Math.atan2(w.position.x - x, w.position.z - z) });
+      }
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(8));
+    }
+  }
+
   test('Cerberus Mk. II on watch, its sensor cone sweeping', async ({ page }) => {
     await atTheGates(page);
     await page.evaluate(async () => {
@@ -271,23 +306,32 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
 
   test('Cerberus freed: the Three-Fold Howl', async ({ page }) => {
     await atTheGates(page);
-    await page.evaluate(() => window.wc!.weakenMech(0.02));
-    // The last blows from behind (real punches), then 9 s into the scene (the howl).
-    for (let i = 0; i < 40; i += 1) {
-      const s = await page.evaluate(() => window.wc!.getState());
-      if (s.world!.cutscene) break;
-      const m = Object.values(s.world!.entities).find((e) => e.mech)!;
-      const plating = s.world!.entities[m.mech!.platingId!];
-      const back = { x: -Math.sin(m.rotationY), z: -Math.cos(m.rotationY) };
-      await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x: plating.position.x + back.x * 3.2, z: plating.position.z + back.z * 3.2, yaw: Math.atan2(-back.x, -back.z) });
-      await page.keyboard.press('KeyA');
-      await page.evaluate(() => window.wc!.step(10));
-    }
+    await breakPlating(page);
+    await beatWarden(page);
+    // F at the chains, then 9 s into the freeing scene (the howl).
+    await page.evaluate(async () => {
+      const chains = Object.values(window.wc!.getState().world!.entities).find((e) => e.structure?.kind === 'chains')!;
+      await window.wc!.teleport(chains.position.x + 1.2, chains.position.z, 0);
+    });
+    await page.keyboard.press('KeyF');
+    await page.evaluate(() => window.wc!.step(2));
     await page.evaluate(async () => {
       const w = window.wc!.getState().world!;
       window.wc!.step(w.cutscene!.startTick + 270 - w.tick);
       await window.wc!.freeze(12);
     });
     await expect(page).toHaveScreenshot('cerberus-freed.png', SHOT);
+  });
+
+  test('The Warden climbs out of the broken Mk. II', async ({ page }) => {
+    await atTheGates(page);
+    await breakPlating(page);
+    // 7.3 s in: the low shot as he strides out.
+    await page.evaluate(async () => {
+      const w = window.wc!.getState().world!;
+      window.wc!.step(w.cutscene!.startTick + 219 - w.tick);
+      await window.wc!.freeze(12);
+    });
+    await expect(page).toHaveScreenshot('warden-emerges.png', SHOT);
   });
 });

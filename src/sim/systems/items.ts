@@ -1,4 +1,5 @@
 import { startRest } from './rest';
+import { startFreed } from '../cutscenes/freed';
 
 /** What each fort's chest holds (approved weapons only). */
 const FORT_LOOT: Readonly<Record<string, string>> = { 'fort-asphodel': 'storm-axe', 'fort-styx': 'sunlit-sword', 'fort-gates': 'oak-staff' };
@@ -91,6 +92,25 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
   }
   if (target.structure?.kind === 'barricade') {
     ctx.emit('barricade:examined', { playerId });
+    return null;
+  }
+  if (target.structure?.kind === 'chains') {
+    // Cerberus's chains: they feed the Mk. II until it falls, and the Warden guards them.
+    const { flags } = world;
+    if (flags.cerberusFreed) {
+      ctx.emit('chains:examined', { playerId, reason: 'freed' });
+      return null;
+    }
+    if (!flags.wardenEmerged) {
+      ctx.emit('chains:examined', { playerId, reason: 'machine' });
+      return null;
+    }
+    if (!flags.wardenDefeated) {
+      ctx.emit('chains:examined', { playerId, reason: 'warden' });
+      return null;
+    }
+    const mech = Object.values(world.entities).find((e) => e.mech);
+    startFreed(ctx, mech?.id ?? target.id);
     return null;
   }
   if (target.npc) {

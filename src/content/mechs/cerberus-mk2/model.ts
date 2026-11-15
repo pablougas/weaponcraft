@@ -3,6 +3,7 @@ import { groundAt } from '../../../sim/regions';
 import { MECH } from '../../../sim/systems/mech';
 import { MECH_SIZE } from '../../../sim/terrain/underworld';
 import type { Entity } from '../../../sim/types';
+import { WARDEN_BEATS, WARDEN_ID } from '../../../sim/cutscenes/warden';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
 /** Built at the original set-piece size, then scaled up for the encounter. */
@@ -88,8 +89,12 @@ export const createModel: ModelFactory = (look) => {
   for (const z of [-3, 0, 3]) body.add(M(new THREE.CylinderGeometry(0.45, 0.55, 2.2, 8), iron, [2.6, 13.3, z], { outline: 0.03 }));
 
   // The rear plating (its weak spot): a riveted brass shield on its back, cracking as it's hit.
+  // It's also the rear hatch: hinged on its left edge, it swings open like a door when the Mk. II breaks down (M7).
+  const hinge = new THREE.Group();
+  hinge.position.set(-3.1, 7.6, -7.65);
   const plate = new THREE.Group();
-  plate.position.set(0, 7.6, -7.65);
+  plate.position.set(3.1, 0, 0);
+  hinge.add(plate);
   plate.add(M(new THREE.BoxGeometry(6.2, 5.6, 0.6), plateMat, [0, 0, 0], { outline: 0.04 }));
   for (const [x, y] of [[-2.6, -2.3], [2.6, -2.3], [-2.6, 2.3], [2.6, 2.3]]) plate.add(M(new THREE.SphereGeometry(0.28, 8, 6), iron, [x, y, -0.35], { outline: false }));
   const cracks = [
@@ -102,7 +107,11 @@ export const createModel: ModelFactory = (look) => {
     plate.add(crack);
     return crack;
   });
-  body.add(plate);
+  body.add(hinge);
+  // Behind the hatch: the dark cockpit opening, with a faint red glow inside.
+  const hole = M(new THREE.BoxGeometry(4.6, 4.4, 0.3), new THREE.MeshBasicMaterial({ color: '#160606' }), [0, 7.6, -7.5], { outline: false });
+  hole.visible = false;
+  body.add(hole);
 
   // Legs: piston legs pivoting at the hip so they can stride.
   const legs = [[-3.5, 5.5], [3.5, 5.5], [-3.5, -5.5], [3.5, -5.5]].map(([x, z]) => {
@@ -181,12 +190,18 @@ export const createModel: ModelFactory = (look) => {
       legs[2].rotation.x = -swing;
       body.position.y = m.walking && !down ? Math.abs(Math.cos(stride)) * 0.25 : 0;
 
-      // Down: the body sags and tips forward; the eyes go dark.
-      sag = down ? Math.min(1, sag + frame.dt * 0.6) : 0;
-      if (frame.dt === 0 && down) sag = 1;
+      // Down: the hatch bursts open (2 s into the Warden's scene), then it collapses (3.5 s) and lists.
+      const cut = frame.world.cutscene;
+      const sceneT = cut?.id === WARDEN_ID ? (frame.world.tick - cut.startTick) / 30 : null;
+      const open = !down ? 0 : sceneT === null ? 1 : Math.min(1, Math.max(0, (sceneT - WARDEN_BEATS.hatch / 30) / 0.5));
+      const sagTarget = !down ? 0 : sceneT === null || sceneT >= WARDEN_BEATS.breakdown / 30 ? 1 : 0.45;
+      sag = frame.dt === 0 ? sagTarget : sag < sagTarget ? Math.min(sagTarget, sag + frame.dt * 0.8) : sagTarget;
       body.position.y -= sag * 3.2;
       body.rotation.x = sag * 0.12;
+      body.rotation.z = Math.max(0, sag - 0.45) * 0.14;
       for (const leg of legs) leg.rotation.z = sag * (leg.position.x < 0 ? -0.18 : 0.18);
+      hinge.rotation.y = -1.9 * open;
+      hole.visible = open > 0;
 
       // Stomp: it rears up during the warning and slams down when it lands.
       const attack = m.attack;
@@ -217,8 +232,9 @@ export const createModel: ModelFactory = (look) => {
       const plating = m.platingId ? frame.world.entities[m.platingId] : undefined;
       const left = plating?.health ? plating.health.current / plating.health.max : 0;
       cracks.forEach((crack, i) => { crack.visible = left < 1 - (i + 1) * 0.2; });
-      plate.visible = !!plating;
-      plateMat.emissiveIntensity = 0.2 + (1 - left) * 0.5;
+      // (The plating stays on as the hatch door once it breaks; fully cracked.)
+      if (!plating && down) cracks.forEach((crack) => { crack.visible = true; });
+      plateMat.emissiveIntensity = down ? 0.05 : 0.2 + (1 - left) * 0.5;
 
       // Ground fans. The heads (the cone's origin) are at the front of the body.
       const fx = Math.sin(entity.rotationY);

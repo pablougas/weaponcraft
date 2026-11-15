@@ -72,7 +72,7 @@ export function updateCreatures(ctx: SimContext, physics?: PhysicsWorld): void {
   for (const entity of Object.values(world.entities)) {
     const creature = entity.creature;
     // (Soldiers and mech parts have their own systems.)
-    if (!creature || !entity.health || entity.soldier || entity.mechPart) continue;
+    if (!creature || !entity.health || entity.soldier || entity.mechPart || entity.warden) continue;
     creature.sinceHit += 1;
 
     if (!creature.wanders) {

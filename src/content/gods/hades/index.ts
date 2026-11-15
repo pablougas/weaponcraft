@@ -16,8 +16,9 @@ export const hades: GodDef = {
   approved: true,
   maxHealth: 110,
   maxStamina: 100,
-  walkSpeed: 4.4,
-  sprintSpeed: 7.8,
+  // ~25% faster (team request, Nov 15); still a touch slower than Zeus.
+  walkSpeed: 5.6,
+  sprintSpeed: 9.8,
   jumpSpeed: 7.2,
   hoverTicks: 12,
   body: { radius: 0.36, height: 2.1 },

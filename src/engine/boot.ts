@@ -11,11 +11,14 @@ import { createTutorialPanel } from '../ui/tutorial';
 import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
 import { FREED_CAPTIONS, freedFrame } from '../view/cinematics/freed';
+import { WARDEN_CAPTIONS, wardenFrame } from '../view/cinematics/warden';
 import { ShadowPortal } from '../view/effects/portal';
 import { ShadowEffects } from '../view/effects/shadow';
 import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { FREED_ID, freedTicks } from '../sim/cutscenes/freed';
+import { WARDEN_ID, wardenTicks } from '../sim/cutscenes/warden';
+import { findWarden } from '../sim/systems/warden';
 import { findMech } from '../sim/systems/mech';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
 import { CERBERUS_HOUND, GATES } from '../sim/terrain/underworld';
@@ -228,9 +231,9 @@ export async function boot(): Promise<void> {
       dirty = true;
       return nextFrame();
     },
-    weakenMech(fraction) {
+    weakenMech(fraction, target) {
       if (!session) return nextFrame();
-      session.sendIntent({ type: 'dev:weakenMech', fraction });
+      session.sendIntent({ type: 'dev:weakenMech', fraction, target });
       tick();
       loop.recordTick(performance.now());
       dirty = true;
@@ -368,6 +371,17 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
     if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], 3.2);
+    // The Warden (M7 boss).
+    if (event.type === 'cutscene:beat' && event.cutsceneId === WARDEN_ID && WARDEN_CAPTIONS[event.beat]) captions.show(WARDEN_CAPTIONS[event.beat], event.beat === 'roar' ? 3.5 : 2.4);
+    if (event.type === 'objective:set' && event.objectiveId === 'defeat-the-warden') captions.show('Defeat the Warden.', 3);
+    if (event.type === 'warden:windup' && event.kind === 'leap') captions.show('[The Warden crouches to leap. Move!]', 1.8);
+    if (event.type === 'warden:windup' && event.kind === 'dash') captions.show('[The Warden lowers his shoulder]', 1.6);
+    if (event.type === 'warden:enraged') captions.show('The Warden: Is that all the gods have left?', 3.5);
+    if (event.type === 'warden:defeated') captions.show('[The Warden falls] Hades: The chains, brother. Free him.', 5);
+    if (event.type === 'chains:examined' && event.playerId === activeSession.localPlayerId) {
+      captions.show(event.reason === 'machine' ? 'The chains feed their machine. Bring the Mk. II down first.'
+        : event.reason === 'warden' ? 'The Warden still stands.' : 'Cerberus is free.', 3);
+    }
     if (event.type === 'spirit:freed') {
       const key = keyLabel(inputMap.codesFor('spiritAbility')[0] ?? 'KeyE');
       captions.show(`Three-Fold Howl unlocked for both gods: press ${key}.`, 6);
@@ -688,7 +702,8 @@ export async function boot(): Promise<void> {
       const rocketT = rocketTicks(world);
       const descentT = descentTicks({ world });
       const freedT = freedTicks(world);
-      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : freedT !== null ? FREED_ID : null;
+      const wardenT = wardenTicks(world);
+      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : freedT !== null ? FREED_ID : wardenT !== null ? WARDEN_ID : null;
       // The Gates: the pylon's beam follows the Mk. II; the hound plays the freeing scene.
       const mechEntity = findMech(world);
       const mechPoint = mechEntity ? interpolator.position(world, mechEntity.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
@@ -713,7 +728,7 @@ export async function boot(): Promise<void> {
         }
         cameraRig.update(followCamera, heroPoint, 0, null, floorAt);
         const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
-        const ticksIn = (rocketT ?? descentT ?? freedT ?? 0) + (frozen ? 0 : alpha);
+        const ticksIn = (rocketT ?? descentT ?? freedT ?? wardenT ?? 0) + (frozen ? 0 : alpha);
         let pose: CameraPose;
         if (cutsceneId === 'rocket') {
           const frame = rocketFrame(ticksIn / 30, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
@@ -721,6 +736,12 @@ export async function boot(): Promise<void> {
           meadow.setCinematicBoost(frame.bloom, frame.exposure);
           cameraShake = frame.shake;
           olympusTiming = frame;
+        } else if (cutsceneId === WARDEN_ID) {
+          const warden = findWarden(world);
+          const wardenPoint = warden ? interpolator.position(world, warden.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
+          pose = wardenFrame(ticksIn / 30, world.cutscene?.points ?? {}, wardenPoint, cinematicStart, followPose);
+          meadow.setCinematicBoost(0, 0);
+          cameraShake = 0;
         } else if (cutsceneId === FREED_ID) {
           const hound = { x: GROTTO.center.x + CERBERUS_HOUND.x, y: GROTTO.center.y, z: GROTTO.center.z + CERBERUS_HOUND.z };
           pose = freedFrame(ticksIn / 30, mechPoint ?? world.cutscene?.points?.mech ?? hound, hound, CERBERUS_HOUND.yaw, cinematicStart, followPose);
