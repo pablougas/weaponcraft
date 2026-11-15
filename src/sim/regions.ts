@@ -1,7 +1,7 @@
 import { MEADOW_RADIUS } from './constants';
 import { WATER_LEVEL } from './terrain/meadow';
 import { groundHeightAt } from './terrain/meadow-rocks';
-import { underworldClamp, underworldInside, underworldLocalHeight } from './terrain/underworld';
+import { underworldClamp, underworldGroundHeight, underworldInside } from './terrain/underworld';
 import type { Entity, Vec3 } from './types';
 
 /**
@@ -33,7 +33,7 @@ export function sameRegion(a: Entity | undefined, b: Entity | undefined): boolea
 
 /** Ground height at (x, z) in a region. */
 export function groundAt(region: RegionId, x: number, z: number): number {
-  if (region === 'underworld') return GROTTO.center.y + underworldLocalHeight(x - GROTTO.center.x, z - GROTTO.center.z);
+  if (region === 'underworld') return GROTTO.center.y + underworldGroundHeight(x - GROTTO.center.x, z - GROTTO.center.z);
   return groundHeightAt(x, z);
 }
 

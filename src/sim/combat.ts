@@ -5,6 +5,9 @@ import type { AttackKind, Element, Entity, EntityId, StatusEffect, StatusKind, V
 import { isKnownWeapon, weaponData } from './weapons';
 import type { SimContext } from './world';
 
+/** Health regeneration waits this long after a hit (systems/hero.ts HEALTH_REGEN_DELAY). */
+const HEALTH_REGEN_DELAY_TICKS = ticks(4);
+
 /** Three-Fold Howl's lifesteal share (content/spirits/cerberus.ts HOWL.lifesteal). */
 const HOWL_LIFESTEAL = 0.3;
 
@@ -170,6 +173,8 @@ export function applyDamage(
   target.health.current -= dealt;
 
   if (target.hero && kind !== 'status') target.hero.hurtTicks = HURT_TICKS;
+  // Any damage (poison too) pauses health regeneration (systems/hero.ts).
+  if (target.hero && dealt > 0) target.hero.regenDelay = HEALTH_REGEN_DELAY_TICKS;
   if (target.creature && kind !== 'status') {
     target.creature.sinceHit = 0;
     if (target.creature.wanders && !hasStatus(target, 'blind')) {

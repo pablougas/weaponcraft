@@ -259,8 +259,12 @@ function raiseAlarm(ctx: SimContext, from: Entity & { soldier: SoldierState }, a
 
 function move(entity: Entity, dx: number, dz: number, physics?: PhysicsWorld): void {
   const moved = physics?.moveCharacter(entity.id, { x: dx, y: -0.25, z: dz });
-  if (moved) entity.position = moved.position;
-  else {
+  if (moved) {
+    entity.position = moved.position;
+    // Never below the ground (a body that ends up under the one-sided heightfield would sink forever).
+    const ground = groundAt('underworld', moved.position.x, moved.position.z);
+    if (entity.position.y < ground - 0.3) entity.position = { ...entity.position, y: ground };
+  } else {
     const x = entity.position.x + dx;
     const z = entity.position.z + dz;
     entity.position = { x, y: groundAt('underworld', x, z), z };

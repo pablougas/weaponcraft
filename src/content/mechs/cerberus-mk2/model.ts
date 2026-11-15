@@ -172,7 +172,8 @@ export const createModel: ModelFactory = (look) => {
       if (!m) return;
       const down = m.mode === 'down';
       // Stride while walking (slow and heavy); legs settle when still.
-      if (m.walking && !down) stride += frame.dt * 2.2;
+      const charging = m.attack?.kind === 'charge' && m.attack.windup === 0;
+      if (m.walking && !down) stride += frame.dt * (charging ? 6.5 : 2.2);
       const swing = m.walking && !down ? Math.sin(stride) * 0.32 : 0;
       legs[0].rotation.x = swing;
       legs[3].rotation.x = swing;
@@ -189,6 +190,12 @@ export const createModel: ModelFactory = (look) => {
 
       // Stomp: it rears up during the warning and slams down when it lands.
       const attack = m.attack;
+      // Charge: during the warning it dips its heads and paws the ground; then it runs nose-down.
+      if (attack?.kind === 'charge') {
+        const f = attack.windup > 0 ? 1 - attack.windup / MECH.charge.windup : 1;
+        body.rotation.x = 0.1 * f;
+        if (attack.windup > 0 && !frame.reduceMotion) legs[0].rotation.x = -0.35 * Math.max(0, Math.sin(frame.time * 9));
+      }
       if (attack?.kind === 'stomp' && attack.windup > 0) {
         const f = 1 - attack.windup / MECH.stomp.windup;
         body.rotation.x = -0.16 * Math.sin(Math.min(1, f * 1.3) * Math.PI / 2);

@@ -1,4 +1,4 @@
-import type { AttackKind, Element, EntityId, PlayerId, Vec3 } from './types';
+import type { AttackKind, Element, EntityId, MechAttackKind, PlayerId, Vec3 } from './types';
 
 /**
  * Events the sim emits each tick. Payloads are plain data and carry IDs, never
@@ -95,10 +95,10 @@ export interface EventMap {
   'hero:recovered': { entityId: EntityId; reason: string };
   /** Cerberus Mk. II spotted a god (or was hit): it roars and turns to fight (M7). */
   'mech:alarm': { entityId: EntityId; at: Vec3 };
-  /** The Mk. II is winding up an attack: the warning (stomp ring or glowing heads) lasts `ticks`. */
-  'mech:windup': { entityId: EntityId; kind: 'stomp' | 'breath'; ticks: number; point: Vec3; yaw: number };
+  /** The Mk. II is winding up an attack: the warning (stomp ring, glowing heads, lowered heads before a charge) lasts `ticks`. */
+  'mech:windup': { entityId: EntityId; kind: MechAttackKind; ticks: number; point: Vec3; yaw: number };
   /** The Mk. II's stomp landed, or its breath started. */
-  'mech:strike': { entityId: EntityId; kind: 'stomp' | 'breath' };
+  'mech:strike': { entityId: EntityId; kind: MechAttackKind };
   /** Its rear plating broke: the Mk. II powers down. */
   'mech:down': { entityId: EntityId };
   /** A spirit was freed and bonded with the gods (its ability is unlocked). */

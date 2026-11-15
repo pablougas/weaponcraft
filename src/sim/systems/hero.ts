@@ -24,6 +24,10 @@ const SPRINT_DRAIN_PER_SEC = 18;
 const HOVER_DRAIN_PER_SEC = 10;
 /** Stamina refills fast (team request): empty to full in about 2 s. */
 const STAMINA_REGEN_PER_SEC = 50;
+/** Health slowly comes back (team request, Nov 15): this many points a second… */
+export const HEALTH_REGEN_PER_SEC = 2;
+/** …starting this long after the god was last hurt. */
+export const HEALTH_REGEN_DELAY = ticks(4);
 /** Pause before stamina refills after spending it. */
 const STAMINA_DELAY = ticks(0.3);
 /** Longer pause after running dry while holding an ability, or after an ultimate. */
@@ -510,6 +514,14 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
     } else if (hero.staminaDelay === 0 && hero.charge == null) {
       const passive = god.passive && regionOf(entity) === 'underworld' ? god.passive.staminaRegenMultiplier : 1;
       entity.stamina.current = Math.min(entity.stamina.max, entity.stamina.current + perTick(STAMINA_REGEN_PER_SEC * passive));
+    }
+  }
+
+  // Health: slowly back to full once the god hasn't been hurt for a few seconds (not while down).
+  if (entity.health && entity.health.current > 0 && hero.down == null) {
+    hero.regenDelay = Math.max(0, (hero.regenDelay ?? 0) - 1);
+    if (hero.regenDelay === 0 && entity.health.current < entity.health.max) {
+      entity.health.current = Math.min(entity.health.max, entity.health.current + perTick(HEALTH_REGEN_PER_SEC));
     }
   }
 

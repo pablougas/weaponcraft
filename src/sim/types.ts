@@ -68,6 +68,9 @@ export interface Entity {
   mechPart?: { mechId: EntityId; part: 'rear-plating' };
 }
 
+/** The Mk. II's attacks: a stomp all round, fire breath down its cone, and a charge at you. */
+export type MechAttackKind = 'stomp' | 'breath' | 'charge';
+
 /** What the mech is doing (M7). 'down' once its rear plating breaks. */
 export type MechMode = 'patrol' | 'alert' | 'attack' | 'search' | 'down';
 
@@ -87,9 +90,11 @@ export interface MechState {
   /** Sweep phase for the heads while on watch. */
   scan: number;
   /** An attack in progress: wind-up ticks left (the warning), then active ticks; where it aims. */
-  attack: { kind: 'stomp' | 'breath'; windup: number; active: number; point: Vec3; yaw: number } | null;
+  attack: { kind: MechAttackKind; windup: number; active: number; point: Vec3; yaw: number; hit?: EntityId[] } | null;
   /** Ticks before the next attack. */
   cooldown: number;
+  /** Its last attack (so a charge is followed by fire when you're in its cone). Optional for older saves. */
+  lastAttack?: MechAttackKind | null;
   /** Is it walking this tick (for the view's stride)? */
   walking: boolean;
   /** The plating entity on its back. */
@@ -184,6 +189,8 @@ export interface HeroState {
   safeTimer?: number;
   /** Ticks the hero has been trying to move without moving (stuck detection). */
   stuckTicks?: number;
+  /** Ticks until health starts regenerating again (reset when hurt). Optional for older saves. */
+  regenDelay?: number;
   /** Three-Fold Howl (M7): ticks left of lifesteal on everything this god hits. */
   howl?: number;
 }

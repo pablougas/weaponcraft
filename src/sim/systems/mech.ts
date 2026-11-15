@@ -3,7 +3,7 @@ import { ticks } from '../constants';
 import { startFreed } from '../cutscenes/freed';
 import { GROTTO, groundAt } from '../regions';
 import { MECH_PATROL, MECH_SIZE, MECH_WATCH } from '../terrain/underworld';
-import type { Entity, EntityId, MechState, Vec3 } from '../types';
+import type { Entity, EntityId, MechAttackKind, MechState, Vec3 } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 import { isResting } from './rest';
 
@@ -11,9 +11,9 @@ import { isResting } from './rest';
  * Cerberus Mk. II (SPEC §10, cut-down M7): the humans' war machine keeps
  * watch at the Gates. It walks a loop in front of them while its three heads
  * sweep a sensor cone; a god seen in the cone (or right beside it) is spotted.
- * Then it turns — slowly — to fight: a stomp that hits everything around it
- * (a red ring warns first) and a fire breath down its sensor cone (the heads
- * glow first). Its only weak spot is the plating on its back, a separate
+ * Then it charges at you, and turns — slowly — to fight: a stomp that hits
+ * everything around it (a red ring warns first), a fire breath down its sensor
+ * cone (the heads glow first), and more charges when you keep your distance. Its only weak spot is the plating on its back, a separate
  * hittable entity. When the plating breaks it powers down and Cerberus is freed.
  */
 export const MECH = {
@@ -38,6 +38,12 @@ export const MECH = {
   leash: 48,
   stomp: { radius: 16, windup: ticks(1.5), damage: 32, cooldown: ticks(3) },
   breath: { range: 26, cone: 0.38, windup: ticks(1.3), active: ticks(1.2), every: ticks(0.3), damage: 9, cooldown: ticks(2.5) },
+  /**
+   * Charge: it lowers its heads (the warning, turning to aim), then thunders
+   * straight ahead. Whoever it runs into is hurt and thrown aside; dodge
+   * sideways and its back is yours. It charges first whenever you're out of stomp range.
+   */
+  charge: { windup: ticks(1), active: ticks(2.5), speed: 12, damage: 26, hitWidth: 2.5, overshoot: 10, cooldown: ticks(2), leash: 70 },
   loseTarget: ticks(6),
   search: ticks(6),
 } as const;
@@ -123,19 +129,20 @@ function turnToward(mech: Entity, yaw: number): number {
   return Math.abs(wrap(yaw - mech.rotationY));
 }
 
-/** Walks forward along its heading (it walks where it faces), staying on its leash. */
-function walk(mech: MechEntity, speed: number): void {
+/** Walks forward along its heading (it walks where it faces), staying on its leash. Returns whether it moved. */
+function walk(mech: MechEntity, speed: number, leash: number = MECH.leash): boolean {
   const f = forward(mech.rotationY);
   const x = mech.position.x + (f.x * speed) / 30;
   const z = mech.position.z + (f.z * speed) / 30;
   const lx = x - GROTTO.center.x - MECH_WATCH.x;
   const lz = z - GROTTO.center.z - MECH_WATCH.z;
-  if (Math.hypot(lx, lz) > MECH.leash) {
+  if (Math.hypot(lx, lz) > leash) {
     mech.mech.walking = false;
-    return;
+    return false;
   }
   mech.position = { x, y: groundAt('underworld', x, z), z };
   mech.mech.walking = true;
+  return true;
 }
 
 /** Advances the Mk. II (authority only). */
@@ -185,6 +192,8 @@ function updateOne(ctx: SimContext, e: MechEntity): void {
   if (m.mode !== 'attack' && m.awareness >= MECH.alertAt && m.targetId) {
     m.mode = 'attack';
     m.timer = 0;
+    // It comes for you straight away.
+    m.cooldown = 0;
     ctx.emit('mech:alarm', { entityId: e.id, at: { ...(m.lastSeen ?? e.position) } });
   }
 
@@ -246,7 +255,17 @@ function fight(ctx: SimContext, e: MechEntity, seen: Entity[]): void {
       startAttack(ctx, e, 'stomp', MECH.stomp.windup, 1);
       return;
     }
-    if (d < MECH.breath.range && inSensorCone(e, target, MECH.breath.range, MECH.breath.cone + 0.1)) {
+    // Far off: charge (it aims during the warning). In breath range and in its cone after a charge: breathe fire.
+    const breathOk = d < MECH.breath.range && inSensorCone(e, target, MECH.breath.range, MECH.breath.cone + 0.1);
+    if (breathOk && m.lastAttack === 'charge') {
+      startAttack(ctx, e, 'breath', MECH.breath.windup, MECH.breath.active);
+      return;
+    }
+    if (off < 1.2) {
+      startAttack(ctx, e, 'charge', MECH.charge.windup, MECH.charge.active);
+      return;
+    }
+    if (breathOk) {
       startAttack(ctx, e, 'breath', MECH.breath.windup, MECH.breath.active);
       return;
     }
@@ -254,15 +273,20 @@ function fight(ctx: SimContext, e: MechEntity, seen: Entity[]): void {
   if (d > MECH.closeIn && off < 0.5) walk(e, MECH.run);
 }
 
-function startAttack(ctx: SimContext, e: MechEntity, kind: 'stomp' | 'breath', windup: number, active: number): void {
+function startAttack(ctx: SimContext, e: MechEntity, kind: MechAttackKind, windup: number, active: number): void {
   const m = e.mech;
-  m.attack = { kind, windup, active, point: { ...e.position }, yaw: m.facing };
+  m.attack = { kind, windup, active, point: { ...e.position }, yaw: kind === 'charge' ? e.rotationY : m.facing, hit: [] };
+  m.lastAttack = kind;
   ctx.emit('mech:windup', { entityId: e.id, kind, ticks: windup, point: { ...e.position }, yaw: m.facing });
 }
 
 function advanceAttack(ctx: SimContext, e: MechEntity): void {
   const m = e.mech;
   const attack = m.attack!;
+  if (attack.kind === 'charge') {
+    advanceCharge(ctx, e, attack);
+    return;
+  }
   if (attack.windup > 0) {
     attack.windup -= 1;
     if (attack.windup === 0) ctx.emit('mech:strike', { entityId: e.id, kind: attack.kind });
@@ -289,6 +313,49 @@ function advanceAttack(ctx: SimContext, e: MechEntity): void {
   if (attack.active <= 0) {
     m.attack = null;
     m.cooldown = MECH.breath.cooldown;
+  }
+}
+
+/** The charge: aim during the warning, then run straight, trampling whoever is in the way. */
+function advanceCharge(ctx: SimContext, e: MechEntity, attack: NonNullable<MechState['attack']>): void {
+  const m = e.mech;
+  const target = m.targetId ? ctx.world.entities[m.targetId] : undefined;
+  if (attack.windup > 0) {
+    // Lowering its heads, turning to aim at you.
+    if (target) {
+      turnToward(e, Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z));
+      m.facing = e.rotationY;
+    }
+    attack.windup -= 1;
+    if (attack.windup === 0) {
+      attack.yaw = e.rotationY;
+      // It means to run through you and a little past.
+      const d = target ? Math.hypot(target.position.x - e.position.x, target.position.z - e.position.z) : 20;
+      attack.active = Math.min(MECH.charge.active, Math.ceil(((d + MECH.charge.overshoot) / MECH.charge.speed) * 30));
+      ctx.emit('mech:strike', { entityId: e.id, kind: 'charge' });
+    }
+    return;
+  }
+  e.rotationY = attack.yaw;
+  m.facing = attack.yaw;
+  const moved = walk(e, MECH.charge.speed, MECH.charge.leash);
+  // Trample: anyone ahead of its chest and within its width.
+  const f = forward(e.rotationY);
+  for (const god of targets(ctx)) {
+    if (attack.hit?.includes(god.id)) continue;
+    const dx = god.position.x - e.position.x;
+    const dz = god.position.z - e.position.z;
+    const along = dx * f.x + dz * f.z;
+    const across = Math.abs(dx * f.z - dz * f.x);
+    if (along > -MECH_SIZE.halfZ && along < MECH_SIZE.halfZ + 2 && across < MECH_SIZE.halfX + MECH.charge.hitWidth) {
+      (attack.hit ??= []).push(god.id);
+      applyDamage(ctx, god.id, MECH.charge.damage, e.id, 'heavy');
+    }
+  }
+  attack.active -= 1;
+  if (attack.active <= 0 || !moved) {
+    m.attack = null;
+    m.cooldown = MECH.charge.cooldown;
   }
 }
 

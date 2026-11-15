@@ -225,6 +225,9 @@ export class Sfx {
           // Pistons straining as it rears up.
           this.tone(ctx, { from: 50, to: 120, duration: event.ticks / 30, volume: 0.16, type: 'sawtooth' });
           this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.1, type: 'bandpass', freq: 400, freqEnd: 1400 });
+        } else if (event.kind === 'charge') {
+          // Pawing the ground: three heavy scrapes.
+          for (let i = 0; i < 3; i += 1) this.noiseBurst(ctx, { duration: 0.22, volume: 0.25, type: 'lowpass', freq: 700, delay: i * 0.3 });
         } else {
           // Drawing breath: a rising, roaring hiss.
           this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.18, type: 'bandpass', freq: 300, freqEnd: 2200 });
@@ -235,6 +238,10 @@ export class Sfx {
         if (event.kind === 'stomp') {
           this.noiseBurst(ctx, { duration: 1.6, volume: 0.7, type: 'lowpass', freq: 600, freqEnd: 50 });
           this.tone(ctx, { from: 70, to: 26, duration: 1.2, volume: 0.45, type: 'sine' });
+        } else if (event.kind === 'charge') {
+          // Thundering footfalls.
+          for (let i = 0; i < 7; i += 1) this.tone(ctx, { from: 60, to: 30, duration: 0.25, volume: 0.35, type: 'sine', delay: i * 0.3 });
+          this.noiseBurst(ctx, { duration: 2.2, volume: 0.3, type: 'lowpass', freq: 400 });
         } else {
           this.noiseBurst(ctx, { duration: 1.3, volume: 0.4, type: 'bandpass', freq: 1200, freqEnd: 500 });
           this.noiseBurst(ctx, { duration: 1.3, volume: 0.25, type: 'lowpass', freq: 400 });

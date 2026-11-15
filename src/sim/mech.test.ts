@@ -113,6 +113,33 @@ describe('Cerberus Mk. II (M7)', () => {
     expect(zeus().health!.current).toBeLessThan(before);
   });
 
+  it('once it spots you it charges: heads lowered for a second (the warning), then it runs you down', () => {
+    const { run, zeus, mech, near } = atTheGates();
+    // 30 m in front, heads held on Zeus until it spots him; then it charges.
+    let windupTick = -1;
+    let strikeTick = -1;
+    let hitTick = -1;
+    const start = { ...mech().position };
+    for (let t = 0; t < 240 && hitTick < 0; t += 1) {
+      if (windupTick < 0) {
+        mech().mech.scan = 0;
+        mech().mech.facing = mech().rotationY;
+      }
+      const events = windupTick < 0 ? near(30, 0) : run([], 1);
+      for (const e of events) {
+        if (e.type === 'mech:windup' && e.kind === 'charge' && windupTick < 0) windupTick = t;
+        if (e.type === 'mech:strike' && e.kind === 'charge') strikeTick = t;
+        if (e.type === 'combat:hit' && e.targetId === zeus().id && e.attackerId === mech().id) hitTick = t;
+      }
+    }
+    expect(windupTick).toBeGreaterThanOrEqual(0);
+    // A second's warning before it runs.
+    expect(strikeTick - windupTick).toBeGreaterThanOrEqual(29);
+    expect(hitTick).toBeGreaterThan(strikeTick);
+    // It covered the ground fast (12 m/s).
+    expect(Math.hypot(mech().position.x - start.x, mech().position.z - start.z)).toBeGreaterThan(12);
+  });
+
   it('only the rear plating can be hurt; breaking it powers the Mk. II down and frees Cerberus (E: Three-Fold Howl)', () => {
     const { world, run, zeus, mech, plating, near } = atTheGates();
     // E does nothing before Cerberus is free.
@@ -174,5 +201,20 @@ describe('Cerberus Mk. II (M7)', () => {
     zeus().health!.current = 50;
     const dealt = applyDamage(createSimContext(world, true).ctx, id, 20, zeus().id, 'heavy');
     expect(zeus().health!.current).toBe(50 + Math.round(dealt * HOWL.lifesteal));
+  });
+});
+
+describe('health regeneration', () => {
+  it('a hurt god slowly heals once he has not been hit for 4 s', () => {
+    const { run, zeus } = atTheGates();
+    const z = zeus();
+    z.health!.current = 40;
+    z.hero!.regenDelay = 120;
+    run([], 119);
+    expect(z.health!.current).toBe(40);
+    run([], 31);
+    // About 2 a second.
+    expect(z.health!.current).toBeGreaterThan(41.5);
+    expect(z.health!.current).toBeLessThan(42.5);
   });
 });

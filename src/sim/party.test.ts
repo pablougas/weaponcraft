@@ -94,7 +94,9 @@ describe('Hades joins and V switches (M6)', () => {
     expect(run([], 2)).toContainEqual(expect.objectContaining({ type: 'hero:down', entityId: hades.id }));
     const up = run([], COMPANION_DOWN_TICKS + 2);
     expect(up).toContainEqual(expect.objectContaining({ type: 'hero:revived', entityId: hades.id }));
-    expect(hades.health!.current).toBe(55);
+    // Back at half health (plus a tick or two of slow regeneration).
+    expect(hades.health!.current).toBeGreaterThanOrEqual(55);
+    expect(hades.health!.current).toBeLessThan(56);
     expect(Math.hypot(hades.position.x - active().position.x, hades.position.z - active().position.z)).toBeLessThan(3);
   });
 });

@@ -49,7 +49,7 @@ describe('the Asphodel Fields collider', () => {
   it('matches the drawn ground mesh everywhere (no invisible walls, no floating)', async () => {
     const THREE = await import('three');
     const { GROTTO } = await import('./regions');
-    const { FIELDS, FIELDS_CELL, FORT_SPOTS, FORT_RADIUS, GATES, SPIRES, TUNNEL, underworldLocalHeight } = await import('./terrain/underworld');
+    const { FIELDS, FIELDS_CELL, FORT_SPOTS, FORT_RADIUS, GATES, SPIRES, TUNNEL, underworldGroundHeight, underworldLocalHeight } = await import('./terrain/underworld');
     const physics = new PhysicsWorld(await loadPhysics());
     physics.step();
     // The same ground mesh the view builds (src/view/underworld/fields.ts).
@@ -65,6 +65,7 @@ describe('the Asphodel Fields collider', () => {
     const ray = new THREE.Raycaster();
     const c = GROTTO.center;
     let worst = 0;
+    let worstPlaced = 0;
     let checked = 0;
     // Inside grid cells (a ray exactly on a grid line can slip between triangles), across the whole non-square field.
     for (let x = FIELDS.minX + 30 + 1.1; x < FIELDS.maxX - 30; x += 17.5) {
@@ -76,11 +77,47 @@ describe('the Asphodel Fields collider', () => {
         ray.set(new THREE.Vector3(x, 120, z), new THREE.Vector3(0, -1, 0));
         const drawn = ray.intersectObject(mesh)[0].point.y;
         worst = Math.max(worst, Math.abs(ground - drawn));
+        // What the sim places things on (groundAt) is the same surface.
+        worstPlaced = Math.max(worstPlaced, Math.abs(underworldGroundHeight(x, z) - ground));
         checked += 1;
       }
     }
     expect(checked).toBeGreaterThan(300);
     expect(worst).toBeLessThan(0.05);
+    expect(worstPlaced).toBeLessThan(0.05);
+    physics.free();
+  });
+});
+
+describe('soldiers on the Underworld ground', () => {
+  it('stay on the surface (never sink through it) over 20 s of patrols', async () => {
+    const { createWorld } = await import('./world');
+    const { ensureMeadowPopulated } = await import('./populate');
+    const { tickWorld } = await import('./tick');
+    const { TUTORIAL_STEPS } = await import('./tutorial');
+    const { groundAt } = await import('./regions');
+    const physics = new PhysicsWorld(await loadPhysics());
+    const world = createWorld(7, 1_000);
+    ensureMeadowPopulated(world);
+    type Intent = import('./intents').Intent;
+    const run = (intents: Intent[] = [], n = 1) => {
+      for (let t = 0; t < n; t += 1) tickWorld(world, { nowMs: 1_000 + world.tick * 33, isAuthority: true, intents: t === 0 ? intents : [], physics });
+    };
+    run([{ type: 'player:declare', playerId: 'p1', seenRocket: true, seenCutscenes: ['rocket', 'descent'] }]);
+    run(TUTORIAL_STEPS.map((stepId) => ({ type: 'dev:tutorial', playerId: 'p1', stepId }) as Intent));
+    run([{ type: 'cutscene:skip', playerId: 'p1' }]);
+    run([{ type: 'cutscene:skip', playerId: 'p1' }], 3);
+    run([], 600);
+    const soldiers = Object.values(world.entities).filter((e) => e.soldier);
+    expect(soldiers.length).toBeGreaterThan(20);
+    const worst = Math.max(...soldiers.map((e) => groundAt('underworld', e.position.x, e.position.z) - e.position.y));
+    expect(worst).toBeLessThan(0.3);
+
+    // A soldier saved underground (e.g. from before the fields' collider was fixed) climbs back out at once.
+    const sunk = soldiers.find((e) => !e.soldier!.squadId)!;
+    sunk.position = { ...sunk.position, y: groundAt('underworld', sunk.position.x, sunk.position.z) - 3 };
+    run([], 2);
+    expect(world.entities[sunk.id].position.y).toBeGreaterThan(groundAt('underworld', sunk.position.x, sunk.position.z) - 0.3);
     physics.free();
   });
 });

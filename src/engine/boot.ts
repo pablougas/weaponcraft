@@ -361,7 +361,11 @@ export async function boot(): Promise<void> {
     if (event.type === 'soldier:rout') captions.show('[The captain falls. His sentries break and run!]', 3);
     // Cerberus Mk. II (M7).
     if (event.type === 'mech:alarm') captions.show('[Cerberus Mk. II roars and turns toward you]', 3);
-    if (event.type === 'mech:windup') captions.show(event.kind === 'stomp' ? '[The Mk. II rears up. Get clear!]' : '[Its three heads glow with stolen fire]', 2.5);
+    if (event.type === 'mech:windup') {
+      captions.show(event.kind === 'stomp' ? '[The Mk. II rears up. Get clear!]'
+        : event.kind === 'charge' ? '[The Mk. II lowers its heads and paws the ground. It\u2019s going to charge!]'
+          : '[Its three heads glow with stolen fire]', 2.5);
+    }
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
     if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], 3.2);
     if (event.type === 'spirit:freed') {

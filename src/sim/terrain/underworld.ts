@@ -73,6 +73,38 @@ export function underworldLocalHeight(x: number, z: number): number {
   return h * open;
 }
 
+/** The fields' ground grid (shared by the physics heightfield and the drawn mesh): cells along x and z. */
+export const FIELDS_GRID = {
+  nx: Math.round((FIELDS.maxX - FIELDS.minX) / FIELDS_CELL),
+  nz: Math.round((TUNNEL.toZ + 22 - FIELDS.minZ) / FIELDS_CELL),
+} as const;
+
+/**
+ * The ground as it's actually built: flat triangles between the grid points
+ * (the collider and the mesh both split each cell along the same diagonal,
+ * from (x0, z1) to (x1, z0)). Anything placed on the ground uses this, so it
+ * stands exactly where the physics and the drawing put the surface — the
+ * smooth function can sit up to ~1.7 m lower in hollows and at terrace feet.
+ */
+export function underworldGroundHeight(x: number, z: number): number {
+  const fx = (x - FIELDS.minX) / FIELDS_CELL;
+  const fz = (z - FIELDS.minZ) / FIELDS_CELL;
+  if (fx < 0 || fz < 0 || fx >= FIELDS_GRID.nx || fz >= FIELDS_GRID.nz) return underworldLocalHeight(x, z);
+  const ix = Math.floor(fx);
+  const iz = Math.floor(fz);
+  const u = fx - ix;
+  const v = fz - iz;
+  const at = (i: number, k: number) => underworldLocalHeight(FIELDS.minX + i * FIELDS_CELL, FIELDS.minZ + k * FIELDS_CELL);
+  const h01 = at(ix, iz + 1);
+  const h10 = at(ix + 1, iz);
+  if (u + v <= 1) {
+    const h00 = at(ix, iz);
+    return h00 + u * (h10 - h00) + v * (h01 - h00);
+  }
+  const h11 = at(ix + 1, iz + 1);
+  return h11 + (1 - u) * (h01 - h11) + (1 - v) * (h10 - h11);
+}
+
 /** Is (x, z) (relative to the grotto) somewhere a god can stand, `margin` metres in from the edge? */
 export function underworldInside(x: number, z: number, margin = 0, barricadeOpen = true): boolean {
   if (Math.hypot(x, z) < 20 - margin) return true;
