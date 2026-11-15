@@ -57,7 +57,11 @@ test.describe('the Underworld route (M6)', () => {
     await page.waitForFunction(() => window.wc !== undefined);
     await page.evaluate(() => window.wc!.ready());
     s = await state(page);
-    expect(s.world!.reveal.underworld).toBe(revealed);
+    // The clock runs until the save, so a cell or two more may be revealed; none may be lost.
+    const after = s.world!.reveal.underworld!;
+    expect(after.length).toBe(revealed.length);
+    expect([...revealed].filter((c, i) => c === '1' && after[i] !== '1')).toEqual([]);
+    expect(revealed).toContain('1');
     expect(s.world!.flags.barricadeBroken).toBe(true);
     expect(consoleErrors).toEqual([]);
   });
