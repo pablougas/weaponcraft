@@ -7,8 +7,8 @@ test.describe('characters preview (Hades model)', () => {
     await page.goto('/?preview=characters');
     await expect(page.locator('body[data-ready="true"]')).toHaveCount(1, { timeout: 150_000 });
     await expect(page.locator('.wc-preview-character')).toHaveCount(2);
-    // Hades stays unapproved until the team signs off the in-game model.
-    await expect(page.locator('[data-character="hades"] .wc-pending')).toHaveCount(1);
+    // The team approved Hades's in-game model (Nov 14).
+    await expect(page.locator('[data-character="hades"] .wc-ok')).toHaveCount(1);
     // 3 angles + 4 faces per character, all rendered.
     const renders = await page.locator('img[data-render]').evaluateAll((imgs) => imgs.map((img) => (img as HTMLImageElement).src.startsWith('data:image/png')));
     expect(renders).toHaveLength(14);
