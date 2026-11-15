@@ -154,3 +154,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - "Focuses on an enemy" means lock-on (Tab). While he's locked on to an enemy within 16 m, the daggers fly at it one every 0.4 s, for 22 shadow damage each (so his Shadow lifesteal applies). Each dagger re-forms in the circle 3 s after it's thrown. With no lock, they just circle.
 - The companion AI locks on in fights already, so an AI Hades uses them too. Companions now cast the spirit gift when a fight starts, if they have more than 50 stamina.
 - The orbit is shared by the sim and the view (`daggerOrbit`), so a throw leaves from the dagger you see.
+- Revised (team request): the daggers hover in a tight pyramid above his crown, with their tips meeting at an apex, and the formation turns slowly. They fly one at a time, 0.8 s apart, and each one trails a violet tracer behind it.

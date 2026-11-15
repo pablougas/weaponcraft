@@ -4,7 +4,7 @@ import { attackSpecFor, DODGE_TICKS } from '../../../sim/systems/hero';
 import type { Entity } from '../../../sim/types';
 import { isKnownWeapon, weaponData } from '../../../sim/weapons';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from '../../../view/entity-model';
-import { DAGGERS, daggerOrbit } from '../../spirits/shadow-daggers';
+import { DAGGERS, daggerApex, daggerOrbit } from '../../spirits/shadow-daggers';
 import { buildDagger, daggerMaterials } from '../../../view/effects/shadow';
 import { createParticles } from '../../../view/particles';
 import { buildWeaponModel } from '../../../view/weapon-model';
@@ -327,7 +327,7 @@ export const createModel: ModelFactory = (look, entityId) => {
       const flicker = frame.reduceMotion ? 1 : 1 + Math.sin(t * 7) * 0.08 + Math.sin(t * 13) * 0.04;
       flameTongue.scale.set(1, flicker, 1);
 
-      // Shadow Daggers: circling above his head, tips outward; a thrown one fades back in as it re-forms.
+      // Shadow Daggers: a pyramid above his crown, tips meeting at the apex; a thrown one fades back in as it re-forms.
       const ring = hero?.daggers;
       daggerRing.visible = !!ring;
       if (ring) {
@@ -335,11 +335,15 @@ export const createModel: ModelFactory = (look, entityId) => {
         orbitT = Math.abs(orbitT + frame.dt - simT) > 0.1 ? simT : orbitT + frame.dt;
         daggerRing.rotation.y = -root.rotation.y;
         const fadeOut = Math.min(1, ring.ticksLeft / 15);
+        const apex = daggerApex(origin, orbitT);
         daggers.forEach((d, i) => {
           const p = daggerOrbit(origin, i, orbitT);
           d.group.position.set(p.x, p.y, p.z);
-          // Tip outward and a little down, along the ring (ring-local, so no lookAt: that works in world space).
-          d.group.rotation.set(0.35, Math.atan2(p.x, p.z) + 0.5, 0, 'YXZ');
+          // Tip toward the apex (ring-local, so no lookAt: that works in world space). In YXZ, a negative X tilts +Z up.
+          const dx = apex.x - p.x;
+          const dy = apex.y - p.y;
+          const dz = apex.z - p.z;
+          d.group.rotation.set(-Math.atan2(dy, Math.hypot(dx, dz)), Math.atan2(dx, dz), 0, 'YXZ');
           const back = ring.reform[i] > 0 ? Math.max(0, 1 - ring.reform[i] / 12) : 1;
           d.group.visible = back > 0;
           d.group.scale.setScalar(0.6 + 0.4 * back);

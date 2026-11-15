@@ -12,29 +12,45 @@ export const DAGGERS = {
   /** A dagger flies at whatever Hades is locked on to (Tab) within this range. */
   range: 16,
   damage: 22,
-  /** Time between daggers, so a volley reads as three throws. */
-  intervalTicks: ticks(0.4),
-  /** A thrown dagger re-forms in the circle after this long. */
+  /** One dagger at a time: the next flies only after the last has landed (team request). */
+  intervalTicks: ticks(0.8),
+  /** A thrown dagger re-forms in the pyramid after this long. */
   reformTicks: ticks(3),
   cooldownTicks: ticks(20),
   staminaCost: 30,
-  /** The circle, hovering above his crown (team request): radius and height around Hades, and how fast it turns (rad/s). */
-  orbitRadius: 1.15,
-  orbitHeight: 2.9,
-  spin: 2.4,
+  /**
+   * The pyramid above his crown (team request): three daggers close together,
+   * tips leaning in to meet at an apex, turning slowly. Base radius and height,
+   * the apex's rise above the base, and the turn rate (rad/s).
+   */
+  orbitRadius: 0.32,
+  orbitHeight: 2.75,
+  apexRise: 0.6,
+  spin: 0.9,
 } as const;
 
+/** The pyramid's gentle bob (the whole formation moves together, so it keeps its shape). */
+function bob(seconds: number): number {
+  return Math.sin(seconds * 2) * 0.05;
+}
+
 /**
- * Where dagger `i` circles at a given time (seconds). The sim throws from here
- * and the view draws them here, so the throw leaves from the dagger you see.
+ * Where dagger `i` sits in the pyramid at a given time (seconds). The sim
+ * throws from here and the view draws them here, so the throw leaves from the
+ * dagger you see.
  */
 export function daggerOrbit(center: Vec3, i: number, seconds: number): Vec3 {
   const a = seconds * DAGGERS.spin + (i * Math.PI * 2) / DAGGERS.count;
   return {
     x: center.x + Math.sin(a) * DAGGERS.orbitRadius,
-    y: center.y + DAGGERS.orbitHeight + Math.sin(seconds * 2 + i * 2.1) * 0.12,
+    y: center.y + DAGGERS.orbitHeight + bob(seconds),
     z: center.z + Math.cos(a) * DAGGERS.orbitRadius,
   };
+}
+
+/** The pyramid's apex, where the three tips meet. */
+export function daggerApex(center: Vec3, seconds: number): Vec3 {
+  return { x: center.x, y: center.y + DAGGERS.orbitHeight + DAGGERS.apexRise + bob(seconds), z: center.z };
 }
 
 /** The enemy Hades is focused on (his lock-on), if a dagger can reach it. */
@@ -47,10 +63,10 @@ function focusOf(caster: Entity, world: { entities: Record<string, Entity> }): E
 }
 
 /**
- * Hades's E once Cerberus is free: three shadow daggers circle him for 15 s.
+ * Hades's E once Cerberus is free: three shadow daggers hover in a pyramid above his crown for 15 s.
  * Whenever he locks on to an enemy, they throw themselves at it one after
- * another (22 shadow damage each, so his lifesteal heals him) and re-form in
- * the circle 3 s later.
+ * another, one at a time (22 shadow damage each, so his lifesteal heals him) and re-form in
+ * the pyramid 3 s later.
  */
 export const shadowDaggers: SpiritAbility = {
   id: 'shadow-daggers',

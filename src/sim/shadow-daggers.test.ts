@@ -57,9 +57,13 @@ describe('Shadow Daggers (Cerberus\'s gift to Hades, Nov 15)', () => {
 
     // Lock on: all three fly, one after another, and each hurts.
     hades().hero!.lockTarget = target.id;
-    const volley = run([], DAGGERS.intervalTicks * 3);
+    const volley = run([], (DAGGERS.intervalTicks + 1) * 3);
     const throws = volley.filter((e) => e.type === 'ability:cast' && e.abilityId === 'shadow-dagger');
     expect(throws).toHaveLength(3);
+    // One at a time, each well after the last.
+    const at = throws.map((e) => (e as { tick: number }).tick);
+    expect(at[1] - at[0]).toBeGreaterThanOrEqual(DAGGERS.intervalTicks);
+    expect(at[2] - at[1]).toBeGreaterThanOrEqual(DAGGERS.intervalTicks);
     expect(throws.every((e) => (e as { targetIds: string[] }).targetIds[0] === target.id)).toBe(true);
     expect(target.health!.current).toBeLessThanOrEqual(1000 - 3 * DAGGERS.damage);
     expect(hades().hero!.daggers!.reform.every((r) => r > 0)).toBe(true);

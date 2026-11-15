@@ -82,34 +82,51 @@ export class ShadowEffects {
     });
   }
 
-  /** A shadow dagger thrown from Hades's circle at his focus: a fast straight streak, then a dark burst. */
+  /**
+   * A shadow dagger thrown from Hades's pyramid at his focus, with a violet
+   * tracer that follows it (a tail a couple of metres long that catches up and
+   * fades once it lands), then a dark burst.
+   */
   dagger(from: Vec3, to: Vec3, reduceMotion: boolean): void {
     const blade = buildDagger();
     const mats = daggerMaterials(blade);
     const a = new THREE.Vector3(from.x, from.y, from.z);
     const b = new THREE.Vector3(to.x, to.y, to.z);
-    const trailMat = this.glow('#9b6bff', 0.45);
-    const trailGeo = new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 8, 0.035, 5, false);
-    const trail = new THREE.Mesh(trailGeo, trailMat);
-    trail.geometry.setDrawRange(0, 0);
+    const length = Math.max(0.1, a.distanceTo(b));
+    const segments = 48;
+    const radial = 6;
+    const perSegment = radial * 6;
+    const line = new THREE.LineCurve3(a, b);
+    // A bright core inside a soft glow; both are drawn only between the tail and the dagger.
+    const coreMat = this.glow('#e6dcff', 0.85);
+    const glowMat = this.glow('#7a3cff', 0.4);
+    const core = new THREE.Mesh(new THREE.TubeGeometry(line, segments, 0.025, radial, false), coreMat);
+    const glow = new THREE.Mesh(new THREE.TubeGeometry(line, segments, 0.08, radial, false), glowMat);
+    const tracers = [core, glow];
+    for (const t of tracers) t.geometry.setDrawRange(0, 0);
+    const tail = Math.min(1, 2.4 / length);
     const burstMat = this.glow('#5b2aa8', 0.6);
     const burst = new THREE.Mesh(this.sphere, burstMat);
     burst.position.copy(b);
     burst.scale.setScalar(0.001);
-    const flight = 0.16;
+    const flight = Math.min(0.45, 0.12 + length / 40);
     const fadeTime = reduceMotion ? 0.25 : 0.4;
     blade.position.copy(a);
     blade.lookAt(b);
     this.add({
-      objects: [blade, trail, burst], materials: [...mats, trailMat, burstMat], age: 0, life: flight + fadeTime,
+      objects: [blade, core, glow, burst], materials: [...mats, coreMat, glowMat, burstMat], age: 0, life: flight + fadeTime,
       update: (_t, age) => {
         const p = Math.min(1, age / flight);
         blade.position.lerpVectors(a, b, p);
         blade.visible = p < 1;
-        const total = trail.geometry.index ? trail.geometry.index.count : 0;
-        trail.geometry.setDrawRange(0, Math.floor(total * p));
-        const fade = age < flight ? 1 : Math.max(0, 1 - (age - flight) / fadeTime);
-        trailMat.opacity = 0.45 * fade;
+        // The tail follows the dagger; after it lands the tail runs on into the target.
+        const after = age < flight ? 0 : (age - flight) / fadeTime;
+        const head = Math.floor(segments * p);
+        const from0 = Math.max(0, Math.floor(segments * (p - tail + after * tail)));
+        for (const t of tracers) t.geometry.setDrawRange(from0 * perSegment, Math.max(0, head - from0) * perSegment);
+        const fade = Math.max(0, 1 - after);
+        coreMat.opacity = 0.85 * fade;
+        glowMat.opacity = 0.4 * fade;
         burstMat.opacity = age < flight ? 0 : 0.6 * fade;
         burst.scale.setScalar(age < flight ? 0.001 : 0.25 + (1 - fade) * (reduceMotion ? 0.25 : 0.5));
       },
