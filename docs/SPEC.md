@@ -14,7 +14,7 @@ Humans have had enough of the gods. They fire a rocket that shatters the summit 
 - **Broad but shallow:** every system exists in a minimum form.
 - **No ending:** open sandbox. The goals are to free spirits, fill the Fusion Codex and explore.
 - **First cut if behind:** drop to 3 biomes + Olympus.
-- **Demo path (2–3 min):** calm prologue → rocket cinematic → travel to the Underworld → fuse a Light weapon → sneak up on **Cerberus Mk. II** → break the plating → hatch → beat the pilot → free the Cerberus spirit and gain its ability.
+- **Demo path (3–5 min):** calm prologue → rocket cinematic → Hades arrives and portals Zeus to the Outer Grotto → "Find and free Cerberus" → cross the Asphodel Fields past human forts and sentries, switching between Zeus and Hades → sneak up on **Cerberus Mk. II** → break the plating → hatch → beat the pilot → free Cerberus and gain his ability.
 - **Hard deadline: public demo on itch.io on Sunday, Nov 15, 2026.** A working build must be uploaded to itch.io by **Saturday night**, and every milestone after that ships as a new upload. See §16 for itch.io requirements.
 
 ## 3. Story and flow
@@ -30,17 +30,20 @@ Humans have had enough of the gods. They fire a rocket that shatters the summit 
 2. A rocket streaks across the sky with a smoke trail and a rising sound.
 3. Impact on the summit, then a shockwave, a dust wall rolling down the slopes, and the temple and top of the mountain breaking apart and falling. Floating debris remains.
 4. Pan down: human columns with torches and banners climb from every side, one per biome, with mech silhouettes among them.
-5. Control returns. HUD back, objective: *"Find the others. Survive."*
+5. Hades's arrival follows straight on (§3.3); control returns in the Outer Grotto with the objective *"Find and free Cerberus."*
 
 Rules:
 - **Unskippable the first time** on a save. Skippable on later playthroughs and new saves.
 - **Photosensitivity safe:** no rapid flashing. The impact uses one slow bloom swell, never strobing. If *Reduce motion & flashes* is on, the flash and shake are softened further.
 - It runs as a scripted timeline (`src/sim/cutscenes/rocket.ts`) that sets `state.flags.olympusShattered = true` at impact. The input layer ignores intents while `state.cutscene` is active.
 
-### 3.3 After the blast (main game)
-- **Olympus = shattered summit.** The top is blown off, the temple is ruined, debris floats, and smoke rises during the first in-game day. The meadow becomes **the Refuge**: Forge, Fusion Altar, bed/respawn, and later the base-building zone.
-- The six biomes around Olympus are **occupied by humans**. There are no raids. Humans hold their own territory with **soldier patrols, camps and a mech lair** in each biome.
-- Difficulty scales with distance from Olympus.
+### 3.3 After the blast: Hades and the descent (M5.1)
+- **Olympus = shattered summit.** The top is blown off, the temple is ruined, debris floats and smoke rises. The surface is no longer safe.
+- **Hades arrives.** As the dust settles, Hades steps out of a shadow portal in the meadow. Short captioned exchange: the surface belongs to the humans now; the gods must regroup **underground** and find **Cerberus**, the Hound of the Gate.
+- **Portal to the Outer Grotto.** Hades opens a portal and takes Zeus with him: a short, calm transition (input locked only for the scene, no flashing, reduce motion respected, all lines captioned).
+- **The discovery.** In the Outer Grotto they find the humans got there first: a glowing **energy conduit** runs from the grotto deeper into the Underworld, and a captured soldier's dispatch / a vision in the Styx shows **Cerberus chained and drained to power the Cerberus Mk. II**. New objective: **"Find and free Cerberus."**
+- **Outer Grotto = the new Refuge** (first Underworld safe area): Fusion Altar, a bed / respawn point and the start of the route. Control returns as **Zeus**; in M5.1 Hades is a story character standing in the grotto (no combat, no switching yet).
+- The other five biomes stay occupied by humans (soldier patrols, forts/camps, a mech lair each) and come after the demo. Difficulty scales with distance from the Refuge.
 
 ### 3.4 Spirit creatures and mechs (core progression)
 Each mech imprisons its biome's spirit creature and runs on its energy. The mech is a mechanical imitation of that creature. Defeating a mech:
@@ -58,6 +61,16 @@ Each mech imprisons its biome's spirit creature and runs on its energy. The mech
 
 The GDD's per-god Divine Beasts are **replaced** by spirits for this build.
 
+### 3.5 The Underworld route (M6 demo region)
+A region **much larger than the training meadow** that you roam freely, built so that reaching the mech is a **trial**:
+- **Outer Grotto (safe start)** → **the Asphodel Fields**: a vast open cavern you can roam in any direction (grey asphodel meadows, the Styx and its tributaries, bone-white rock spires, a ceiling lost in violet haze lit by drifting soul-motes and glowing crystal veins) → **the Gates** where **Cerberus Mk. II** stands, visibly wired to the chained Cerberus by pulsing conduits.
+- **Small human forts along the way** (3 on the main path, proposed): palisade, watchtower, tents, a campfire, 3–6 soldiers and a loot chest each. Clearing one marks it on the map.
+- **Sentries:** lone lookouts and watch-posts covering the approaches with visible **sight cones**; seen = alarm, and nearby soldiers come running. Sneaking past (shadows, rock cover, Hades's Shadow Step decoy) or taking them out first are both valid.
+- **Open-world roaming:** side areas off the main path with chests, ruins and weapons to find; the conduit and the Gates' glow are always visible as a landmark.
+- **Caves (stretch goal):** 1–2 enclosed side caves with a chest or a shortcut, if time allows.
+- **Lighting:** the Underworld has its own fixed "eternal dusk" look (violet/teal, soul-motes, glowing flora) and ignores the surface clock; the time-of-day setting only affects the surface.
+- The actual mech fight (sensor cone, rear plating, hatch, interior, pilot) and freeing Cerberus are **M7**.
+
 ## 4. World
 - **Seeded procedural** landmass ringed by sea, with **Mount Olympus at the center** and six biome wedges around it: Marble Highlands, Storm Peaks, Drowned Coast, Underworld Caverns, Sun-Scorched Plains, Whispering Forest.
 - Each biome is a registry entry (§12): palette, terrain params, resources, props, enemy table, camp layouts, mech lair, hazard, music.
@@ -74,10 +87,24 @@ The GDD's per-god Divine Beasts are **replaced** by spirits for this build.
 - **Accessibility:** minimap toggle, size (small/medium/large) and rotation (north-up / player-up) in settings.
 
 ## 5. Player
-- **Zeus first:** passive charge build-up, **Chain Lightning** (Q), short hover jump. **Hades second**, after Zeus is fully working: Shadow Step, Skull Cage (with the fair-warning rules from the GDD).
+- **Zeus first:** passive charge build-up, **Chain Lightning** (Q), short hover jump. **Hades** has a story cameo in M5.1 and becomes playable in M6 (below).
 - **Controls (rebindable):** **arrow keys move**; letters are actions. Space jump/hover, Shift sprint, **X dodge roll** (also Alt), **A punch** (also left mouse), **S weapon strike** (tap light / hold heavy; right mouse = heavy), **D Lightning Fist** (hold to charge), **Q Chain Lightning** (tap or hold to keep firing), **R Sky Strike**, **W Bolt Step** (lightning teleport), E spirit ability, F interact, Tab lock-on, mouse or Comma/Period to turn the camera (it auto-follows when not turned), I inventory, C codex, M map, Esc settings. The game must be fully playable without the mouse.
 - **Zeus's lightning kit:** Chain Lightning (hold to fire every 0.3 s until stamina runs out; fires forward even with no target), **Sky Strike** (needs ≥50% stamina, drains all of it, huge AoE bolt from the sky after a 0.6 s marker, 12 s cooldown), **Lightning Fist** (charged electrified punch with a short lunge), **Bolt Step** (W: flash up to 8 m, or to the lock-on target, briefly untouchable, landing with a small lightning burst), plus a plain 3-hit **punch** combo. Details and numbers: `docs/prompts/M3.1-fixes.md`.
 - **Dodge roll:** fast (≈0.26 s, ≈4.4 m), early i-frames, input buffer, cancels attack recovery.
+- **Two playable gods, switchable (M6).** **Zeus** and **Hades** are both in the world; **V** (rebindable) switches which one you control, with the camera easing across. The other is an **AI companion**: follows 3–6 m behind, catches up with his own teleport (Bolt Step / Shadow Step) if he falls more than 25 m behind or is stuck for 2 s, and fights threats near you (basic attacks plus his Q now and then; never his ultimate). Each god keeps his own health, stamina, weapon and cooldowns. A companion knocked to 0 health is down for 10 s, then gets back up near you. Switching is blocked during cutscenes and has a 1 s cooldown.
+- **Hades is as powerful as Zeus**, on the **same keys**, with a different style: Zeus hits from range in big bursts; Hades fights closer, controls crowds and steals life (the Shadow element's status effect).
+
+| Key | Zeus | Hades |
+|---|---|---|
+| A | Punch combo | Punch combo |
+| S | Spear: tap thrust / hold sweep | **Shadow bident**: tap double-thrust / hold wide sweep (cleaves); every hit heals Hades for 10% of the damage |
+| W | Bolt Step: lightning teleport up to 8 m | **Shadow Step**: melts into shadow, reappears up to 8 m away (or *behind* the lock-on target within 12 m), 0.25 s untouchable; leaves a **shadow decoy** for 2 s that enemies chase; his next attack within 1 s deals +50% |
+| Q | Chain Lightning: hold to keep firing, chains to 4 | **Soul Bolts**: hold to keep firing homing shadow skulls (every 0.35 s, 8 stamina, 16 damage, range 16 m, heal 25% of damage); with no target they fly 14 m ahead |
+| D | Lightning Fist: charge, lunge, electrified punch | **Grasp of the Dead**: charge up to 1 s, slam the ground; spectral hands rise in a 3–5 m ring (by charge), 18–40 damage, root enemies for 1–2 s and pull them toward the centre; 15–30 stamina, 2 s cooldown |
+| R | Sky Strike: needs ≥50% stamina, spends all | **Skull Cage**: needs ≥50% stamina, spends all; a **red warning ring for 1.5 s** marks the spot (lock-on target or 10 m ahead), then a cage of bone drops (4 m): everything inside is trapped for 4 s and crushed for 1.2 × stamina spent over 3 s; 12 s cooldown. Same fairness rules as the GDD: marker always first, visible through effects, no flashing |
+| Passive | Charge build-up | **Lord of the Dead**: +15% damage and +25% stamina regen underground or at night |
+
+- **Hades's look (generated, original design):** tall, ash-grey skin, a short dark beard, black and deep-violet robes over dark bronze armour, a spiked black-iron crown, violet-teal soul-fire eyes and faint shadow wisps trailing from his cloak. Same canvas-face expression system as Zeus. Avoid any film or cartoon Hades (e.g. no flaming blue hair).
 - Health + stamina (sprint, dodge, climb). Death respawns at the last bed.
 - Combat is a **ranged + melee mix**: the weapon archetype decides the moveset (sword, spear, axe, bow, staff…).
 
@@ -115,6 +142,8 @@ Counter wheel **Light > Shadow > Poison > Lightning > Light**. Hitting the eleme
 ## 9. Humans (enemies)
 - **Soldiers:** spear, archer, shield-bearer; later an engineer who repairs mechs. AI states: patrol → suspicious → alert (calls others) → attack → search → return.
 - **Camps:** tents, palisade, watchtower, campfire, loot chest. Clearing a camp marks it on the map. Camps respawn slowly (proposed: each new game day).
+- **Forts (M6):** smaller than camps: palisade, watchtower, 3–6 soldiers, loot chest; placed along the route in the Underworld region.
+- **Sentries (M6):** stationary lookouts with a visible sight cone; spotting a god raises the alarm and nearby soldiers come running. They can be sneaked past or taken out quietly.
 - **Mech drones:** sentry / crawler near lairs.
 - Patrols are stronger at night and farther from Olympus.
 
@@ -172,7 +201,7 @@ Target: **BotW-like light and atmosphere** with warm, expressive characters (tea
 - **Reference implementation:** `docs/reference/style-test.html` (three r170 via CDN). Port its shaders and look into `view/`; don't copy the file wholesale.
 
 ## 15. Out of scope this weekend
-Networked co-op itself (architecture is ready; it would need a server, which the client-only rule forbids until the team asks), gods beyond Zeus + Hades, skins, carveable terrain, raids, a story ending, PvP, touch/mobile controls for the 3D game.
+Networked co-op itself (architecture is ready; it would need a server, which the client-only rule forbids until the team asks), the five surface biomes beyond the Underworld region (after the demo), gods beyond Zeus + Hades, skins, carveable terrain, raids, a story ending, PvP, touch/mobile controls for the 3D game.
 
 ## 16. itch.io demo requirements
 - **Packaging:** `npm run package` → `artifacts/game.zip` with `index.html` at the zip root (the existing script enforces this). Upload as an **HTML** project, *playable in the browser*.
