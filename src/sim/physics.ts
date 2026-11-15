@@ -89,7 +89,8 @@ export class PhysicsWorld {
     const rig = GROTTO_SPOTS.rig;
     this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + rig.x, c.y + 1.4, c.z + rig.z));
     const gate = GROTTO_SPOTS.barricade;
-    this.world.createCollider(R.ColliderDesc.cuboid(3.6, 2.5, 0.5).setTranslation(c.x + gate.x, c.y + 2.5, c.z + gate.z));
+    // Wall to wall, so nobody slips round its ends.
+    this.world.createCollider(R.ColliderDesc.cuboid(7.5, 2.5, 0.5).setTranslation(c.x + gate.x, c.y + 2.5, c.z + gate.z));
     // The tunnel beyond the barricade, walled off for now.
     this.world.createCollider(R.ColliderDesc.cuboid(3.6, 4, 0.5).setTranslation(c.x + gate.x, c.y + 4, c.z + gate.z - 6));
   }

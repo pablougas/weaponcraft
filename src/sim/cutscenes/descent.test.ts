@@ -8,6 +8,7 @@ import { deserialize, serialize } from '../serialize';
 import { tickWorld } from '../tick';
 import { TUTORIAL_STEPS } from '../tutorial';
 import { createWorld } from '../world';
+import { DOWN, REST_HEAL_TICK, REST_TOTAL, restPose } from '../systems/rest';
 import { DESCENT_BEATS, DESCENT_ID, GROTTO_SPOTS } from './descent';
 import { ROCKET_BEATS } from './rocket';
 
@@ -129,11 +130,61 @@ describe('the Outer Grotto (with physics)', () => {
     expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'dispatch:read' }));
     at(GROTTO_SPOTS.hades.x - 1.4, GROTTO_SPOTS.hades.z + 0.5);
     expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'npc:talk', name: 'Hades' }));
-    // The grotto's bed heals.
+    // The grotto's bed: lie down, the screen fades, health comes back, get up.
     zeus().health!.current = 30;
     at(GROTTO_SPOTS.bed.x - 1.4, GROTTO_SPOTS.bed.z);
-    expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'hero:rested' }));
+    expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'hero:resting' }));
+    expect(restPose(zeus().hero).onBed).toBe(true);
+    expect(run([{ type: 'player:action', playerId: 'p1', action: 'punch' }])).toContainEqual(expect.objectContaining({ type: 'intent:rejected', reason: 'resting' }));
+    const rested = run([], REST_HEAL_TICK);
+    expect(rested).toContainEqual(expect.objectContaining({ type: 'hero:rested' }));
     expect(zeus().health!.current).toBe(zeus().health!.max);
+    run([], REST_TOTAL);
+    expect(zeus().hero!.rest).toBeNull();
+    run([{ type: 'player:move', playerId: 'p1', x: 1, z: 0, sprint: false, jumpHeld: false }], 15);
+    expect(zeus().hero!.moving).toBe(true);
     void world;
+  });
+
+  it('nobody gets round the ends of the barricade', () => {
+    const { run, zeus } = story({ physics: true, seen: ['rocket', 'descent'] });
+    run(TUTORIAL_STEPS.map((stepId) => ({ type: 'dev:tutorial', playerId: 'p1', stepId }) as Intent));
+    run([{ type: 'cutscene:skip', playerId: 'p1' }]);
+    run([{ type: 'cutscene:skip', playerId: 'p1' }], 5);
+    for (const side of [-1, 1]) {
+      run([{ type: 'dev:teleport', playerId: 'p1', x: GROTTO.center.x + side * 6.5, z: GROTTO.center.z - 16 }], 2);
+      run([{ type: 'player:move', playerId: 'p1', x: side * 0.35, z: -1, sprint: true, jumpHeld: false }], 150);
+      expect(zeus().position.z - GROTTO.center.z).toBeGreaterThan(GROTTO_SPOTS.barricade.z - 0.2);
+    }
+  });
+
+  it('a god who falls in battle wakes at the grotto bed, healed', () => {
+    const { world, run, zeus } = story({ seen: ['rocket', 'descent'] });
+    run(TUTORIAL_STEPS.map((stepId) => ({ type: 'dev:tutorial', playerId: 'p1', stepId }) as Intent));
+    run([{ type: 'cutscene:skip', playerId: 'p1' }]);
+    run([{ type: 'cutscene:skip', playerId: 'p1' }], 3);
+    run([{ type: 'dev:teleport', playerId: 'p1', x: GROTTO.center.x - 5, z: GROTTO.center.z - 10 }], 2);
+    zeus().health!.current = 0;
+    expect(run([], 2)).toContainEqual(expect.objectContaining({ type: 'hero:down' }));
+    expect(run([{ type: 'player:move', playerId: 'p1', x: 1, z: 0, sprint: false, jumpHeld: false }], 10)).toEqual(expect.any(Array));
+    const woke = run([], DOWN.total);
+    const bed = Object.values(world.entities).find((e) => e.structure?.kind === 'bed' && e.region === 'underworld')!;
+    expect(woke).toContainEqual(expect.objectContaining({ type: 'hero:revived', bedId: bed.id }));
+    run([], REST_TOTAL);
+    expect(zeus().health!.current).toBe(zeus().health!.max);
+    expect(Math.hypot(zeus().position.x - bed.position.x, zeus().position.z - bed.position.z)).toBeLessThan(2.5);
+    expect(zeus().hero!.down ?? null).toBeNull();
+  });
+
+  it('the Underworld is separate: lock-on never picks a surface dummy', () => {
+    const { world, run, zeus } = story({ seen: ['rocket', 'descent'] });
+    run(TUTORIAL_STEPS.map((stepId) => ({ type: 'dev:tutorial', playerId: 'p1', stepId }) as Intent));
+    run([{ type: 'cutscene:skip', playerId: 'p1' }]);
+    run([{ type: 'cutscene:skip', playerId: 'p1' }], 3);
+    // Stand right under a practice dummy's spot on the surface.
+    const dummy = Object.values(world.entities).find((e) => e.defId.includes('dummy'))!;
+    run([{ type: 'dev:teleport', playerId: 'p1', x: dummy.position.x + 1, z: dummy.position.z }], 2);
+    run([{ type: 'player:action', playerId: 'p1', action: 'lockOn' }]);
+    expect(zeus().hero!.lockTarget).toBeNull();
   });
 });

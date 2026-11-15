@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GROTTO_SPOTS } from '../../sim/cutscenes/descent';
 import { GROTTO } from '../../sim/regions';
 import { rng } from '../../sim/rng';
@@ -32,9 +33,9 @@ export function buildGrotto(look: Look): GrottoView {
   const fp = floorGeo.attributes.position;
   const floorColors = new Float32Array(fp.count * 3);
   const c = new THREE.Color();
-  const stoneA = new THREE.Color('#2f2a36');
-  const stoneB = new THREE.Color('#463d4f');
-  const moss = new THREE.Color('#2f4a46');
+  const stoneA = new THREE.Color('#3b3452');
+  const stoneB = new THREE.Color('#57497a');
+  const moss = new THREE.Color('#2f5e5a');
   for (let i = 0; i < fp.count; i += 1) {
     const x = fp.getX(i);
     const z = fp.getZ(i);
@@ -50,8 +51,8 @@ export function buildGrotto(look: Look): GrottoView {
   const wallGeo = new THREE.CylinderGeometry(23, 25, 17, 72, 10, true);
   const wp = wallGeo.attributes.position;
   const wallColors = new Float32Array(wp.count * 3);
-  const rockA = new THREE.Color('#2a2433');
-  const rockB = new THREE.Color('#4a3f58');
+  const rockA = new THREE.Color('#3a2f52');
+  const rockB = new THREE.Color('#5f4c86');
   for (let i = 0; i < wp.count; i += 1) {
     const x = wp.getX(i);
     const y = wp.getY(i);
@@ -76,7 +77,7 @@ export function buildGrotto(look: Look): GrottoView {
   const domeGeo = new THREE.SphereGeometry(25, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2);
   domeGeo.scale(1, 0.55, 1);
   domeGeo.translate(0, 16.5, 0);
-  group.add(new THREE.Mesh(domeGeo, toon({ color: '#1e1926', rim: false, side: THREE.BackSide })));
+  group.add(new THREE.Mesh(domeGeo, toon({ color: '#2d2440', rim: false, side: THREE.BackSide })));
   const stalMat = toon({ color: '#3a3247', rim: false });
   for (let i = 0; i < 26; i += 1) {
     const a = rand() * Math.PI * 2;
@@ -85,23 +86,70 @@ export function buildGrotto(look: Look): GrottoView {
     group.add(M(new THREE.ConeGeometry(0.25 + rand() * 0.45, h, 6), stalMat, [Math.cos(a) * r, 17.5 - h / 2 - (r / 23) * 4, Math.sin(a) * r], { rot: [Math.PI, 0, 0], outline: false, cast: false }));
   }
 
-  // Glowing crystal veins along the walls (teal and violet).
-  const teal = toon({ color: '#7fe0d6', emissive: '#2fb8aa', emissiveIntensity: 0.9, rim: false });
-  const violet = toon({ color: '#b89ae8', emissive: '#6a44c0', emissiveIntensity: 0.9, rim: false });
-  look.glowMaterials.push({ mat: teal, day: 0.9, night: 0.9 }, { mat: violet, day: 0.9, night: 0.9 });
-  for (let i = 0; i < 18; i += 1) {
-    const a = rand() * Math.PI * 2;
-    if (Math.abs(Math.atan2(Math.sin(a - GROTTO.tunnelBearing), Math.cos(a - GROTTO.tunnelBearing))) < 0.25) continue;
-    const r = 21.5 + rand() * 1.2;
-    const cluster = new THREE.Group();
-    cluster.position.set(Math.sin(a) * r, 0.3 + rand() * 7, Math.cos(a) * r);
-    cluster.lookAt(0, cluster.position.y, 0);
-    for (let k = 0; k < 4; k += 1) {
-      const crystal = M(new THREE.OctahedronGeometry(0.25 + rand() * 0.35), i % 3 ? teal : violet, [(rand() - 0.5) * 0.8, (rand() - 0.5) * 0.8, 0.2], { scale: [0.6, 1.8, 0.6], rot: [rand(), rand(), rand()], outline: false, cast: false });
-      cluster.add(crystal);
+  // A crystal cavern: clusters of six-sided crystals grow out of the walls,
+  // stand along the floor's edge and hang from the ceiling (teal, violet, pale).
+  const crystalGeo = (() => {
+    const body = new THREE.CylinderGeometry(0.5, 0.42, 1, 6);
+    body.translate(0, 0.5, 0);
+    const tip = new THREE.ConeGeometry(0.5, 0.55, 6);
+    tip.translate(0, 1.275, 0);
+    const merged = mergeGeometries([body.toNonIndexed(), tip.toNonIndexed()])!;
+    merged.computeVertexNormals();
+    return merged;
+  })();
+  const crystalMats = [
+    toon({ color: '#7fe0d6', emissive: '#2fb8aa', emissiveIntensity: 0.75, rim: false }),
+    toon({ color: '#b89ae8', emissive: '#6a44c0', emissiveIntensity: 0.75, rim: false }),
+    toon({ color: '#e4dcff', emissive: '#8f7fd0', emissiveIntensity: 0.55, rim: false }),
+  ];
+  for (const mat of crystalMats) look.glowMaterials.push({ mat, day: mat.emissiveIntensity, night: mat.emissiveIntensity });
+  type Crystal = { pos: THREE.Vector3; dir: THREE.Vector3; width: number; height: number };
+  const crystals: Crystal[][] = [[], [], []];
+  const fromTunnel = (a: number) => Math.abs(Math.atan2(Math.sin(a - GROTTO.tunnelBearing), Math.cos(a - GROTTO.tunnelBearing)));
+  const up = new THREE.Vector3(0, 1, 0);
+  const addCluster = (base: THREE.Vector3, along: THREE.Vector3, count: number, size: number, spread: number) => {
+    const kind = Math.floor(rand() * 3);
+    for (let k = 0; k < count; k += 1) {
+      const dir = along.clone().add(new THREE.Vector3((rand() - 0.5) * spread, (rand() - 0.5) * spread, (rand() - 0.5) * spread)).normalize();
+      const s = size * (0.45 + rand() * 0.75);
+      crystals[(kind + (k % 4 === 3 ? 1 : 0)) % 3].push({ pos: base.clone().add(new THREE.Vector3((rand() - 0.5) * size * 0.5, 0, (rand() - 0.5) * size * 0.5)), dir, width: s * 0.38, height: s });
     }
-    group.add(cluster);
+  };
+  // Walls: clusters at every height, pointing into the cavern.
+  for (let i = 0; i < 90; i += 1) {
+    const a = rand() * Math.PI * 2;
+    if (fromTunnel(a) < 0.32) continue;
+    const y = Math.pow(rand(), 1.4) * 11;
+    const r = 22.2 - y * 0.12;
+    const inward = new THREE.Vector3(-Math.sin(a), 0.35 + rand() * 0.5, -Math.cos(a));
+    addCluster(new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r), inward, 3 + Math.floor(rand() * 4), 0.9 + rand() * 1.6, 0.9);
   }
+  // Floor edge: big standing crystals leaning in.
+  for (let i = 0; i < 26; i += 1) {
+    const a = (i / 26) * Math.PI * 2 + rand() * 0.15;
+    if (fromTunnel(a) < 0.4) continue;
+    const r = 20.3 + rand() * 1.2;
+    addCluster(new THREE.Vector3(Math.sin(a) * r, 0, Math.cos(a) * r), new THREE.Vector3(-Math.sin(a) * 0.45, 1, -Math.cos(a) * 0.45), 2 + Math.floor(rand() * 3), 2.4 + rand() * 2.6, 0.6);
+  }
+  // Ceiling: crystals hanging down.
+  for (let i = 0; i < 34; i += 1) {
+    const a = rand() * Math.PI * 2;
+    const r = 3 + rand() * 17;
+    const y = 16.5 - (r / 23) * 4.5;
+    addCluster(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), new THREE.Vector3(0, -1, 0), 2 + Math.floor(rand() * 3), 1 + rand() * 1.8, 0.7);
+  }
+  const quat = new THREE.Quaternion();
+  const mtx = new THREE.Matrix4();
+  crystals.forEach((list, k) => {
+    const mesh = new THREE.InstancedMesh(crystalGeo, crystalMats[k], list.length);
+    list.forEach((c, i) => {
+      quat.setFromUnitVectors(up, c.dir);
+      mtx.compose(c.pos, quat, new THREE.Vector3(c.width, c.height, c.width));
+      mesh.setMatrixAt(i, mtx);
+    });
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
 
   // The Styx pool, west of the rig: dark water with a soft teal glow and a stone rim.
   const pool = new THREE.Group();
@@ -157,20 +205,20 @@ export function buildGrotto(look: Look): GrottoView {
     group.add(flame);
   };
   addTorch(ds.x + 1.6, ds.z - 0.8);
-  addTorch(-3.6, GROTTO_SPOTS.barricade.z + 1.6);
-  addTorch(3.6, GROTTO_SPOTS.barricade.z + 1.6);
+  addTorch(-4.2, GROTTO_SPOTS.barricade.z + 1.6);
+  addTorch(4.2, GROTTO_SPOTS.barricade.z + 1.6);
 
   // The barricade across the tunnel: sharpened logs, iron bands and a red banner.
   const bs = GROTTO_SPOTS.barricade;
   const barricade = new THREE.Group();
   barricade.position.set(bs.x, 0, bs.z);
-  for (let i = 0; i < 12; i += 1) {
-    const x = -3.3 + i * 0.6;
+  for (let i = 0; i < 23; i += 1) {
+    const x = -6.6 + i * 0.6;
     const h = 3.6 + rand() * 0.8;
     barricade.add(M(new THREE.CylinderGeometry(0.25, 0.27, h, 7), woodMat, [x, h / 2, (rand() - 0.5) * 0.15], { outline: 0.012 }));
     barricade.add(M(new THREE.ConeGeometry(0.25, 0.55, 7), woodMat, [x, h + 0.27, 0], { outline: 0.01 }));
   }
-  for (const y of [1.1, 2.6]) barricade.add(M(new THREE.BoxGeometry(7.4, 0.14, 0.62), ironMat, [0, y, 0.05], { outline: 0.01 }));
+  for (const y of [1.1, 2.6]) barricade.add(M(new THREE.BoxGeometry(14, 0.14, 0.62), ironMat, [0, y, 0.05], { outline: 0.01 }));
   barricade.add(M(new THREE.PlaneGeometry(1.4, 2.2), toon({ color: '#9b2b2b', rim: false, side: THREE.DoubleSide }), [1.6, 2.2, 0.32], { outline: false }));
   group.add(barricade);
 

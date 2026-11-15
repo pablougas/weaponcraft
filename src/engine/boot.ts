@@ -13,6 +13,7 @@ import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
 import { ShadowPortal } from '../view/effects/portal';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
+import { restPose } from '../sim/systems/rest';
 import { rocketTicks } from '../sim/cutscenes/rocket';
 import { DAY_MS } from '../sim/time';
 import { loadProgress, saveProgress } from './progress';
@@ -292,6 +293,7 @@ export async function boot(): Promise<void> {
     if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
     if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
     if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. We will break through.', 4);
+    if (event.type === 'hero:down') captions.show('Zeus has fallen. He wakes at the Refuge.', 3.5);
     if (event.type === 'npc:talk') captions.show('Hades: Cerberus first. Then we take back what is ours.', 4);
     if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
     if (event.type === 'hero:rested') captions.show('You rest. Health and stamina restored.');
@@ -534,7 +536,7 @@ export async function boot(): Promise<void> {
       const dt = frozen ? 0 : Math.min(0.1, frameMs / 1000);
       const world = activeSession.world;
       frame = { time: viewSeconds, dt, world, reduceMotion: settings.get().reduceMotion };
-      views.sync(world, interpolator, alpha, frame);
+      views.sync(world, interpolator, alpha, frame, regionOf(localHero()));
       lightning.update(dt);
       skyStrikes.update(dt);
       dust.update(dt);
@@ -606,6 +608,8 @@ export async function boot(): Promise<void> {
         }
         cameraShake = 0;
       }
+      // Resting at the bed or falling in battle fades the screen too.
+      fade = Math.max(fade, restPose(hero?.hero).fade);
       fadeOverlay.style.opacity = String(fade);
       fadeOverlay.hidden = fade <= 0.001;
       const points = world.cutscene?.points;

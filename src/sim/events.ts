@@ -53,6 +53,12 @@ export interface EventMap {
   'objective:set': { objectiveId: string };
   /** A god rested at a bed: healed (and later, respawns there). */
   'hero:rested': { playerId: PlayerId };
+  /** A god lay down at a bed. */
+  'hero:resting': { entityId: EntityId; bedId: EntityId };
+  /** A god fell in battle. */
+  'hero:down': { entityId: EntityId };
+  /** A fallen god woke at a bed (or their last safe spot). */
+  'hero:revived': { entityId: EntityId; bedId: EntityId | null };
   /** Read the humans' dispatch in the grotto. */
   'dispatch:read': { playerId: PlayerId };
   /** Looked at the barricade over the tunnel deeper in (it opens in M6). */

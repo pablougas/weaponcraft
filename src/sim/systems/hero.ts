@@ -7,7 +7,8 @@ import { interact } from './items';
 import type { Intent, PlayerAction } from '../intents';
 import type { PhysicsWorld } from '../physics';
 import { meadowHeightAt, WATER_LEVEL } from '../terrain/meadow';
-import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionOf, type RegionId } from '../regions';
+import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionOf, sameRegion, type RegionId } from '../regions';
+import { isResting, updateRest } from './rest';
 import { COMBO_WINDOW_TICKS, PUNCH_COMBO } from '../unarmed';
 import type { Entity, EntityId, HeroState, Vec3, WorldState } from '../types';
 import type { SimContext } from '../world';
@@ -132,6 +133,7 @@ export function applyHeroIntent(ctx: SimContext, intent: Extract<Intent, { type:
   const entity = playerHero(ctx, intent.playerId);
   if (!entity) return 'no hero';
   const hero = entity.hero;
+  if (isResting(hero)) return 'resting';
 
   if (intent.type === 'player:move') {
     const length = Math.hypot(intent.x, intent.z);
@@ -289,7 +291,7 @@ function findLockTarget(ctx: SimContext, entity: Entity): EntityId | null {
   const fz = Math.cos(entity.rotationY);
   let best: { id: EntityId; score: number } | null = null;
   for (const other of Object.values(ctx.world.entities)) {
-    if (other.id === entity.id || !isHittable(other)) continue;
+    if (other.id === entity.id || !isHittable(other) || !sameRegion(other, entity)) continue;
     const dx = other.position.x - entity.position.x;
     const dz = other.position.z - entity.position.z;
     const distance = Math.hypot(dx, dz);
@@ -381,6 +383,11 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
   const { world } = ctx;
   const hero = entity.hero;
   const god = godDef(entity.defId);
+  if (updateRest(ctx, entity)) {
+    hero.moving = false;
+    hero.sprinting = false;
+    return;
+  }
 
   hero.iframes = Math.max(0, hero.iframes - 1);
   hero.hurtTicks = Math.max(0, hero.hurtTicks - 1);
@@ -416,7 +423,7 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
 
   if (hero.lockTarget) {
     const target = world.entities[hero.lockTarget];
-    if (!isHittable(target) || Math.hypot(target.position.x - entity.position.x, target.position.z - entity.position.z) > LOCK_BREAK_RANGE) {
+    if (!isHittable(target) || !sameRegion(target, entity) || Math.hypot(target.position.x - entity.position.x, target.position.z - entity.position.z) > LOCK_BREAK_RANGE) {
       hero.lockTarget = null;
     }
   }

@@ -2,7 +2,7 @@ import type { UltimateModule } from '../../../sim/abilities';
 import { applyDamage, flatDistance, isHittable, knockBack } from '../../../sim/combat';
 import { ticks } from '../../../sim/constants';
 import type { EntityId } from '../../../sim/types';
-import { groundAt, regionOf } from '../../../sim/regions';
+import { groundAt, regionOf, sameRegion } from '../../../sim/regions';
 import { aimPoint, lockedTarget } from './aim';
 
 const RADIUS = 5;
@@ -36,7 +36,7 @@ export const skyStrike: UltimateModule = {
   land(ctx, casterId, point, spent) {
     const hit: EntityId[] = [];
     for (const entity of Object.values(ctx.world.entities)) {
-      if (entity.id === casterId || !isHittable(entity)) continue;
+      if (entity.id === casterId || !isHittable(entity) || !sameRegion(entity, ctx.world.entities[casterId])) continue;
       const distance = flatDistance(entity.position, point);
       if (distance > RADIUS + (entity.body?.radius ?? 0.4) || Math.abs(entity.position.y - point.y) > 6) continue;
       const falloff = 1 - (1 - EDGE_FRACTION) * Math.min(1, distance / RADIUS);

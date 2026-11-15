@@ -168,4 +168,13 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await cinematicAt(page, 541 + 905);
     await expect(page).toHaveScreenshot('grotto-refuge.png', SHOT);
   });
+
+  test('resting on the grotto bed', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    // Stand beside the bed (grotto spot 7.5, 4; the grotto is 2 km down) and press F.
+    await page.evaluate(() => window.wc!.teleport(7.5 - 1.6, 4 - 0.9));
+    await page.keyboard.press('KeyF');
+    await page.evaluate(async () => { window.wc!.step(31); await window.wc!.freeze(12); });
+    await expect(page).toHaveScreenshot('grotto-resting.png', SHOT);
+  });
 });

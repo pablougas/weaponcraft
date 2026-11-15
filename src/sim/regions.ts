@@ -25,6 +25,11 @@ export function regionOf(entity: Entity | undefined): RegionId {
   return entity?.region ?? 'surface';
 }
 
+/** Are two entities in the same region? (Nothing reaches across: targeting, hits, labels.) */
+export function sameRegion(a: Entity | undefined, b: Entity | undefined): boolean {
+  return regionOf(a) === regionOf(b);
+}
+
 /** Ground height at (x, z) in a region. */
 export function groundAt(region: RegionId, x: number, z: number): number {
   if (region === 'underworld') return GROTTO.center.y;

@@ -128,6 +128,10 @@ export interface HeroState {
   ultimate?: { ticksLeft: number; point: Vec3; spent: number } | null;
   /** A Bolt Step waiting to happen this tick: the horizontal jump in metres. */
   blink?: { dx: number; dz: number } | null;
+  /** Resting at a bed: ticks into the rest timeline (systems/rest.ts) and which bed. */
+  rest?: { t: number; bedId: EntityId } | null;
+  /** Fallen in battle: ticks since falling (then wakes at the Refuge bed). */
+  down?: number | null;
   /** Last spot the hero stood safely on, and ticks until it's updated again. */
   lastSafe?: Vec3 | null;
   safeTimer?: number;

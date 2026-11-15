@@ -1,3 +1,4 @@
+import { startRest } from './rest';
 import { godDef } from '../defs';
 import type { Intent } from '../intents';
 import type { Entity, EntityId, PlayerId, WorldState } from '../types';
@@ -61,9 +62,7 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
   if (target.structure?.kind === 'bed') {
     // Rest: back to full health. The world clock is global, so sleeping never skips time (SPEC §6).
     const hero = heroOf(world, playerId);
-    if (hero?.health) hero.health.current = hero.health.max;
-    if (hero?.stamina) hero.stamina.current = hero.stamina.max;
-    ctx.emit('hero:rested', { playerId });
+    if (hero?.hero) startRest(ctx, hero as Entity & { hero: NonNullable<Entity['hero']> }, target);
     return null;
   }
   if (target.structure?.kind === 'forge') {

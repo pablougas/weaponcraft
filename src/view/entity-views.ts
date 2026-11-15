@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { enemies } from '../content/enemies';
 import { gods } from '../content/gods';
+import { regionOf, type RegionId } from '../sim/regions';
+import { restPose } from '../sim/systems/rest';
 import { hadesLook } from '../content/gods/hades';
 import { structures } from '../content/structures';
 import type { ModelLoader } from '../content/types';
-import type { EntityId, GameEvent, WorldState } from '../sim';
+import type { Entity, EntityId, GameEvent, WorldState } from '../sim';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from './entity-model';
 import type { Interpolator } from './interpolation';
 import type { Look } from './look';
@@ -47,7 +49,7 @@ export class EntityViews {
     private readonly factories: Map<string, ModelFactory>,
   ) {}
 
-  sync(world: WorldState, interpolator: Interpolator, alpha: number, frame: ModelFrame): void {
+  sync(world: WorldState, interpolator: Interpolator, alpha: number, frame: ModelFrame, region: RegionId = 'surface'): void {
     for (const [id, entry] of this.models) {
       const entity = world.entities[id];
       if (!entity || entity.defId !== entry.defId) this.remove(id);
@@ -63,10 +65,33 @@ export class EntityViews {
         entry = { model, defId: entity.defId };
         this.models.set(entity.id, entry);
       }
+      // Only the local god's region is drawn: the surface and the Underworld never mix.
+      entry.model.root.visible = regionOf(entity) === region;
+      if (!entry.model.root.visible) continue;
       const p = interpolator.position(world, entity.id, alpha, this.position)!;
-      entry.model.root.position.set(p.x, p.y, p.z);
-      entry.model.root.rotation.y = interpolator.rotation(world, entity.id, alpha) ?? entity.rotationY;
+      const root = entry.model.root;
+      root.position.set(p.x, p.y, p.z);
+      root.rotation.y = interpolator.rotation(world, entity.id, alpha) ?? entity.rotationY;
       entry.model.update(entity, frame);
+      if (entity.hero) this.poseResting(world, entity, root);
+    }
+  }
+
+  /** Lying on a bed (or fallen): tip the model onto its back, on the mattress. */
+  private poseResting(world: WorldState, entity: Entity, root: THREE.Object3D): void {
+    const pose = restPose(entity.hero);
+    root.rotation.order = 'YXZ';
+    root.rotation.x = -Math.PI / 2 * pose.lay;
+    if (pose.lay <= 0) return;
+    const bed = entity.hero?.rest ? world.entities[entity.hero.rest.bedId] : undefined;
+    if (pose.onBed && bed) {
+      // Feet at the foot of the mattress, head on the pillow.
+      const yaw = bed.rotationY;
+      const lie = new THREE.Vector3(Math.sin(yaw) * 1.3, 0.86, Math.cos(yaw) * 1.3).add(new THREE.Vector3(bed.position.x, bed.position.y, bed.position.z));
+      root.position.lerp(lie, Math.min(1, pose.lay * 1.4));
+      root.rotation.y = yaw;
+    } else {
+      root.position.y += 0.25 * pose.lay;
     }
   }
 

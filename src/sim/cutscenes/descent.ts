@@ -173,7 +173,7 @@ export function ensureGrotto(ctx: SimContext): void {
   };
   const s = GROTTO_SPOTS;
   place('fusion-altar', 'fusion-altar', s.altar.x, s.altar.z, Math.PI / 2, { radius: 0.85, height: 1.2 });
-  place('bed', 'bed', s.bed.x, s.bed.z, -0.5, { radius: 0.7, height: 0.7 });
+  place('bed', 'bed', s.bed.x, s.bed.z, -0.5, { radius: 1.0, height: 1.0 });
   place('dispatch', 'dispatch', s.dispatch.x, s.dispatch.z, 0.3, null);
   place('barricade', 'barricade', s.barricade.x, s.barricade.z, 0, null);
   world.flags.grottoBuilt = true;
