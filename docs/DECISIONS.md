@@ -88,3 +88,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - 2026-11-14 — The human columns climb Olympus above the meadow's mountain ring (its foot is hidden from the Refuge), exaggerated in size so figures, torches, banners and a mech per column read from 2 km. They appear during the cinematic only; the occupied biomes come in M6–M7.
 - 2026-11-14 — The Refuge: after the rocket a Forge and a bed join the Fusion Altar. F at the bed restores health and stamina (time is global, so no sleeping through the night); F at the Forge explains that crafting needs materials from the wider world (the crafting UI is M6).
 - 2026-11-14 — Captions for every beat and the objective; the cinematic sting is synthesized (rocket whine, impact boom, collapse rumble, war drums and horn, a closing chord).
+- 2026-11-14 — Team approved the M5 screenshots (rocket, impact, pan, shattered summit, HUD with the tutorial panel); recorded as baselines.
