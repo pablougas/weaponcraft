@@ -9,6 +9,7 @@ import { ticks } from '../../../sim/constants';
  */
 export const graspOfTheDead: ChargedMove = {
   id: 'grasp-of-the-dead',
+  icon: 'grasp',
   name: 'Grasp of the Dead',
   element: 'shadow',
   fullChargeTicks: ticks(1),

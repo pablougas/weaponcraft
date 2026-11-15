@@ -18,6 +18,7 @@ const BURST_RADIUS = 1.4;
  */
 export const soulBolts: AbilityModule = {
   id: 'soul-bolts',
+  icon: 'soul',
   name: 'Soul Bolts',
   element: 'shadow',
   cooldownTicks: ticks(0.35),

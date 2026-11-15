@@ -20,6 +20,7 @@ const AIM_DISTANCE = 10;
  */
 export const skullCage: UltimateModule = {
   id: 'skull-cage',
+  icon: 'cage',
   name: 'Skull Cage',
   element: 'shadow',
   cooldownTicks: ticks(12),

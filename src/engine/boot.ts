@@ -371,6 +371,9 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
     if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], 3.2);
+    if (event.type === 'level:reset' && event.entityId === localHero()?.id) {
+      captions.show(event.reason === 'fell' ? '[You wake at the Refuge. Your enemies have regrouped.]' : '[Back at the Refuge. The level starts over.]', 3.5);
+    }
     // The Warden (M7 boss).
     if (event.type === 'cutscene:beat' && event.cutsceneId === WARDEN_ID && WARDEN_CAPTIONS[event.beat]) captions.show(WARDEN_CAPTIONS[event.beat], event.beat === 'roar' ? 3.5 : 2.4);
     if (event.type === 'objective:set' && event.objectiveId === 'defeat-the-warden') captions.show('Defeat the Warden.', 3);
@@ -479,6 +482,7 @@ export async function boot(): Promise<void> {
     store: settings,
     onResume: requestLock,
     onNewGame: newGame,
+    onResetLevel: () => activeSession.sendIntent({ type: 'player:resetLevel' }),
   });
   settingsMenu.setAutoQuality(autoQuality);
 

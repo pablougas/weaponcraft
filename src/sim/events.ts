@@ -111,6 +111,10 @@ export interface EventMap {
   'warden:defeated': { entityId: EntityId };
   /** F on Cerberus's chains before they can be broken: why not yet. */
   'chains:examined': { playerId: PlayerId; reason: 'machine' | 'warden' | 'freed' };
+  /** "Reset level" pressed: the screen fades before the god wakes at the bed. */
+  'level:resetting': { entityId: EntityId };
+  /** The level started over: the god woke at the bed (after falling, or "Reset level"). */
+  'level:reset': { entityId: EntityId; reason: 'fell' | 'reset' };
   /** A spirit was freed and bonded with the gods (its ability is unlocked). */
   'spirit:freed': { spiritId: string };
 }

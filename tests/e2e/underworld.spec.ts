@@ -96,4 +96,39 @@ test.describe('the Underworld route (M6)', () => {
     await expect(page.locator('#wc-captions')).toContainText('chained to their machine', { timeout: 15_000 });
     expect(consoleErrors).toEqual([]);
   });
+
+  test('Reset level (Esc menu): back to the bed, the soldiers calm again; each god has his own ability icons', async ({ page, consoleErrors }) => {
+    test.setTimeout(180_000);
+    await inGrotto(page);
+    // Zeus's and Hades's ability icons differ (V switches).
+    const zeusIcon = await page.locator('[data-hud="ability"] svg').innerHTML();
+    await page.keyboard.press('KeyV');
+    await page.evaluate(() => window.wc!.step(2));
+    await expect.poll(() => page.locator('[data-hud="ability"] .wc-ability-name').textContent()).toBe('Soul Bolts');
+    expect(await page.locator('[data-hud="ability"] svg').innerHTML()).not.toBe(zeusIcon);
+    await page.keyboard.press('KeyV');
+    await page.evaluate(() => window.wc!.step(40));
+
+    // Rouse the first sentry squad.
+    await page.evaluate(() => window.wc!.breakBarricade());
+    await page.evaluate(() => window.wc!.freeze(12));
+    let s = await state(page);
+    const leader = Object.values(s.world!.entities).find((e) => e.soldier?.squadId === 'squad-approach' && e.soldier.leader)!;
+    const f = leader.soldier!.facing;
+    await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x: leader.position.x + Math.sin(f) * 10, z: leader.position.z + Math.cos(f) * 10, yaw: f + Math.PI });
+    await page.evaluate(() => window.wc!.step(60));
+    s = await state(page);
+    expect(Object.values(s.world!.entities).some((e) => e.soldier?.state === 'attack')).toBe(true);
+
+    // Esc → Reset level.
+    await page.keyboard.press('Escape');
+    await page.locator('[data-action="reset-level"]').click();
+    await page.evaluate(() => window.wc!.step(30 + 150));
+    s = await state(page);
+    const god = s.world!.entities[s.world!.players.p1.entityId!];
+    expect(Math.hypot(god.position.x, god.position.z)).toBeLessThan(20); // the grotto (the bed is there)
+    expect(god.health!.current).toBe(god.health!.max);
+    expect(Object.values(s.world!.entities).filter((e) => e.soldier).every((e) => e.soldier!.state === 'patrol')).toBe(true);
+    expect(consoleErrors).toEqual([]);
+  });
 });

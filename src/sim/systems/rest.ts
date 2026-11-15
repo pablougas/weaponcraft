@@ -2,6 +2,7 @@ import { ticks } from '../constants';
 import { groundAt, regionOf } from '../regions';
 import type { Entity, EntityId, HeroState, Vec3 } from '../types';
 import type { SimContext } from '../world';
+import { RESET_FADE, restartEncounters, wakeAtBed } from './restart';
 
 /**
  * Resting at a bed (SPEC §6) and falling in battle. Both are short sim
@@ -33,6 +34,10 @@ export function restPose(hero: HeroState | undefined): { lay: number; fade: numb
     const t = Math.min(1, Math.max(0, x));
     return t * t * (3 - 2 * t);
   };
+  if (hero?.resetting != null) {
+    // "Reset level": a calm fade to black where the god stands.
+    return { lay: 0, fade: ease(hero.resetting / RESET_FADE), onBed: false };
+  }
   if (hero?.down != null) {
     const t = hero.down;
     return { lay: ease(t / DOWN.fall), fade: ease((t - (DOWN.total - DOWN.fadeOut)) / DOWN.fadeOut), onBed: false };
@@ -93,9 +98,19 @@ export function startRest(ctx: SimContext, entity: Entity & { hero: HeroState },
   ctx.emit('hero:resting', { entityId: entity.id, bedId: bed.id });
 }
 
-/** Busy resting or fallen: input is ignored. */
+/** Busy resting, fallen or resetting: input is ignored. */
 export function isResting(hero: HeroState): boolean {
-  return !!hero.rest || hero.down != null;
+  return !!hero.rest || hero.down != null || hero.resetting != null;
+}
+
+/** "Reset level" (Esc menu): fade out, then wake at the bed with the level started over. */
+export function startReset(ctx: SimContext, entity: Entity & { hero: HeroState }): string | null {
+  if (ctx.world.cutscene) return 'cutscene active';
+  if (isResting(entity.hero)) return 'busy';
+  stopEverything(entity.hero);
+  entity.hero.resetting = 0;
+  ctx.emit('level:resetting', { entityId: entity.id });
+  return null;
 }
 
 /**
@@ -104,6 +119,16 @@ export function isResting(hero: HeroState): boolean {
  */
 export function updateRest(ctx: SimContext, entity: Entity & { hero: HeroState }): boolean {
   const hero = entity.hero;
+  if (hero.resetting != null) {
+    hero.resetting += 1;
+    if (hero.resetting >= RESET_FADE && ctx.isAuthority) {
+      hero.resetting = null;
+      wakeAtBed(ctx, entity);
+      restartEncounters(ctx);
+      ctx.emit('level:reset', { entityId: entity.id, reason: 'reset' });
+    }
+    return true;
+  }
   if (ctx.isAuthority && hero.down == null && !hero.rest && entity.health && entity.health.current <= 0) {
     stopEverything(hero);
     hero.down = 0;
@@ -128,8 +153,12 @@ export function updateRest(ctx: SimContext, entity: Entity & { hero: HeroState }
     if (hero.down >= DOWN.total && ctx.isAuthority) {
       hero.down = null;
       const bed = respawnBed(ctx, entity);
-      if (bed) startRest(ctx, entity, bed, REST_HEAL_TICK - 1); // already in the dark; heals on the next tick
-      else {
+      if (bed) {
+        // Both gods wake at the bed, and the level starts over (team request, Nov 15).
+        wakeAtBed(ctx, entity);
+        restartEncounters(ctx);
+        ctx.emit('level:reset', { entityId: entity.id, reason: 'fell' });
+      } else {
         heal(entity);
         if (hero.lastSafe) entity.position = { ...hero.lastSafe };
       }

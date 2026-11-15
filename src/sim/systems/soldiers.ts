@@ -120,24 +120,46 @@ export function ensureGarrison(ctx: SimContext): void {
     return;
   }
   FORT_SPOTS.forEach((fort, f) => {
-    const kinds = FORT_GARRISONS[f];
-    kinds.forEach((kind, i) => {
-      const a = (i / kinds.length) * Math.PI * 2 + f;
-      const r = kind === 'archer' ? FORT_RADIUS * 0.35 : FORT_RADIUS * 0.6;
-      const home = local(fort.x + Math.cos(a) * r, fort.z + Math.sin(a) * r);
-      // Patrols walk a loop just inside the palisade; archers hold their spot.
-      const patrol = kind === 'archer' ? [] : [0, 1, 2, 3].map((k) => {
-        const pa = a + (k * Math.PI) / 2;
-        return local(fort.x + Math.cos(pa) * FORT_RADIUS * 0.6, fort.z + Math.sin(pa) * FORT_RADIUS * 0.6);
-      });
-      spawnSoldier(ctx, kind, home, a + Math.PI, fort.id, patrol);
-    });
+    placeFortGarrison(ctx, f);
     world.forts[fort.id] = { cleared: false, chestOpened: false };
     const chest = spawn(ctx, 'chest', { position: local(fort.x, fort.z - 3), rotationY: 0 });
     Object.assign(world.entities[chest], { structure: { kind: 'chest' }, region: 'underworld', fortId: fort.id, body: { radius: 0.6, height: 0.8 } });
   });
   placeSquads(ctx);
   world.flags.garrisonPlaced = true;
+}
+
+/** A fort's soldiers at their posts, calm. */
+function placeFortGarrison(ctx: SimContext, f: number): void {
+  const fort = FORT_SPOTS[f];
+  const kinds = FORT_GARRISONS[f];
+  kinds.forEach((kind, i) => {
+    const a = (i / kinds.length) * Math.PI * 2 + f;
+    const r = kind === 'archer' ? FORT_RADIUS * 0.35 : FORT_RADIUS * 0.6;
+    const home = local(fort.x + Math.cos(a) * r, fort.z + Math.sin(a) * r);
+    // Patrols walk a loop just inside the palisade; archers hold their spot.
+    const patrol = kind === 'archer' ? [] : [0, 1, 2, 3].map((k) => {
+      const pa = a + (k * Math.PI) / 2;
+      return local(fort.x + Math.cos(pa) * FORT_RADIUS * 0.6, fort.z + Math.sin(pa) * FORT_RADIUS * 0.6);
+    });
+    spawnSoldier(ctx, kind, home, a + Math.PI, fort.id, patrol);
+  });
+}
+
+/**
+ * Starts the Underworld's soldiers over (a fallen god or "Reset level"):
+ * every soldier and arrow is removed, then the forts not yet cleared get their
+ * full garrison back at their posts, calm, and every sentry squad starts its
+ * route again. Cleared forts stay cleared.
+ */
+export function restartGarrison(ctx: SimContext): void {
+  const { world } = ctx;
+  if (!world.flags.garrisonPlaced) return;
+  for (const e of Object.values(world.entities)) if (e.soldier || e.projectile) despawn(ctx, e.id);
+  FORT_SPOTS.forEach((fort, f) => {
+    if (!world.forts[fort.id]?.cleared) placeFortGarrison(ctx, f);
+  });
+  placeSquads(ctx);
 }
 
 function placeSquads(ctx: SimContext): void {

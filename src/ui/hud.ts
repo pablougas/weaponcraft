@@ -14,9 +14,17 @@ const GLYPHS: Record<string, string> = {
   punch: '<circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3" stroke="currentColor" stroke-width="2"/>',
   blink: '<path d="M3 15h6M2 11h5M4 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".7"/><path d="M16.5 2 10 11.5h4.2L12.5 22l8-12h-4.4z" fill="currentColor"/>',
   roll: '<path d="M18 8a7 7 0 1 0 1.2 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m19.5 3.5-.8 5.3-5.2-1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+  // Hades's moves (M6): a bony hand rising, a hooded shade with trails, a soul-flame, a skull behind bars.
+  grasp: '<path d="M3 21h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7.5 21v-5.5L5 11.5M10.5 21V8.5M13.5 21V7M16.5 21V8.5M18.5 21v-4.5l1.5-3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M9.5 18h8" stroke="currentColor" stroke-width="1.4" opacity=".6"/>',
+  shadow: '<path d="M15 2.5a3.2 3.2 0 0 1 3.2 3.2V8l2.3 13.5H10.2L12.4 8V5.7A3.2 3.2 0 0 1 15 2.5z" fill="currentColor"/><path d="M2.5 10h6M2 14h6.5M3.5 18h5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>',
+  soul: '<path d="M12 2.5c1 3 6 5.5 6 10.5a6 6 0 0 1-12 0c0-2.4 1.2-3.8 2.3-4.8.1 1.8.9 3 2 3.3-.7-3.3.1-6.4 1.7-9z" fill="currentColor"/><circle cx="10" cy="14.5" r="1.25" fill="#141019"/><circle cx="14" cy="14.5" r="1.25" fill="#141019"/>',
+  cage: '<path d="M4 3v18M9 3v3M15 3v3M20 3v18M3 3h18M3 21h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".75"/><path d="M12 7.5a5 5 0 0 0-5 5v2.2h2V17h6v-2.3h2v-2.2a5 5 0 0 0-5-5z" fill="currentColor"/><circle cx="10" cy="12.6" r="1.1" fill="#141019"/><circle cx="14" cy="12.6" r="1.1" fill="#141019"/>',
   // Three-Fold Howl: three rings of sound.
   howl: '<circle cx="6" cy="12" r="2.4" fill="currentColor"/><path d="M10 7.5a6 6 0 0 1 0 9M13.5 5a9.5 9.5 0 0 1 0 14M17 2.8a13 13 0 0 1 0 18.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 };
+
+/** An ability's own icon if the HUD has it, else the slot's default. */
+const glyphOr = (icon: string | undefined, fallback: string): string => (icon && GLYPHS[icon] ? icon : fallback);
 
 interface AbilitySlot {
   hud: string;
@@ -91,16 +99,16 @@ export function createHud(parent: HTMLElement): Hud {
     ];
     if (god.chargedMove) {
       const move = god.chargedMove;
-      defs.push({ hud: 'charged', action: 'chargedMove', glyph: 'fist', name: move.name, cooldownId: move.id, cooldownTicks: move.cooldownTicks, staminaNeeded: () => move.staminaMin, element: move.element });
+      defs.push({ hud: 'charged', action: 'chargedMove', glyph: glyphOr(move.icon, 'fist'), name: move.name, cooldownId: move.id, cooldownTicks: move.cooldownTicks, staminaNeeded: () => move.staminaMin, element: move.element });
     }
     if (god.blink) {
       const blink = god.blink;
-      defs.push({ hud: 'blink', action: 'blink', glyph: 'blink', name: blink.name, cooldownId: blink.id, cooldownTicks: blink.cooldownTicks, staminaNeeded: () => blink.staminaCost, element: blink.element });
+      defs.push({ hud: 'blink', action: 'blink', glyph: glyphOr(blink.icon, 'blink'), name: blink.name, cooldownId: blink.id, cooldownTicks: blink.cooldownTicks, staminaNeeded: () => blink.staminaCost, element: blink.element });
     }
-    defs.push({ hud: 'ability', action: 'godAbility', glyph: 'bolt', name: god.ability.name, cooldownId: god.ability.id, cooldownTicks: god.ability.cooldownTicks, staminaNeeded: () => god.ability.staminaCost, element: god.ability.element });
+    defs.push({ hud: 'ability', action: 'godAbility', glyph: glyphOr(god.ability.icon, 'bolt'), name: god.ability.name, cooldownId: god.ability.id, cooldownTicks: god.ability.cooldownTicks, staminaNeeded: () => god.ability.staminaCost, element: god.ability.element });
     if (god.ultimate) {
       const ultimate = god.ultimate;
-      defs.push({ hud: 'ultimate', action: 'ultimate', glyph: 'sky', name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction, element: ultimate.element });
+      defs.push({ hud: 'ultimate', action: 'ultimate', glyph: glyphOr(ultimate.icon, 'sky'), name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction, element: ultimate.element });
     }
     // A freed spirit's gift (M7: Cerberus's Three-Fold Howl), the same for both gods.
     if (spirit) {

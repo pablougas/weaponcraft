@@ -44,6 +44,8 @@ export type Intent =
     /** Camera heading, radians (forward = (sin, cos)). */
     aimYaw?: number;
   }
+  /** "Reset level" (Esc menu): back to the last bed, the level's encounters started over. */
+  | { type: 'player:resetLevel'; playerId: PlayerId }
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 

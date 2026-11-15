@@ -29,6 +29,8 @@ export interface SettingsMenuOptions {
   /** Called from the Resume click (a user gesture, so pointer lock can be requested). */
   onResume(): void;
   onNewGame(): void;
+  /** "Reset level": back to the last bed with the level's encounters started over (progress is kept). */
+  onResetLevel(): void;
 }
 
 type VolumeKey = 'master' | 'music' | 'sfx';
@@ -88,6 +90,7 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
       </section>
       <div class="wc-actions">
         <button type="button" class="wc-primary" data-action="resume">Resume</button>
+        <button type="button" data-action="reset-level" title="Back to the last bed; enemies start over. Your progress is kept.">Reset level</button>
         <button type="button" data-action="new-game">New game</button>
       </div>
       <p class="wc-hint">Move ↑ ↓ ← → · Sprint Shift · Jump Space (hold to hover) · Roll X · Punch A · Weapon S (hold for heavy) · Lightning Fist D (hold, release) · Chain Lightning Q (hold to keep firing) · Sky Strike R · Bolt Step W · Switch god V · Lock on Tab · Pick up / use F · Inventory I · Codex C · Map M · Turn camera , . or mouse. Settings are saved in this browser.</p>
@@ -166,6 +169,10 @@ export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOpt
     const action = (event.target as HTMLElement).closest<HTMLElement>('[data-action]')?.dataset.action;
     if (action === 'resume') {
       menu.close();
+      options.onResume();
+    } else if (action === 'reset-level') {
+      menu.close();
+      options.onResetLevel();
       options.onResume();
     } else if (action === 'new-game') {
       if (!confirming) {

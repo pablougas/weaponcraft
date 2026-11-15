@@ -213,6 +213,8 @@ export interface HeroState {
   safeTimer?: number;
   /** Ticks the hero has been trying to move without moving (stuck detection). */
   stuckTicks?: number;
+  /** "Reset level": ticks into the fade before waking at the bed, or null. */
+  resetting?: number | null;
   /** Ticks until health starts regenerating again (reset when hurt). Optional for older saves. */
   regenDelay?: number;
   /** Three-Fold Howl (M7): ticks left of lifesteal on everything this god hits. */

@@ -9,7 +9,12 @@ import { ensureMeadowPopulated } from './populate';
 import { GROTTO } from './regions';
 import { deserialize, serialize } from './serialize';
 import { findMech, MECH } from './systems/mech';
-import { MECH_SIZE, MECH_WATCH } from './terrain/underworld';
+import { FORT_SPOTS, MECH_SIZE, MECH_WATCH } from './terrain/underworld';
+import { RESET_FADE } from './systems/restart';
+import { REST_TOTAL } from './systems/rest';
+import { restartGarrison } from './systems/soldiers';
+/** Soldiers per fort (systems/soldiers.ts FORT_GARRISONS). */
+const FORT_GARRISON_SIZES = [3, 4, 5];
 import { tickWorld } from './tick';
 import { TUTORIAL_STEPS } from './tutorial';
 import type { Entity } from './types';
@@ -309,5 +314,64 @@ describe('the Warden (M7 boss)', () => {
     expect(leap).toBeDefined();
     expect(leap!.ticks).toBeLessThan(WARDEN.leap.windup);
     expect(leap!.ticks).toBeGreaterThanOrEqual(Math.round(WARDEN.leap.windup * WARDEN.rageWindup));
+  });
+});
+
+describe('starting the level over (falling, or "Reset level")', () => {
+  it('Reset level: fade, wake at the bed healed, and every encounter still in play starts over; progress is kept', () => {
+    const { world, run, zeus, mech, plating } = atTheGates();
+    // Put the soldiers back (atTheGates removes them) as the real game has them.
+    world.flags.garrisonPlaced = true;
+    restartGarrison(createSimContext(world, true).ctx);
+    const soldiers = () => Object.values(world.entities).filter((e) => e.soldier);
+    const total = soldiers().length;
+    // Mess things up: a soldier dead, the rest on alert; a fort cleared; the Mk. II hunting with its plating worn.
+    const fortId = FORT_SPOTS[0].id;
+    for (const s of soldiers()) {
+      s.soldier!.state = 'attack';
+      s.soldier!.awareness = 100;
+    }
+    soldiers().filter((s) => s.soldier!.fortId === fortId).forEach((s) => { delete world.entities[s.id]; });
+    world.forts[fortId].cleared = true;
+    const victim = soldiers().find((s) => s.soldier!.squadId)!;
+    delete world.entities[victim.id];
+    mech().mech.mode = 'attack';
+    mech().mech.awareness = 100;
+    plating().health!.current = 100;
+    zeus().health!.current = 30;
+
+    const events = run([{ type: 'player:resetLevel', playerId: 'p1' }], RESET_FADE + 3);
+    expect(events.some((e) => e.type === 'level:reset')).toBe(true);
+    // At the bed, healed (in the grotto).
+    expect(zeus().hero!.rest).not.toBeNull();
+    run([], REST_TOTAL);
+    expect(zeus().health!.current).toBe(zeus().health!.max);
+    expect(Math.hypot(zeus().position.x - GROTTO.center.x, zeus().position.z - GROTTO.center.z)).toBeLessThan(20);
+    // Soldiers: all back (bar the cleared fort's), calm, at their posts.
+    const fortSize = soldiers().length;
+    expect(soldiers().every((s) => s.soldier!.state === 'patrol' && s.soldier!.awareness < 25)).toBe(true);
+    expect(soldiers().some((s) => s.soldier!.fortId === fortId)).toBe(false);
+    expect(fortSize).toBe(total - FORT_GARRISON_SIZES[0]);
+    // The Mk. II is back on watch with its plating whole.
+    expect(mech().mech.mode).toBe('patrol');
+    expect(plating().health!.current).toBe(MECH.plating);
+  });
+
+  it('falling in battle starts the level over too; the Warden comes back at full strength', () => {
+    const { world, run, zeus, plating } = atTheGates();
+    plating().health!.current = 0;
+    run([], 2);
+    run([], WARDEN_BEATS.end + 2);
+    const warden = findWarden(world)!;
+    warden.health.current = 200;
+    warden.warden.enraged = true;
+    zeus().health!.current = 0;
+    const events = run([], 120);
+    expect(events.some((e) => e.type === 'level:reset' && e.reason === 'fell')).toBe(true);
+    expect(warden.health.current).toBe(WARDEN.health);
+    expect(warden.warden.enraged).toBe(false);
+    // Story progress stays: the Mk. II is still down and the Warden still fighting.
+    expect(world.flags.wardenEmerged).toBe(true);
+    expect(warden.warden.mode).toBe('fight');
   });
 });

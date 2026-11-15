@@ -18,7 +18,8 @@ import { applyItemIntent } from './systems/items';
 import { completeStep, tutorialComplete, updateTutorial } from './tutorial';
 import { updateCreatures } from './systems/wildlife';
 import { groundAt, regionOf } from './regions';
-import type { WorldState } from './types';
+import type { Entity, WorldState } from './types';
+import { startReset } from './systems/rest';
 import { createSimContext, despawn, spawn, type SimContext } from './world';
 
 export { TICK_HZ, TICK_MS } from './constants';
@@ -160,6 +161,13 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     case 'player:equip':
     case 'player:fuse': {
       const reason = applyItemIntent(ctx, intent);
+      if (reason) reject(reason);
+      return;
+    }
+    case 'player:resetLevel': {
+      const heroId = world.players[intent.playerId].entityId;
+      const hero = heroId ? world.entities[heroId] : undefined;
+      const reason = hero?.hero ? startReset(ctx, hero as Entity & { hero: NonNullable<Entity['hero']> }) : 'no hero';
       if (reason) reject(reason);
       return;
     }

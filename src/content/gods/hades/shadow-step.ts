@@ -8,6 +8,7 @@ import { ticks } from '../../../sim/constants';
  */
 export const shadowStep: BlinkMove = {
   id: 'shadow-step',
+  icon: 'shadow',
   name: 'Shadow Step',
   element: 'shadow',
   range: 8,

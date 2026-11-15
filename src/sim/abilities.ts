@@ -9,6 +9,8 @@ import type { SimContext } from './world';
  * while stamina lasts.
  */
 export interface AbilityModule {
+  /** HUD icon (a glyph name in ui/hud.ts); each god's moves have their own look. Defaults to the slot's icon. */
+  icon?: string;
   id: string;
   name: string;
   element: 'light' | 'shadow' | 'poison' | 'lightning';
@@ -27,6 +29,8 @@ export interface AbilityModule {
  * charge and the attack; content supplies the numbers and the on-hit effect.
  */
 export interface ChargedMove {
+  /** HUD icon (a glyph name in ui/hud.ts); each god's moves have their own look. Defaults to the slot's icon. */
+  icon?: string;
   id: string;
   name: string;
   element: 'light' | 'shadow' | 'poison' | 'lightning';
@@ -51,6 +55,8 @@ export interface ChargedMove {
  * it can't pass through rocks or trees, and keeps it inside the meadow.
  */
 export interface BlinkMove {
+  /** HUD icon (a glyph name in ui/hud.ts); each god's moves have their own look. Defaults to the slot's icon. */
+  icon?: string;
   id: string;
   name: string;
   element: 'light' | 'shadow' | 'poison' | 'lightning';
@@ -76,6 +82,8 @@ export interface BlinkMove {
  * after `telegraphTicks`. It spends all current stamina; damage scales with it.
  */
 export interface UltimateModule {
+  /** HUD icon (a glyph name in ui/hud.ts); each god's moves have their own look. Defaults to the slot's icon. */
+  icon?: string;
   id: string;
   name: string;
   element: 'light' | 'shadow' | 'poison' | 'lightning';
