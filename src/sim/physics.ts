@@ -129,9 +129,10 @@ export class PhysicsWorld {
         heights[iz + ix * (nz + 1)] = underworldLocalHeight(x, z);
       }
     }
+    // Rapier's heightfield takes (rows along z, columns along x); the meadow is square so it never mattered there.
     const extentX = nx * FIELDS_CELL;
     const extentZ = nz * FIELDS_CELL;
-    this.world.createCollider(R.ColliderDesc.heightfield(nx, nz, heights, { x: extentX, y: 1, z: extentZ })
+    this.world.createCollider(R.ColliderDesc.heightfield(nz, nx, heights, { x: extentX, y: 1, z: extentZ })
       .setTranslation(c.x + FIELDS.minX + extentX / 2, c.y, c.z + FIELDS.minZ + extentZ / 2));
   }
 

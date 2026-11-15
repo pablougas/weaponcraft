@@ -44,3 +44,43 @@ describe('tree trunks', () => {
     physics.free();
   });
 });
+
+describe('the Asphodel Fields collider', () => {
+  it('matches the drawn ground mesh everywhere (no invisible walls, no floating)', async () => {
+    const THREE = await import('three');
+    const { GROTTO } = await import('./regions');
+    const { FIELDS, FIELDS_CELL, FORT_SPOTS, FORT_RADIUS, GATES, SPIRES, TUNNEL, underworldLocalHeight } = await import('./terrain/underworld');
+    const physics = new PhysicsWorld(await loadPhysics());
+    physics.step();
+    // The same ground mesh the view builds (src/view/underworld/fields.ts).
+    const maxZ = TUNNEL.toZ + 22;
+    const nx = Math.round((FIELDS.maxX - FIELDS.minX) / FIELDS_CELL);
+    const nz = Math.round((maxZ - FIELDS.minZ) / FIELDS_CELL);
+    const geo = new THREE.PlaneGeometry(nx * FIELDS_CELL, nz * FIELDS_CELL, nx, nz);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(FIELDS.minX + (nx * FIELDS_CELL) / 2, 0, FIELDS.minZ + (nz * FIELDS_CELL) / 2);
+    const gp = geo.attributes.position;
+    for (let i = 0; i < gp.count; i += 1) gp.setY(i, underworldLocalHeight(gp.getX(i), gp.getZ(i)));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    const ray = new THREE.Raycaster();
+    const c = GROTTO.center;
+    let worst = 0;
+    let checked = 0;
+    // Inside grid cells (a ray exactly on a grid line can slip between triangles), across the whole non-square field.
+    for (let x = FIELDS.minX + 30 + 1.1; x < FIELDS.maxX - 30; x += 17.5) {
+      for (let z = FIELDS.minZ + 30 + 0.9; z < FIELDS.maxZ - 5; z += 12.5) {
+        if (SPIRES.some((sp) => Math.hypot(sp.x - x, sp.z - z) < sp.radius * 2 + 2)) continue;
+        if (FORT_SPOTS.some((f) => Math.hypot(f.x - x, f.z - z) < FORT_RADIUS + 3)) continue;
+        if (Math.hypot(GATES.x - x, GATES.z - z) < 40) continue;
+        const ground = physics.groundBelow(c.x + x, c.y + 120, c.z + z)! - c.y;
+        ray.set(new THREE.Vector3(x, 120, z), new THREE.Vector3(0, -1, 0));
+        const drawn = ray.intersectObject(mesh)[0].point.y;
+        worst = Math.max(worst, Math.abs(ground - drawn));
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(300);
+    expect(worst).toBeLessThan(0.05);
+    physics.free();
+  });
+});
