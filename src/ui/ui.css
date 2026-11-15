@@ -11,6 +11,12 @@
   --wc-display: Cinzel, "Trajan Pro", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
+/* `hidden` always wins: component styles like `display: flex` must not
+   override it (the F prompt stayed on screen as an empty box because of this). */
+[hidden] {
+  display: none !important;
+}
+
 #wc-canvas {
   position: fixed;
   inset: 0;

@@ -26,6 +26,8 @@ test.describe('weapons and fusion (M4)', () => {
     await page.locator('#wc-title').click();
     await expect(page.locator('#wc-title')).toHaveCount(0);
 
+    // Nothing in reach on the rock: no prompt at all (not even an empty box).
+    await expect(page.locator('.wc-prompt')).toBeHidden();
     // The Sunlit Blade lies in the meadow, east of the rock.
     await page.evaluate(() => window.wc!.teleport(12.8, 7));
     await expect(page.locator('.wc-prompt')).toContainText('Pick up Sunlit Blade');
@@ -36,6 +38,8 @@ test.describe('weapons and fusion (M4)', () => {
     await page.keyboard.press('KeyF');
     await expect.poll(async () => (await state(page)).world!.players[(await state(page)).localPlayerId!].inventory).toEqual(['starter-spear', 'sunlit-sword']);
 
+    // Picked up: nothing left in reach, so the prompt goes away.
+    await expect(page.locator('.wc-prompt')).toBeHidden();
     // F at the Fusion Altar opens it.
     await page.evaluate(() => window.wc!.teleport(6.5, 3));
     await page.keyboard.press('KeyF');
@@ -55,6 +59,10 @@ test.describe('weapons and fusion (M4)', () => {
     expect(s.world!.codex['starter-spear+sunlit-sword']).toMatchObject({ resultId: 'dawnbringer@lightning', legendary: true });
 
     await altar.locator('[data-action="close"]').first().click();
+    // Walking away from the altar removes "F Use Fusion Altar".
+    await expect(page.locator('.wc-prompt')).toContainText('Use Fusion Altar');
+    await page.evaluate(() => window.wc!.teleport(-20, -20));
+    await expect(page.locator('.wc-prompt')).toBeHidden();
     await page.keyboard.press('KeyC');
     await expect(page.locator('#wc-codex')).toContainText('1 / 6');
     await expect(page.locator('#wc-codex')).toContainText('Dawnbringer');
