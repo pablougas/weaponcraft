@@ -176,7 +176,7 @@ export class Sfx {
         if (event.weaponId) for (let i = 0; i < 4; i += 1) this.tone(ctx, { from: 1800 + i * 240, to: 1700 + i * 240, duration: 0.12, volume: 0.05, type: 'sine', delay: 0.3 + i * 0.06 });
         return;
       case 'barricade:broken':
-        this.onCaption('[The barricade crashes down]');
+        // (boot.ts captions this beat with Hades's line.)
         if (!ctx) return;
         this.noiseBurst(ctx, { duration: 1.2, volume: 0.5, type: 'lowpass', freq: 1200, freqEnd: 120 });
         for (let i = 0; i < 4; i += 1) this.tone(ctx, { from: 140 - i * 15, to: 60, duration: 0.2, volume: 0.25, type: 'sine', delay: i * 0.13 });

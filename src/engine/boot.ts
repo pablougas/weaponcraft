@@ -15,6 +15,7 @@ import { ShadowEffects } from '../view/effects/shadow';
 import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
+import { GATES } from '../sim/terrain/underworld';
 import { restPose } from '../sim/systems/rest';
 import { rocketTicks } from '../sim/cutscenes/rocket';
 import { DAY_MS } from '../sim/time';
@@ -297,6 +298,8 @@ export async function boot(): Promise<void> {
   /** Footsteps: metres walked since the last step, and where the god was last frame. */
   let strideLeft = 0;
   let lastStepPos: { x: number; z: number } | null = null;
+  /** The Cerberus Mk. II fight is still to come (M7): reaching the Gates ends the demo on Hades's line, once per session. */
+  let gatesSeen = false;
   /** Auto-follow waits this long after the player last turned the camera. */
   const AUTO_FOLLOW_DELAY_MS = 600;
 
@@ -629,6 +632,11 @@ export async function boot(): Promise<void> {
         }
       } else {
         lastStepPos = null;
+      }
+      if (!gatesSeen && hero && shell.screen === 'playing' && regionOf(hero) === 'underworld'
+        && Math.hypot(hero.position.x - GROTTO.center.x - GATES.x, hero.position.z - GROTTO.center.z - GATES.z) < 70) {
+        gatesSeen = true;
+        captions.show('Hades: There. Cerberus, chained to their machine, his fire feeding it. We take that thing apart, brother. But not blind.', 7);
       }
       // The meadow's edge during the prologue (the wider world opens after the rocket, M6).
       if (hero && shell.screen === 'playing' && !world.flags.prologueDone

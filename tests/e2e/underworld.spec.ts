@@ -75,4 +75,18 @@ test.describe('the Underworld route (M6)', () => {
     expect(s.world!.flags.barricadeBroken).toBe(true);
     expect(consoleErrors).toEqual([]);
   });
+
+  test('reaching the Gates ends the demo on Hades’s line (the Mk. II fight is M7)', async ({ page, consoleErrors }) => {
+    await inGrotto(page);
+    // Break the barricade (sim-side) so the fields are open, then stand 60 m short of the Gates (x 0, z −585).
+    await page.evaluate(() => window.wc!.teleport(0, -16.6, Math.PI));
+    for (let i = 0; i < 80 && !(await state(page)).world!.flags.barricadeBroken; i += 1) {
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(12));
+    }
+    await page.evaluate(() => window.wc!.teleport(0, -525, Math.PI));
+    await page.evaluate(() => window.wc!.step(2));
+    await expect(page.locator('#wc-captions')).toContainText('chained to their machine', { timeout: 15_000 });
+    expect(consoleErrors).toEqual([]);
+  });
 });
