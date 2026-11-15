@@ -1,0 +1,64 @@
+import type { Page } from '@playwright/test';
+import { expect, openGame, test } from './fixtures';
+
+type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
+const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
+const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
+
+async function inGrotto(page: Page) {
+  await openGame(page);
+  await page.evaluate(() => window.wc!.setSeed(7));
+  await page.locator('#wc-title').click();
+  for (const step of STEPS) await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
+  await page.evaluate(() => window.wc!.step(541 + 905));
+  await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
+}
+
+test.describe('the Underworld route (M6)', () => {
+  test('break the barricade, cross the fields: a sentry raises the alarm, soldiers attack; the map reveal survives a reload', async ({ page, consoleErrors }) => {
+    test.setTimeout(240_000);
+    await inGrotto(page);
+    await expect(page.locator('#wc-minimap')).toBeVisible();
+
+    // Punch the barricade down (A, real input).
+    await page.evaluate(() => window.wc!.teleport(0, -16.6, Math.PI));
+    for (let i = 0; i < 80; i += 1) {
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(12));
+      if ((await state(page)).world!.flags.barricadeBroken) break;
+    }
+    expect((await state(page)).world!.flags.barricadeBroken).toBe(true);
+
+    // In front of the first sentry (x 14, z −120, looking north): it sounds the horn.
+    await page.evaluate(() => window.wc!.teleport(14, -134, 0));
+    await page.evaluate(() => window.wc!.step(120));
+    let s = await state(page);
+    const sentry = Object.values(s.world!.entities).find((e) => e.soldier?.kind === 'sentry' && Math.abs(e.position.z + 120) < 2)!;
+    expect(sentry.soldier!.awareness).toBeGreaterThanOrEqual(60);
+
+    // Stand at the first fort's gate: its soldiers notice and attack.
+    // Just inside the first fort's gate (it faces the path, east): its soldiers notice and attack.
+    const chest = Object.values(s.world!.entities).find((e) => e.structure?.kind === 'chest' && e.fortId === 'fort-asphodel')!;
+    const fort = { x: chest.position.x, z: chest.position.z + 3 + 2000 * 0 };
+    await page.evaluate((f) => window.wc!.teleport(f.x + 12, f.z, -Math.PI / 2), fort);
+    await page.evaluate(() => window.wc!.step(150));
+    s = await state(page);
+    const fortSoldiers = Object.values(s.world!.entities).filter((e) => e.soldier?.fortId === 'fort-asphodel');
+    expect(fortSoldiers.some((e) => e.soldier!.state === 'attack')).toBe(true);
+    expect(s.world!.forts['fort-asphodel'].seen).toBe(true);
+
+    // M opens the full map.
+    await page.keyboard.press('KeyM');
+    await expect(page.locator('#wc-minimap.wc-map-full')).toBeVisible();
+    await page.keyboard.press('KeyM');
+
+    const revealed = s.world!.reveal.underworld!;
+    await page.reload();
+    await page.waitForFunction(() => window.wc !== undefined);
+    await page.evaluate(() => window.wc!.ready());
+    s = await state(page);
+    expect(s.world!.reveal.underworld).toBe(revealed);
+    expect(s.world!.flags.barricadeBroken).toBe(true);
+    expect(consoleErrors).toEqual([]);
+  });
+});

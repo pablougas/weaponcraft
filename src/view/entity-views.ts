@@ -29,6 +29,13 @@ export async function preloadModels(): Promise<Map<string, ModelFactory>> {
   }));
   // Weapons lying in the world use one built-in model that shows whichever weapon it is.
   factories.set('weapon-pickup', createPickupModel);
+  // Arrows in flight (M6): a shaft with a bronze head, pointing where it flies.
+  factories.set('arrow', (look) => {
+    const root = new THREE.Group();
+    root.add(look.M(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 5), look.toon({ color: '#6a4a33' }), [0, 0, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
+    root.add(look.M(new THREE.ConeGeometry(0.04, 0.14, 5), look.toon({ color: '#b08a42' }), [0, 0, 0.45], { rot: [Math.PI / 2, 0, 0], outline: false }));
+    return { root, update() {} };
+  });
   // Shadow Step's decoy (M6).
   factories.set('shadow-decoy', () => {
     const decoy = createDecoyModel();

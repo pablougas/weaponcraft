@@ -2,7 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO } from './regions';
-import { CERBERUS_POST, FIELDS, FIELDS_CELL, GATE_PILLARS, MECH_FOOTPRINT, SPIRES, TUNNEL, underworldLocalHeight } from './terrain/underworld';
+import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_FOOTPRINT, palisadeSegments, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
@@ -107,6 +107,16 @@ export class PhysicsWorld {
     const mech = MECH_FOOTPRINT;
     this.world.createCollider(R.ColliderDesc.cuboid(mech.halfX, 6, mech.halfZ).setTranslation(c.x + mech.x, c.y + 6, c.z + mech.z));
     this.world.createCollider(R.ColliderDesc.cylinder(3, 1).setTranslation(c.x + CERBERUS_POST.x, c.y + 3, c.z + CERBERUS_POST.z));
+    // The forts' palisades and watchtowers.
+    for (const fort of FORT_SPOTS) {
+      for (const seg of palisadeSegments(fort)) {
+        this.world.createCollider(R.ColliderDesc.cuboid(2.0, 1.7, 0.3)
+          .setTranslation(c.x + seg.x, c.y + 1.7, c.z + seg.z)
+          .setRotation({ x: 0, y: Math.sin(seg.yaw / 2), z: 0, w: Math.cos(seg.yaw / 2) }));
+      }
+      const tower = watchtowerSpot(fort);
+      this.world.createCollider(R.ColliderDesc.cuboid(1.6, 4, 1.6).setTranslation(c.x + tower.x, c.y + 4, c.z + tower.z));
+    }
     // The fields' ground (a heightfield on the same grid the view draws).
     const nx = Math.round((FIELDS.maxX - FIELDS.minX) / FIELDS_CELL);
     const maxZ = TUNNEL.toZ + 22;

@@ -117,3 +117,27 @@ export const SPIRES: readonly Spire[] = (() => {
   }
   return out;
 })();
+
+/** Bearing (like rotationY) from a fort's centre to its gate, which faces the main path. */
+export function fortGateBearing(fort: { x: number; z: number }): number {
+  return Math.atan2(pathX(fort.z) - fort.x, 0.0001);
+}
+
+/** Palisade wall segments around a fort (centres and yaw), leaving the gate open. */
+export function palisadeSegments(fort: { x: number; z: number }): Array<{ x: number; z: number; yaw: number }> {
+  const out: Array<{ x: number; z: number; yaw: number }> = [];
+  const gate = fortGateBearing(fort);
+  const count = 26;
+  for (let i = 0; i < count; i += 1) {
+    const a = (i / count) * Math.PI * 2;
+    if (Math.abs(Math.atan2(Math.sin(a - gate), Math.cos(a - gate))) < 0.3) continue;
+    out.push({ x: fort.x + Math.sin(a) * FORT_RADIUS, z: fort.z + Math.cos(a) * FORT_RADIUS, yaw: a });
+  }
+  return out;
+}
+
+/** The watchtower inside each fort, opposite the gate. */
+export function watchtowerSpot(fort: { x: number; z: number }): { x: number; z: number } {
+  const a = fortGateBearing(fort) + Math.PI;
+  return { x: fort.x + Math.sin(a) * (FORT_RADIUS - 4), z: fort.z + Math.cos(a) * (FORT_RADIUS - 4) };
+}

@@ -3,7 +3,7 @@ import '@fontsource/cinzel/700.css';
 import * as THREE from 'three';
 import '../ui/ui.css';
 import { cloneWorld, MEADOW_RADIUS, type Entity, type IntentInput } from '../sim';
-import { godDef } from '../sim/defs';
+import { godDef, weaponDef } from '../sim/defs';
 import { createDevMenu, type DevMenu } from '../ui/dev-menu';
 import { createAltarScreen } from '../ui/altar';
 import { createCaptions } from '../ui/captions';
@@ -12,6 +12,7 @@ import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematic
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
 import { ShadowPortal } from '../view/effects/portal';
 import { ShadowEffects } from '../view/effects/shadow';
+import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
 import { restPose } from '../sim/systems/rest';
@@ -175,7 +176,13 @@ export async function boot(): Promise<void> {
         const p = god.position;
         worldView.camera.position.set(p.x + f.x * 1.8 + f.z * 0.5, p.y + 1.95 * s, p.z + f.z * 1.8 - f.x * 0.5);
         worldView.camera.lookAt(p.x, p.y + 1.82 * s, p.z);
-      } else if (presetId !== 'closeup') {
+      } else if (presetId === 'overlook' && god && worldView) {
+        // High behind the god, looking out over what's ahead (review shots of the fields).
+        const f = { x: Math.sin(god.rotationY), z: Math.cos(god.rotationY) };
+        const p = god.position;
+        worldView.camera.position.set(p.x - f.x * 9, p.y + 8, p.z - f.z * 9);
+        worldView.camera.lookAt(p.x + f.x * 14, p.y, p.z + f.z * 14);
+      } else if (presetId !== 'closeup' && presetId !== 'overlook') {
         worldView?.snapCam(presetId);
       }
       dirty = true;
@@ -313,6 +320,11 @@ export async function boot(): Promise<void> {
     if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
     if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
     if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. Break it down.', 4);
+    if (event.type === 'soldier:alarm') captions.show(event.kind === 'sentry' ? '[A sentry’s horn sounds. Soldiers are coming.]' : '[Soldier, shouting] “Over there!”', 3);
+    if (event.type === 'soldier:suspicious') captions.show('[Soldier] “Who’s there?”', 2);
+    if (event.type === 'fort:cleared') captions.show('Fort cleared. Its chest is unguarded.', 3.5);
+    if (event.type === 'chest:opened') captions.show(event.weaponId ? `Found a weapon in the chest (${weaponDef(event.weaponId).name}).` : 'The chest is empty.', 3.5);
+    if (event.type === 'intent:rejected' && event.reason === 'guarded' && event.playerId === activeSession.localPlayerId) captions.show('Soldiers guard this chest. Clear the fort first.', 3);
     if (event.type === 'barricade:broken') captions.show('[The barricade splinters] Hades: The Asphodel Fields. The hound is somewhere past the Gates.', 5);
     if (event.type === 'hero:down') captions.show('Zeus has fallen. He wakes at the Refuge.', 3.5);
     if (event.type === 'npc:talk') captions.show('Hades: Cerberus first. Then we take back what is ours.', 4);
@@ -439,6 +451,7 @@ export async function boot(): Promise<void> {
   document.body.append(fadeOverlay);
   const portalA = new ShadowPortal(meadow.scene);
   const portalB = new ShadowPortal(meadow.scene);
+  const minimap = createMinimap(document.body);
   const tutorialPanel = createTutorialPanel(document.body, (action) => keyLabel(inputMap.codesFor(action)[0] ?? ''));
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return;
@@ -459,6 +472,11 @@ export async function boot(): Promise<void> {
       return;
     }
     if (shell.screen === 'playing' && !settingsMenu?.isOpen) {
+      if (inputMap.matches('map', event)) {
+        event.preventDefault();
+        minimap.toggleFull();
+        return;
+      }
       for (const [action, screen] of [['inventory', inventoryScreen], ['codex', codexScreen]] as const) {
         if (inputMap.matches(action, event)) {
           event.preventDefault();
@@ -693,6 +711,7 @@ export async function boot(): Promise<void> {
       const showHud = shell.screen === 'playing' && !world.cutscene;
       hud.setVisible(showHud);
       hud.update(world, hero?.id ?? null);
+      minimap.update(world, hero?.id ?? null, showHud);
       tutorialPanel.update(world, showHud);
       for (const screen of screens) screen.refresh();
       labels.update(world, meadow.camera, activeSession.localPlayerId, dt, settings.get().reduceMotion, showHud);

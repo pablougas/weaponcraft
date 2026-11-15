@@ -120,8 +120,8 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   if (!sameRegion(self, leader) || distance > CATCH_UP_DISTANCE || stuck) {
     // Beside and a little behind, out of the follow camera's line of sight.
     const back = leader.rotationY + Math.PI;
-    const x = leader.position.x + Math.sin(back) * 1.2 + Math.cos(back) * 2.6;
-    const z = leader.position.z + Math.cos(back) * 1.2 - Math.sin(back) * 2.6;
+    const x = leader.position.x + Math.sin(back) * 1.2 - Math.cos(back) * 2.6;
+    const z = leader.position.z + Math.cos(back) * 1.2 + Math.sin(back) * 2.6;
     const from = { ...self.position };
     self.region = leader.region;
     self.position = { x, y: Math.max(groundAt(regionOf(leader), x, z), leader.position.y), z };
@@ -158,8 +158,8 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   hero.lockTarget = null;
 
   // Follow 3–6 m behind, off to the leader's side (so he isn't between you and the camera).
-  const sideX = Math.cos(leader.rotationY) * 2.4 - Math.sin(leader.rotationY) * 1.5;
-  const sideZ = -Math.sin(leader.rotationY) * 2.4 - Math.cos(leader.rotationY) * 1.5;
+  const sideX = -Math.cos(leader.rotationY) * 2.4 - Math.sin(leader.rotationY) * 1.5;
+  const sideZ = Math.sin(leader.rotationY) * 2.4 - Math.cos(leader.rotationY) * 1.5;
   const gx = leader.position.x + sideX - self.position.x;
   const gz = leader.position.z + sideZ - self.position.z;
   const toSpot = Math.hypot(gx, gz);

@@ -49,7 +49,13 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' };
+  /** A soldier or sentry (M6). */
+  soldier?: SoldierState;
+  /** An arrow in flight: velocity in m/s, life, damage and who shot it. */
+  projectile?: { vx: number; vy: number; vz: number; ticksLeft: number; damage: number; ownerId: EntityId };
+  /** The fort a chest belongs to. */
+  fortId?: string;
   /** A short-lived shadow decoy (Shadow Step): enemies chase it until it fades. */
   decoy?: { ownerId: EntityId; ticksLeft: number };
   /** A story character you can talk to (F). */
@@ -148,6 +154,33 @@ export interface HeroState {
   stuckTicks?: number;
 }
 
+export type SoldierKind = 'spear' | 'shield' | 'archer' | 'sentry';
+
+/** A human soldier or sentry (M6): perception and the patrol → alert → attack → search loop. */
+export interface SoldierState {
+  kind: SoldierKind;
+  /** The fort it guards (null for sentries). */
+  fortId: string | null;
+  state: 'patrol' | 'suspicious' | 'attack' | 'search' | 'return';
+  /** 0–100: how sure it is someone's there (suspicious at 25, alert at 60). */
+  awareness: number;
+  targetId: EntityId | null;
+  lastSeen: Vec3 | null;
+  /** Ticks since the target was last seen (or in the current state). */
+  timer: number;
+  patrol: Vec3[];
+  patrolIndex: number;
+  /** Where it's looking (its sight cone), radians like rotationY. */
+  facing: number;
+  /** A sentry's post heading, which its sweep centres on. */
+  postFacing?: number;
+  /** Ticks left winding up an attack (visible to the player), then cooldown. */
+  windup: number;
+  cooldown: number;
+  /** Sentry sweep counter. */
+  scan: number;
+}
+
 export interface CreatureState {
   /** Wildlife wanders and flees; practice dummies stay put. */
   wanders: boolean;
@@ -196,6 +229,8 @@ export interface WorldFlags {
   meadowPopulated: boolean;
   /** M5.1: Hades took Zeus down to the Outer Grotto. */
   descended?: boolean;
+  /** M6: the forts' soldiers and the sentries are placed. */
+  garrisonPlaced?: boolean;
   /** M6: the barricade over the tunnel has been torn down. */
   barricadeBroken?: boolean;
   /** M5.1: the grotto's altar, bed, dispatch and barricade are placed. */
@@ -252,6 +287,10 @@ export interface WorldState {
   tutorial: TutorialState;
   /** Current objective ID shown to players (e.g. 'find-the-others'), or null. */
   objective: string | null;
+  /** The Underworld's forts (M6): cleared once every soldier is down; the chest opened. */
+  forts: Record<string, { cleared: boolean; chestOpened: boolean; seen?: boolean }>;
+  /** Fog of war per region map (M6): '0'/'1' per 16 m cell (systems/reveal.ts). */
+  reveal: { underworld?: string };
   /** World clock time (ms) when the rocket hit Olympus, or null before. */
   olympusShatteredAtMs: number | null;
 }

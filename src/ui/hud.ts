@@ -125,7 +125,7 @@ export function createHud(parent: HTMLElement): Hud {
   ally.className = 'wc-ally';
   ally.hidden = true;
   ally.innerHTML = '<span class="wc-ally-name"></span><span class="wc-ally-bar"><span></span></span><kbd></kbd>';
-  element.append(ally);
+  (element.querySelector('.wc-hud-vitals') ?? element).append(ally);
   const allyName = ally.querySelector<HTMLElement>('.wc-ally-name')!;
   const allyFill = ally.querySelector<HTMLElement>('.wc-ally-bar > span')!;
   const allyKey = ally.querySelector<HTMLElement>('kbd')!;

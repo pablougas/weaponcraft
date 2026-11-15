@@ -1,5 +1,6 @@
 import type { SimContext } from '../world';
 import { despawn } from '../world';
+import { ensureGarrison } from './soldiers';
 
 /**
  * The Underworld route's story beats (M6). The barricade is torn down when
@@ -8,6 +9,8 @@ import { despawn } from '../world';
 export function updateRoute(ctx: SimContext, defeated: ReadonlyArray<{ entityId: string; by: string | null }>): void {
   if (!ctx.isAuthority) return;
   const { world } = ctx;
+  // The humans' garrison holds the fields beyond the grotto.
+  if (world.flags.descended && !world.flags.garrisonPlaced) ensureGarrison(ctx);
   if (world.flags.barricadeBroken) return;
   const barricade = Object.values(world.entities).find((e) => e.structure?.kind === 'barricade');
   if (!barricade?.health || barricade.health.current > 0) return;

@@ -27,6 +27,8 @@ export function createWorld(seed: number, nowMs: number, playerIds: readonly Pla
     codex: {},
     tutorial: { done: [], movedTicks: 0, sprintTicks: 0 },
     objective: null,
+    forts: {},
+    reveal: {},
     olympusShatteredAtMs: null,
   };
 }

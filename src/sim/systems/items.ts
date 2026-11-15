@@ -1,4 +1,7 @@
 import { startRest } from './rest';
+
+/** What each fort's chest holds (approved weapons only). */
+const FORT_LOOT: Readonly<Record<string, string>> = { 'fort-asphodel': 'storm-axe', 'fort-styx': 'sunlit-sword', 'fort-gates': 'oak-staff' };
 import { godDef } from '../defs';
 import type { Intent } from '../intents';
 import type { Entity, EntityId, PlayerId, WorldState } from '../types';
@@ -63,6 +66,19 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
     // Rest: back to full health. The world clock is global, so sleeping never skips time (SPEC §6).
     const hero = heroOf(world, playerId);
     if (hero?.hero) startRest(ctx, hero as Entity & { hero: NonNullable<Entity['hero']> }, target);
+    return null;
+  }
+  if (target.structure?.kind === 'chest') {
+    const fortId = target.fortId ?? '';
+    const fort = world.forts[fortId];
+    if (!fort || fort.chestOpened) return 'empty';
+    if (!fort.cleared) return 'guarded';
+    const player = world.players[playerId];
+    const weaponId = FORT_LOOT[fortId] ?? null;
+    if (weaponId && player.inventory.length >= INVENTORY_SLOTS) return 'inventory full';
+    fort.chestOpened = true;
+    if (weaponId) player.inventory.push(weaponId);
+    ctx.emit('chest:opened', { playerId, fortId, weaponId });
     return null;
   }
   if (target.structure?.kind === 'forge') {

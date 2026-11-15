@@ -3,8 +3,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GROTTO } from '../../sim/regions';
 import { fbm } from '../../sim/terrain/noise';
 import {
-  CERBERUS_POST, FIELDS, FIELDS_CELL, GATE_PILLARS, GATES, MECH_FOOTPRINT, SPIRES, TUNNEL,
-  pathX, riverZ, underworldLocalHeight,
+  CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, GATES, MECH_FOOTPRINT, SPIRES, TUNNEL,
+  palisadeSegments, pathX, riverZ, underworldLocalHeight, watchtowerSpot,
 } from '../../sim/terrain/underworld';
 import type { Look } from '../look';
 
@@ -274,6 +274,58 @@ export function buildFields(look: Look): FieldsView {
     new THREE.Vector3(MECH_FOOTPRINT.x - 4, 9, MECH_FOOTPRINT.z),
   ]), 40, 0.3, 8, false), conduitMat);
   group.add(drain);
+
+  // The humans' forts: a log palisade with a gate toward the path, a watchtower, tents, a campfire and a banner.
+  const logMat = toon({ color: '#5e4330' });
+  const canvas = toon({ color: '#c9b99a' });
+  const banner = toon({ color: '#9b2b2b', side: THREE.DoubleSide, rim: false });
+  const flame = new THREE.MeshBasicMaterial({ color: '#ffb35c', toneMapped: false });
+  const logGeo = new THREE.CylinderGeometry(0.22, 0.25, 3.6, 7);
+  const tipGeo = new THREE.ConeGeometry(0.22, 0.45, 7);
+  const logs: THREE.Matrix4[] = [];
+  const tips: THREE.Matrix4[] = [];
+  for (const fort of FORT_SPOTS) {
+    for (const seg of palisadeSegments(fort)) {
+      for (let k = -4; k <= 4; k += 1) {
+        const x = seg.x + Math.cos(seg.yaw) * k * 0.46;
+        const z = seg.z - Math.sin(seg.yaw) * k * 0.46;
+        const y = h(x, z);
+        const tall = 3.2 + ((k * 7 + Math.round(seg.x)) % 3) * 0.2;
+        logs.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y + tall / 2, z), q.identity(), new THREE.Vector3(1, tall / 3.6, 1)));
+        tips.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y + tall + 0.2, z), q.identity(), new THREE.Vector3(1, 1, 1)));
+      }
+    }
+    const tower = watchtowerSpot(fort);
+    const ty = h(tower.x, tower.z);
+    for (const [ox, oz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) {
+      group.add(M(new THREE.CylinderGeometry(0.18, 0.2, 7.5, 7), logMat, [tower.x + ox, ty + 3.75, tower.z + oz], { outline: 0.012 }));
+    }
+    group.add(M(new THREE.BoxGeometry(3.6, 0.3, 3.6), logMat, [tower.x, ty + 7.5, tower.z], { outline: 0.015 }));
+    group.add(M(new THREE.ConeGeometry(2.8, 1.8, 4), logMat, [tower.x, ty + 9.6, tower.z], { rot: [0, Math.PI / 4, 0], outline: 0.015 }));
+    group.add(M(new THREE.PlaneGeometry(1.2, 2), banner, [tower.x, ty + 6.4, tower.z + 1.85], { outline: false }));
+    for (const [ox, oz, r] of [[-6, 4, 0.4], [5, 5, -0.6]]) {
+      const tent = new THREE.Mesh(new THREE.ConeGeometry(2.1, 2.4, 4), canvas);
+      tent.position.set(fort.x + ox, h(fort.x + ox, fort.z + oz) + 1.2, fort.z + oz);
+      tent.rotation.y = r;
+      tent.castShadow = true;
+      group.add(tent);
+    }
+    const fy = h(fort.x + 2, fort.z + 1);
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i / 6) * Math.PI * 2;
+      group.add(M(new THREE.CylinderGeometry(0.08, 0.08, 1, 6), logMat, [fort.x + 2 + Math.cos(a) * 0.3, fy + 0.15, fort.z + 1 + Math.sin(a) * 0.3], { rot: [Math.PI / 2, a, 0], outline: false }));
+    }
+    const fire = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.9, 8), flame);
+    fire.position.set(fort.x + 2, fy + 0.5, fort.z + 1);
+    group.add(fire);
+  }
+  const logMesh = new THREE.InstancedMesh(logGeo, logMat, logs.length);
+  logs.forEach((m, i) => logMesh.setMatrixAt(i, m));
+  logMesh.castShadow = true;
+  group.add(logMesh);
+  const tipMesh = new THREE.InstancedMesh(tipGeo, logMat, tips.length);
+  tips.forEach((m, i) => tipMesh.setMatrixAt(i, m));
+  group.add(tipMesh);
 
   // Soul-motes drifting around the camera.
   const moteCount = 500;

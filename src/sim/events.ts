@@ -65,6 +65,22 @@ export interface EventMap {
   'hero:revived': { entityId: EntityId; bedId: EntityId | null };
   /** Read the humans' dispatch in the grotto. */
   'dispatch:read': { playerId: PlayerId };
+  /** A shield-bearer blocked a hit from the front. */
+  'combat:blocked': { attackerId: EntityId | null; targetId: EntityId };
+  /** A soldier glimpsed something and is coming to look. */
+  'soldier:suspicious': { entityId: EntityId };
+  /** A soldier shouted (or a sentry sounded the horn): nearby soldiers come running. */
+  'soldier:alarm': { entityId: EntityId; kind: string; at: Vec3 };
+  /** A soldier is winding up an attack (the god can roll out of it). */
+  'soldier:windup': { entityId: EntityId; kind: string; ticks: number };
+  /** A soldier's melee attack landed or missed. */
+  'soldier:strike': { entityId: EntityId; kind: string };
+  /** A fort came into view (it's on the map now). */
+  'fort:spotted': { fortId: string };
+  /** Every soldier in a fort is down. */
+  'fort:cleared': { fortId: string };
+  /** A fort's chest was opened. */
+  'chest:opened': { playerId: PlayerId; fortId: string; weaponId: string | null };
   /** The barricade over the tunnel was torn down: the way to the Asphodel Fields is open. */
   'barricade:broken': { by: EntityId | null };
   /** Looked at the barricade over the tunnel deeper in (it opens in M6). */

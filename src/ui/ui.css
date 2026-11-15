@@ -1117,3 +1117,38 @@
   border-radius: 4px;
   border: 1px solid rgb(255 255 255 / 35%);
 }
+
+/* The Underworld map (M6): round minimap top-right; the full map on M. */
+#wc-minimap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 6;
+  pointer-events: none;
+}
+#wc-minimap canvas {
+  display: block;
+  border-radius: 50%;
+  border: 2px solid var(--wc-gold-dim, #8a7440);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%);
+}
+#wc-minimap .wc-map-legend {
+  display: none;
+}
+#wc-minimap.wc-map-full {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  background: rgb(5 4 10 / 72%);
+}
+#wc-minimap.wc-map-full canvas {
+  border-radius: 10px;
+}
+#wc-minimap.wc-map-full .wc-map-legend {
+  display: block;
+  margin: 0;
+  color: #e8e2d0;
+  font: 13px Inter, ui-sans-serif, system-ui, sans-serif;
+}

@@ -5,6 +5,8 @@ import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
 import { switchCharacter, updateCompanions } from './systems/party';
 import { updateRoute } from './systems/route';
+import { updateSoldiers } from './systems/soldiers';
+import { updateReveal } from './systems/reveal';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
 import { applyItemIntent } from './systems/items';
@@ -50,6 +52,8 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   updateStatuses(ctx);
   updateHeroes(ctx, input.physics);
   if (input.isAuthority) updateCreatures(ctx, input.physics);
+  updateSoldiers(ctx, input.physics);
+  updateReveal(ctx);
   updateRoute(ctx, events.filter((e): e is Extract<typeof e, { type: 'entity:defeated' }> => e.type === 'entity:defeated'));
 
   // Prologue: tutorial progress, then the rocket when every step is done (SPEC §3.1–3.2).

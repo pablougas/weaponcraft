@@ -1,5 +1,6 @@
 import type { ContentDef, ModelLoader } from '../types';
 import { bed } from './bed';
+import { chest } from './chest';
 import { forge } from './forge';
 import { fusionAltar } from './fusion-altar';
 
@@ -10,4 +11,4 @@ export interface StructureDef extends ContentDef {
 }
 
 // Registry: add a folder here and one line below. Never edit the engine.
-export const structures: readonly StructureDef[] = [fusionAltar, bed, forge];
+export const structures: readonly StructureDef[] = [fusionAltar, bed, forge, chest];

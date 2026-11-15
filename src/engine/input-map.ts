@@ -24,6 +24,7 @@ export type InputAction =
   | 'interact'
   | 'inventory'
   | 'codex'
+  | 'map'
   | 'cameraLeft'
   | 'cameraRight'
   | 'settings'
@@ -58,6 +59,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   interact: ['KeyF'],
   inventory: ['KeyI'],
   codex: ['KeyC'],
+  // The full Underworld map (M6).
+  map: ['KeyM'],
   cameraLeft: ['Comma'],
   cameraRight: ['Period'],
   settings: ['Escape'],

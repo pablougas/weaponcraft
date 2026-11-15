@@ -149,6 +149,15 @@ export function applyDamage(
     boost *= attacker.hero.ambush.multiplier;
     attacker.hero.ambush = null;
   }
+  // Shield-bearers block most of what hits them from the front (go round, or break the guard with a stun).
+  if (target.soldier?.kind === 'shield' && attacker && kind !== 'status' && !(target.creature?.stun)) {
+    const toAttacker = Math.atan2(attacker.position.x - target.position.x, attacker.position.z - target.position.z);
+    const off = Math.abs(Math.atan2(Math.sin(toAttacker - target.soldier.facing), Math.cos(toAttacker - target.soldier.facing)));
+    if (off < 0.9) {
+      boost *= 0.3;
+      ctx.emit('combat:blocked', { attackerId, targetId });
+    }
+  }
   const dealt = Math.min(target.health.current, Math.max(0, Math.round(amount * multiplier * boost)));
   target.health.current -= dealt;
 

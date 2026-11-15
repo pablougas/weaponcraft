@@ -22,7 +22,7 @@ async function frozenScene(page: Page, dayFraction: number, camera: Camera = 'vi
   await openGame(page);
   await page.locator('#wc-title').click();
   await expect(page.locator('#wc-title, #wc-loading')).toHaveCount(0);
-  if (!hud) await page.addStyleTag({ content: '#wc-hud, #wc-labels, #wc-tutorial, #wc-captions, #wc-skip { display: none !important; }' });
+  if (!hud) await page.addStyleTag({ content: '#wc-hud, #wc-labels, #wc-tutorial, #wc-captions, #wc-skip, #wc-minimap { display: none !important; }' });
   await page.evaluate(async ({ dayFraction, camera }) => {
     await window.wc!.freeze(12);
     await window.wc!.setSeed(7);
@@ -206,5 +206,29 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
       await window.wc!.freeze(12);
     });
     await expect(page).toHaveScreenshot('asphodel-fields.png', SHOT);
+  });
+
+  test('a human fort in the Asphodel Fields', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    // Outside the first fort's gate, looking in (fort-asphodel sits west of the path at z −185).
+    await page.evaluate(async () => {
+      await window.wc!.teleport(-4, -160, Math.PI + 0.75);
+      window.wc!.step(2);
+      await window.wc!.freeze(12);
+      await window.wc!.snapCam('overlook');
+    });
+    await expect(page).toHaveScreenshot('fort.png', SHOT);
+  });
+
+  test('a sentry and its sight cone', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    // Behind the first sentry (x 14, z −120), out of its cone.
+    await page.evaluate(async () => {
+      await window.wc!.teleport(20, -104, Math.PI + 0.35);
+      window.wc!.step(2);
+      await window.wc!.freeze(12);
+      await window.wc!.snapCam('overlook');
+    });
+    await expect(page).toHaveScreenshot('sentry-cone.png', SHOT);
   });
 });

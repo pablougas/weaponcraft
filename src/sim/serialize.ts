@@ -67,6 +67,8 @@ function migrate(world: WorldState): WorldState {
   world.codex ??= {};
   world.tutorial ??= { done: [], movedTicks: 0, sprintTicks: 0 };
   world.objective ??= null;
+  world.forts ??= {};
+  world.reveal ??= {};
   world.olympusShatteredAtMs ??= null;
   for (const player of Object.values(world.players)) player.inventory ??= [];
   return world;
