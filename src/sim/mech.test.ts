@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { HOWL } from '../content/spirits/cerberus';
 import { applyDamage } from './combat';
-import { FREED_BEATS, FREED_ID } from './cutscenes/freed';
+import { findPoseidon, FREED_BEATS, FREED_ID, freedPoints } from './cutscenes/freed';
 import { WARDEN_BEATS, WARDEN_ID } from './cutscenes/warden';
-import { findWarden, WARDEN } from './systems/warden';
+import { findWarden, FREED_DELAY, WARDEN } from './systems/warden';
 import type { Intent } from './intents';
 import { ensureMeadowPopulated } from './populate';
 import { GROTTO } from './regions';
@@ -147,7 +147,7 @@ describe('Cerberus Mk. II (M7)', () => {
     expect(Math.hypot(mech().position.x - start.x, mech().position.z - start.z)).toBeGreaterThan(12);
   });
 
-  it('only the rear plating can be hurt; breaking it brings out the Warden; beat him, break the chains, Cerberus is free (E: Three-Fold Howl)', () => {
+  it('only the rear plating can be hurt; breaking it brings out the Warden; beating him frees Cerberus, reunites him with Hades and brings Poseidon (E: Three-Fold Howl)', () => {
     const { world, run, zeus, mech, plating, near } = atTheGates();
     // E does nothing before Cerberus is free.
     const rejected = run([{ type: 'player:action', playerId: 'p1', action: 'spiritAbility' }]);
@@ -184,19 +184,23 @@ describe('Cerberus Mk. II (M7)', () => {
     const early = run([{ type: 'player:action', playerId: 'p1', action: 'interact' }]);
     expect(early.some((e) => e.type === 'chains:examined' && e.reason === 'warden')).toBe(true);
 
-    // He falls: the objective is to release Cerberus; F on the chains plays the freeing scene.
+    // He falls; a moment later the chains break on their own: Hades and Cerberus are reunited, then Poseidon arrives.
     warden.health.current = 0;
     const fell = run([], 2);
     expect(fell.some((e) => e.type === 'warden:defeated')).toBe(true);
-    expect(world.objective).toBe('release-cerberus');
-    toChains();
-    run([{ type: 'player:action', playerId: 'p1', action: 'interact' }]);
+    run([], FREED_DELAY + 2);
     expect(world.cutscene?.id).toBe(FREED_ID);
     const rest = run([], FREED_BEATS.end + 2);
     expect(rest.some((e) => e.type === 'spirit:freed' && e.spiritId === 'cerberus')).toBe(true);
+    expect(rest.some((e) => e.type === 'cutscene:beat' && e.beat === 'linePoseidon1')).toBe(true);
     expect(world.flags.cerberusFreed).toBe(true);
-    expect(world.objective).toBe('cerberus-freed');
+    expect(world.objective).toBe('brothers-reunited');
     expect(world.cutscene).toBeNull();
+    // Poseidon stays at the Gates; Hades stands with Cerberus.
+    const poseidon = findPoseidon(world)!;
+    expect(poseidon.npc?.name).toBe('Poseidon');
+    const hades = Object.values(world.entities).find((e) => e.defId === 'hades' && e.hero)!;
+    expect(Math.hypot(hades.position.x - freedPoints().reunion.x, hades.position.z - freedPoints().reunion.z)).toBeLessThan(0.5);
 
     // E now howls: lifesteal on what the god hits.
     zeus().stamina!.current = zeus().stamina!.max;
@@ -318,7 +322,7 @@ describe('the Warden (M7 boss)', () => {
 });
 
 describe('starting the level over (falling, or "Reset level")', () => {
-  it('Reset level: fade, wake at the bed healed, and every encounter still in play starts over; progress is kept', () => {
+  it('Reset level: fade, wake at the bed healed, and every enemy starts over (cleared forts refilled)', () => {
     const { world, run, zeus, mech, plating } = atTheGates();
     // Put the soldiers back (atTheGates removes them) as the real game has them.
     world.flags.garrisonPlaced = true;
@@ -347,31 +351,34 @@ describe('starting the level over (falling, or "Reset level")', () => {
     run([], REST_TOTAL);
     expect(zeus().health!.current).toBe(zeus().health!.max);
     expect(Math.hypot(zeus().position.x - GROTTO.center.x, zeus().position.z - GROTTO.center.z)).toBeLessThan(20);
-    // Soldiers: all back (bar the cleared fort's), calm, at their posts.
-    const fortSize = soldiers().length;
+    // Soldiers: all back (the cleared fort's too), calm, at their posts.
     expect(soldiers().every((s) => s.soldier!.state === 'patrol' && s.soldier!.awareness < 25)).toBe(true);
-    expect(soldiers().some((s) => s.soldier!.fortId === fortId)).toBe(false);
-    expect(fortSize).toBe(total - FORT_GARRISON_SIZES[0]);
+    expect(soldiers().length).toBe(total);
+    expect(world.forts[fortId].cleared).toBe(false);
     // The Mk. II is back on watch with its plating whole.
     expect(mech().mech.mode).toBe('patrol');
     expect(plating().health!.current).toBe(MECH.plating);
   });
 
-  it('falling in battle starts the level over too; the Warden comes back at full strength', () => {
-    const { world, run, zeus, plating } = atTheGates();
+  it('falling in battle starts every enemy over too: a beaten Mk. II stands again and the Warden goes back inside', () => {
+    const { world, run, zeus, mech, plating } = atTheGates();
     plating().health!.current = 0;
     run([], 2);
     run([], WARDEN_BEATS.end + 2);
     const warden = findWarden(world)!;
     warden.health.current = 200;
-    warden.warden.enraged = true;
     zeus().health!.current = 0;
     const events = run([], 120);
     expect(events.some((e) => e.type === 'level:reset' && e.reason === 'fell')).toBe(true);
-    expect(warden.health.current).toBe(WARDEN.health);
-    expect(warden.warden.enraged).toBe(false);
-    // Story progress stays: the Mk. II is still down and the Warden still fighting.
-    expect(world.flags.wardenEmerged).toBe(true);
-    expect(warden.warden.mode).toBe('fight');
+    expect(findWarden(world)).toBeUndefined();
+    expect(world.flags.wardenEmerged).toBe(false);
+    expect(mech().mech.mode).toBe('patrol');
+    expect(plating().health!.current).toBe(MECH.plating);
+    expect(world.objective).toBe('find-and-free-cerberus');
+    // Break it again: the Warden climbs out again.
+    plating().health!.current = 0;
+    run([], 2);
+    expect(world.cutscene?.id).toBe(WARDEN_ID);
   });
+
 });

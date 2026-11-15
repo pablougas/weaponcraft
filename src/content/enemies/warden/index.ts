@@ -9,9 +9,9 @@ export const theWarden: EnemyDef = {
   id: 'the-warden',
   name: 'The Warden',
   approved: true,
-  maxHealth: 1000,
-  body: { radius: 0.75, height: 3.5 },
+  maxHealth: 1600,
+  body: { radius: 1, height: 4.5 },
   wanders: false,
-  speed: 6.8,
+  speed: 7.6,
   model: () => import('./model'),
 };

@@ -55,7 +55,7 @@ const local = (x: number, z: number): Vec3 => ({ x: GROTTO.center.x + x, y: grou
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const forward = (yaw: number) => ({ x: Math.sin(yaw), z: Math.cos(yaw) });
 
-type MechEntity = Entity & { mech: MechState };
+export type MechEntity = Entity & { mech: MechState };
 
 /** Places the Mk. II on its watch loop, once (when the garrison is placed). */
 export function ensureMech(ctx: SimContext): void {
@@ -72,18 +72,7 @@ export function ensureMech(ctx: SimContext): void {
     mode: 'patrol', awareness: 0, targetId: null, lastSeen: null, timer: 0, patrolIndex: 1,
     facing: yaw, scan: 0, attack: null, cooldown: 0, walking: false, platingId: null,
   };
-  const platingId = spawn(ctx, 'mech-plating', { position: { ...mech.position }, rotationY: yaw });
-  const plating = world.entities[platingId];
-  Object.assign(plating, {
-    region: 'underworld',
-    health: { current: MECH.plating, max: MECH.plating },
-    body: { radius: 2.4, height: 6 },
-    // Hostile, so the companion helps break it; not wandering (it rides on the mech's back).
-    creature: { wanders: false, home: { ...mech.position }, target: null, wait: 0, flee: 0, sinceHit: 1, hostile: true },
-    mechPart: { mechId: id, part: 'rear-plating' },
-  } satisfies Partial<Entity>);
-  mech.mech.platingId = platingId;
-  placePlating(mech as MechEntity, plating);
+  spawnPlating(ctx, mech as MechEntity);
   ensureChains(ctx);
   world.flags.mechPlaced = true;
 }
@@ -94,6 +83,22 @@ export function ensureChains(ctx: SimContext): void {
   const chains = spawn(ctx, 'cerberus-chains', { position: local(CERBERUS_POST.x + 2.5, CERBERUS_POST.z + 1.5) });
   ctx.world.entities[chains].structure = { kind: 'chains' };
   ctx.world.entities[chains].region = 'underworld';
+}
+
+/** Gives the Mk. II fresh rear plating (on placement, and when the level starts over). */
+export function spawnPlating(ctx: SimContext, mech: MechEntity): void {
+  const platingId = spawn(ctx, 'mech-plating', { position: { ...mech.position }, rotationY: mech.rotationY });
+  const plating = ctx.world.entities[platingId];
+  Object.assign(plating, {
+    region: 'underworld',
+    health: { current: MECH.plating, max: MECH.plating },
+    body: { radius: 2.4, height: 6 },
+    // Hostile, so the companion helps break it; not wandering (it rides on the mech's back).
+    creature: { wanders: false, home: { ...mech.position }, target: null, wait: 0, flee: 0, sinceHit: 1, hostile: true },
+    mechPart: { mechId: mech.id, part: 'rear-plating' },
+  } satisfies Partial<Entity>);
+  mech.mech.platingId = platingId;
+  placePlating(mech, plating);
 }
 
 /** Where the plating sits: on the back of the mech, at ground level so gods can reach it. */
@@ -157,7 +162,7 @@ function walk(mech: MechEntity, speed: number, leash: number = MECH.leash): bool
 
 /** Advances the Mk. II (authority only). */
 export function updateMech(ctx: SimContext): void {
-  if (!ctx.isAuthority) return;
+  if (!ctx.isAuthority || ctx.world.cutscene) return;
   for (const entity of Object.values(ctx.world.entities)) {
     if (entity.mech) updateOne(ctx, entity as MechEntity);
   }

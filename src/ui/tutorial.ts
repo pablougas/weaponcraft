@@ -9,6 +9,7 @@ const OBJECTIVES: Record<string, string> = {
   'defeat-the-warden': 'Defeat the Warden.',
   'release-cerberus': 'Release Cerberus: break his chains.',
   'cerberus-freed': 'Cerberus is free. His Three-Fold Howl is yours.',
+  'brothers-reunited': 'Cerberus is free, and Poseidon has found you.',
 };
 
 const STEP_NAMES: Record<TutorialStepId, string> = {

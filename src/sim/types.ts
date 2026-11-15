@@ -90,6 +90,8 @@ export interface WardenState {
   enraged: boolean;
   /** Walking this tick (for the view's stride). */
   walking: boolean;
+  /** Ticks since he fell (the reunion scene starts a moment later). */
+  fallen?: number;
 }
 
 /** The Mk. II's attacks: a stomp all round, fire breath down its cone, and a charge at you. */

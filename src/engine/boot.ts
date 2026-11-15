@@ -10,18 +10,18 @@ import { createCaptions } from '../ui/captions';
 import { createTutorialPanel } from '../ui/tutorial';
 import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
-import { FREED_CAPTIONS, freedFrame } from '../view/cinematics/freed';
+import { FREED_CAPTION_SECONDS, FREED_CAPTIONS, freedFrame } from '../view/cinematics/freed';
 import { WARDEN_CAPTIONS, wardenFrame } from '../view/cinematics/warden';
 import { ShadowPortal } from '../view/effects/portal';
 import { ShadowEffects } from '../view/effects/shadow';
 import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
-import { FREED_ID, freedTicks } from '../sim/cutscenes/freed';
+import { findPoseidon, FREED_ID, freedPoints, freedTicks } from '../sim/cutscenes/freed';
 import { WARDEN_ID, wardenTicks } from '../sim/cutscenes/warden';
 import { findWarden } from '../sim/systems/warden';
 import { findMech } from '../sim/systems/mech';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
-import { CERBERUS_HOUND, GATES } from '../sim/terrain/underworld';
+import { CERBERUS_HOUND, GATES, TUNNEL } from '../sim/terrain/underworld';
 import { restPose } from '../sim/systems/rest';
 import { rocketTicks } from '../sim/cutscenes/rocket';
 import { DAY_MS } from '../sim/time';
@@ -370,8 +370,9 @@ export async function boot(): Promise<void> {
           : '[Its three heads glow with stolen fire]', 2.5);
     }
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
-    if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], 3.2);
+    if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], FREED_CAPTION_SECONDS[event.beat] ?? 2.6);
     if (event.type === 'level:reset' && event.entityId === localHero()?.id) {
+      cameraRig.rearm();
       captions.show(event.reason === 'fell' ? '[You wake at the Refuge. Your enemies have regrouped.]' : '[Back at the Refuge. The level starts over.]', 3.5);
     }
     // The Warden (M7 boss).
@@ -396,7 +397,11 @@ export async function boot(): Promise<void> {
     if (event.type === 'intent:rejected' && event.reason === 'guarded' && event.playerId === activeSession.localPlayerId) captions.show('Soldiers guard this chest. Clear the fort first.', 3);
     if (event.type === 'barricade:broken') captions.show('[The barricade splinters] Hades: The Asphodel Fields. The hound is somewhere past the Gates.', 5);
     if (event.type === 'hero:down') captions.show('Zeus has fallen. He wakes at the Refuge.', 3.5);
-    if (event.type === 'npc:talk') captions.show('Hades: Cerberus first. Then we take back what is ours.', 4);
+    if (event.type === 'npc:talk') {
+      captions.show(event.name === 'Poseidon'
+        ? 'Poseidon: The tides are turning, brothers. Rest a while; then we find the others.'
+        : 'Hades: Cerberus first. Then we take back what is ours.', 4);
+    }
     if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
     if (event.type === 'hero:rested') captions.show('You rest. Health and stamina restored.');
     if (event.type === 'forge:used') captions.show('The Forge is cold. Bring materials from the wider world to craft here.');
@@ -729,6 +734,8 @@ export async function boot(): Promise<void> {
           meadow.camera.getWorldDirection(target).multiplyScalar(10).add(meadow.camera.position);
           cinematicStart = { position: meadow.camera.position.clone(), target, fov: meadow.camera.fov };
           cinematicId = cutsceneId;
+          // The scene hands back to a close camera (play resumes close and zooms out on the first move).
+          cameraRig.rearm();
         }
         cameraRig.update(followCamera, heroPoint, 0, null, floorAt);
         const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
@@ -747,8 +754,9 @@ export async function boot(): Promise<void> {
           meadow.setCinematicBoost(0, 0);
           cameraShake = 0;
         } else if (cutsceneId === FREED_ID) {
-          const hound = { x: GROTTO.center.x + CERBERUS_HOUND.x, y: GROTTO.center.y, z: GROTTO.center.z + CERBERUS_HOUND.z };
-          pose = freedFrame(ticksIn / 30, mechPoint ?? world.cutscene?.points?.mech ?? hound, hound, CERBERUS_HOUND.yaw, cinematicStart, followPose);
+          const poseidon = findPoseidon(world);
+          const poseidonPoint = poseidon ? interpolator.position(world, poseidon.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
+          pose = freedFrame(ticksIn / 30, world.cutscene?.points ?? freedPoints(), CERBERUS_HOUND.yaw, poseidonPoint, cinematicStart, followPose);
           meadow.setCinematicBoost(0, 0);
           cameraShake = 0;
         } else {
@@ -804,7 +812,12 @@ export async function boot(): Promise<void> {
         }
         interpolator.position(world, hero.id, alpha, heroPoint);
         const lock = hero.hero?.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
-        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt);
+        // Start close; zoom out all the way once the god moves (team request). The grotto and its tunnel are enclosed: stay closer there.
+        if (hero.hero?.moving) cameraRig.heroMoved();
+        const gx = heroPoint.x - GROTTO.center.x;
+        const gz = heroPoint.z - GROTTO.center.z;
+        const enclosed = region === 'underworld' && (Math.hypot(gx, gz) < GROTTO.radius + 2 || (Math.abs(gx) < TUNNEL.halfWidth + 3 && gz > TUNNEL.toZ - 4 && gz < TUNNEL.fromZ + 2));
+        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt, enclosed ? 6.5 : undefined);
         if (region === 'underworld' && Math.hypot(heroPoint.x - GROTTO.center.x, heroPoint.z - GROTTO.center.z) < GROTTO.radius + 1) {
           // Keep the camera inside the grotto's walls (pull it in toward the god).
           const c = GROTTO.center;

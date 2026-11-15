@@ -3,7 +3,7 @@ import { WARDEN } from '../../../sim/systems/warden';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
 /**
- * The Warden: a hulking man, about 3.5 m tall, in blackened iron plate with
+ * The Warden: a hulking man, about 4.5 m tall, in blackened iron plate with
  * bronze trim and spikes, a horned great-helm with a burning visor slit, a
  * torn red cloak, and a two-handed iron maul. Animated from the sim: a heavy
  * run, the maul raised overhead before a swing, a deep crouch before a leap,
@@ -14,6 +14,9 @@ export const createModel: ModelFactory = (look) => {
   const { M, toon } = look;
   const root = new THREE.Group();
   const rig = new THREE.Group();
+  // Modelled at ~3.5 m, shown at ~4.5 m (team request: bigger).
+  const SIZE = 1.3;
+  rig.scale.setScalar(SIZE);
   root.add(rig);
   const iron = toon({ color: '#4a4c58' });
   const plate = toon({ color: '#666b7a' });
@@ -97,11 +100,10 @@ export const createModel: ModelFactory = (look) => {
       legs[0].rotation.x = swing;
       legs[1].rotation.x = -swing;
       torso.rotation.set(w.walking ? 0.12 : 0, 0, 0);
-      rig.position.y = w.walking ? Math.abs(Math.cos(stride)) * 0.08 : 0;
+      rig.position.y = w.walking ? Math.abs(Math.cos(stride)) * 0.08 * SIZE : 0;
       arms[0].rotation.set(-0.5, 0, 0.2);
       arms[1].rotation.set(-0.5, 0, -0.2);
       maul.rotation.set(0.9, 0, 0);
-      rig.scale.setScalar(1);
 
       if (a) {
         const total = a.kind === 'swing' ? WARDEN.swing.windup : a.kind === 'leap' ? WARDEN.leap.windup : WARDEN.dash.windup;
@@ -122,7 +124,7 @@ export const createModel: ModelFactory = (look) => {
         } else if (a.kind === 'leap') {
           // Crouch, then airborne with the maul overhead.
           if (a.windup > 0) {
-            rig.position.y = -0.45 * f;
+            rig.position.y = -0.45 * f * SIZE;
             legs[0].rotation.x = legs[1].rotation.x = -0.6 * f;
             torso.rotation.x = 0.35 * f;
           } else {
@@ -145,7 +147,7 @@ export const createModel: ModelFactory = (look) => {
         fall = frame.dt === 0 ? 1 : Math.min(1, fall + frame.dt * 1.2);
         root.rotation.order = 'YXZ';
         root.rotation.x = -Math.PI / 2 * fall * 0.95;
-        rig.position.y = 0.3 * fall;
+        rig.position.y = 0.3 * fall * SIZE;
       } else {
         fall = 0;
         root.rotation.x = 0;

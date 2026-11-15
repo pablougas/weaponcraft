@@ -290,6 +290,18 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     }
   }
 
+  /** Breaks the plating, beats the Warden, waits for the freeing scene and freezes `ticks` into it. */
+  async function freedSceneAt(page: Page, ticks: number) {
+    await breakPlating(page);
+    await beatWarden(page);
+    await page.evaluate(() => window.wc!.step(80));
+    await page.evaluate(async (n) => {
+      const w = window.wc!.getState().world!;
+      window.wc!.step(w.cutscene!.startTick + n - w.tick);
+      await window.wc!.freeze(12);
+    }, ticks);
+  }
+
   test('Cerberus Mk. II on watch, its sensor cone sweeping', async ({ page }) => {
     await atTheGates(page);
     await page.evaluate(async () => {
@@ -306,21 +318,20 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
 
   test('Cerberus freed: the Three-Fold Howl', async ({ page }) => {
     await atTheGates(page);
-    await breakPlating(page);
-    await beatWarden(page);
-    // F at the chains, then 9 s into the freeing scene (the howl).
-    await page.evaluate(async () => {
-      const chains = Object.values(window.wc!.getState().world!.entities).find((e) => e.structure?.kind === 'chains')!;
-      await window.wc!.teleport(chains.position.x + 1.2, chains.position.z, 0);
-    });
-    await page.keyboard.press('KeyF');
-    await page.evaluate(() => window.wc!.step(2));
-    await page.evaluate(async () => {
-      const w = window.wc!.getState().world!;
-      window.wc!.step(w.cutscene!.startTick + 270 - w.tick);
-      await window.wc!.freeze(12);
-    });
+    await freedSceneAt(page, 180); // 6 s: the howl
     await expect(page).toHaveScreenshot('cerberus-freed.png', SHOT);
+  });
+
+  test('Hades reunited with Cerberus', async ({ page }) => {
+    await atTheGates(page);
+    await freedSceneAt(page, 345); // 11.5 s: Hades with Cerberus
+    await expect(page).toHaveScreenshot('cerberus-reunion.png', SHOT);
+  });
+
+  test('Poseidon arrives: he could not reach them until the Mk. II was beaten', async ({ page }) => {
+    await atTheGates(page);
+    await freedSceneAt(page, 660); // 22 s: Poseidon speaking
+    await expect(page).toHaveScreenshot('poseidon-arrives.png', SHOT);
   });
 
   test('The Warden climbs out of the broken Mk. II', async ({ page }) => {

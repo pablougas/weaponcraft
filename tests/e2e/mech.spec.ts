@@ -4,8 +4,8 @@ import { expect, openGame, test } from './fixtures';
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
 const STEPS = ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'];
-/** "Cerberus Freed" length in ticks (sim/cutscenes/freed.ts FREED_BEATS.end = 13.5 s). */
-const FREED_TICKS = 405;
+/** "Cerberus Freed" length in ticks (sim/cutscenes/freed.ts FREED_BEATS.end = 33 s). */
+const FREED_TICKS = 990;
 /** "The Warden" length in ticks (sim/cutscenes/warden.ts WARDEN_BEATS.end = 10 s). */
 const WARDEN_TICKS = 300;
 
@@ -19,7 +19,7 @@ async function inGrotto(page: Page) {
 }
 
 test.describe('Cerberus Mk. II, the Warden, and freeing Cerberus (M7)', () => {
-  test('sneak behind the Mk. II, break its plating, the Warden climbs out; beat him, break the chains, Cerberus goes free; E howls for Zeus and for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
+  test('sneak behind the Mk. II, break its plating, the Warden climbs out; beat him and Cerberus goes free (Hades reunited, Poseidon arrives); E howls for Zeus and for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
     test.setTimeout(300_000);
     await inGrotto(page);
     await page.evaluate(() => window.wc!.breakBarricade());
@@ -83,22 +83,17 @@ test.describe('Cerberus Mk. II, the Warden, and freeing Cerberus (M7)', () => {
     }
     s = await state(page);
     expect(Object.values(s.world!.entities).find((e) => e.warden)!.warden!.mode).toBe('defeated');
-    expect(s.world!.objective).toBe('release-cerberus');
-
-    // F at Cerberus's chains: the freeing scene.
-    const chains = Object.values(s.world!.entities).find((e) => e.structure?.kind === 'chains')!;
-    await page.evaluate(({ x, z }) => window.wc!.teleport(x, z, 0), { x: chains.position.x + 1.2, z: chains.position.z });
-    await expect(page.locator('#wc-prompt, .wc-prompt').first()).toContainText('chains');
-    await page.keyboard.press('KeyF');
-    await page.evaluate(() => window.wc!.step(2));
+    // A moment later the scene starts on its own: Cerberus freed, Hades reunited with him, Poseidon arrives.
+    await page.evaluate(() => window.wc!.step(80));
     s = await state(page);
     expect(s.world!.cutscene?.id).toBe('cerberus-freed');
     await page.evaluate((n) => window.wc!.step(n), FREED_TICKS);
     s = await state(page);
     expect(s.world!.cutscene).toBeNull();
     expect(s.world!.flags.cerberusFreed).toBe(true);
-    expect(s.world!.objective).toBe('cerberus-freed');
-    await expect(page.locator('#wc-captions')).toContainText('Three-Fold Howl unlocked');
+    expect(s.world!.objective).toBe('brothers-reunited');
+    expect(Object.values(s.world!.entities).some((e) => e.defId === 'poseidon' && e.npc)).toBe(true);
+    // (The unlock caption queues behind the scene's lines when the test steps through it all at once; the HUD slot shows the unlock.)
     await expect(page.locator('[data-hud="spirit"]')).toBeVisible();
 
     // E: Three-Fold Howl, as Zeus…

@@ -148,16 +148,17 @@ function placeFortGarrison(ctx: SimContext, f: number): void {
 
 /**
  * Starts the Underworld's soldiers over (a fallen god or "Reset level"):
- * every soldier and arrow is removed, then the forts not yet cleared get their
- * full garrison back at their posts, calm, and every sentry squad starts its
- * route again. Cleared forts stay cleared.
+ * every soldier and arrow is removed, then every fort gets its full garrison
+ * back at its posts, calm (cleared forts too: they count as not cleared again;
+ * opened chests stay opened), and every sentry squad starts its route again.
  */
 export function restartGarrison(ctx: SimContext): void {
   const { world } = ctx;
   if (!world.flags.garrisonPlaced) return;
   for (const e of Object.values(world.entities)) if (e.soldier || e.projectile) despawn(ctx, e.id);
   FORT_SPOTS.forEach((fort, f) => {
-    if (!world.forts[fort.id]?.cleared) placeFortGarrison(ctx, f);
+    placeFortGarrison(ctx, f);
+    if (world.forts[fort.id]) world.forts[fort.id].cleared = false;
   });
   placeSquads(ctx);
 }
@@ -313,6 +314,8 @@ function walkToward(entity: Entity & { soldier: SoldierState }, to: Vec3, speed:
 /** Advances every soldier and sentry, and the arrows in flight (authority only). */
 export function updateSoldiers(ctx: SimContext, physics?: PhysicsWorld): void {
   if (!ctx.isAuthority) return;
+  // Everyone holds still while a cutscene plays (the gods can't move or defend themselves).
+  if (ctx.world.cutscene) return;
   const { world } = ctx;
   const targets = targetsFor(ctx);
   updateSquadLeaders(ctx);

@@ -46,8 +46,8 @@ export function wardenFrame(t: number, points: Record<string, Vec3>, warden: Vec
   const closer: CameraPose = { position: v(stand, 4).addScaledVector(out, 9).addScaledVector(side, 4), target: v(hatch, -0.5), fov: 48 };
   const him = warden ?? stand;
   const low: CameraPose = {
-    position: v(stand, 1.6).addScaledVector(out, 8).addScaledVector(side, 2.6),
-    target: v(him, 2.4),
+    position: v(stand, 1.6).addScaledVector(out, 10).addScaledVector(side, 3),
+    target: v(him, 3.1),
     fov: 46,
   };
   if (t < BREAKDOWN) blend(start, wide, ease(t / 1.5));

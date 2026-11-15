@@ -3,6 +3,7 @@ import { DT, ticks } from '../constants';
 import type { PhysicsWorld } from '../physics';
 import { groundAt } from '../regions';
 import type { Entity, EntityId, Vec3, WardenAttackKind, WardenState } from '../types';
+import { startFreed } from '../cutscenes/freed';
 import { spawn, type SimContext } from '../world';
 import { isResting } from './rest';
 
@@ -15,19 +16,23 @@ import { isResting } from './rest';
  * rages: quicker, shorter warnings. Beat him and Cerberus's chains can be broken.
  */
 export const WARDEN = {
-  health: 1000,
-  body: { radius: 0.75, height: 3.5 },
-  run: 6.8,
+  // Bigger, tougher and faster (team request, Nov 15): ~4.5 m tall.
+  health: 1600,
+  body: { radius: 1, height: 4.5 },
+  run: 7.6,
   /** Turn rate, rad/s (quick for his size). */
   turn: 6,
-  swing: { range: 4.8, arcDeg: 150, windup: ticks(0.55), recover: ticks(0.45), damage: 24, comboCooldown: ticks(1) },
-  leap: { min: 9, max: 22, windup: ticks(0.8), flight: ticks(0.65), radius: 4.5, damage: 32, every: ticks(7), height: 6 },
-  dash: { min: 6, max: 15, windup: ticks(0.6), active: ticks(0.5), speed: 17, damage: 20, reach: 1.8, every: ticks(5) },
+  swing: { range: 5.8, arcDeg: 150, windup: ticks(0.55), recover: ticks(0.45), damage: 28, comboCooldown: ticks(0.9) },
+  leap: { min: 9, max: 24, windup: ticks(0.8), flight: ticks(0.65), radius: 5, damage: 36, every: ticks(6), height: 7 },
+  dash: { min: 6, max: 16, windup: ticks(0.6), active: ticks(0.55), speed: 18, damage: 24, reach: 2.2, every: ticks(4.5) },
   /** Rage below this share of health: attacks wind up this much faster and he runs this much faster. */
   rageAt: 0.5,
   rageWindup: 0.75,
   rageSpeed: 1.2,
 } as const;
+
+/** Ticks between the Warden falling and the reunion scene. */
+export const FREED_DELAY = ticks(2.5);
 
 type WardenEntity = Entity & { warden: WardenState; health: NonNullable<Entity['health']> };
 
@@ -81,14 +86,18 @@ export function updateWarden(ctx: SimContext, physics?: PhysicsWorld): void {
   if (!e || e.warden.mode === 'emerging') return;
   const w = e.warden;
   w.walking = false;
-  if (w.mode === 'defeated') return;
+  if (w.mode === 'defeated') {
+    // A moment after he falls, the chains break: Hades and Cerberus are reunited (and Poseidon arrives).
+    w.fallen = (w.fallen ?? 0) + 1;
+    if (w.fallen >= FREED_DELAY && !ctx.world.flags.cerberusFreed && !ctx.world.cutscene) startFreed(ctx, e.id);
+    return;
+  }
   if (e.health.current <= 0) {
     w.mode = 'defeated';
     w.attack = null;
+    w.fallen = 0;
     ctx.world.flags.wardenDefeated = true;
-    ctx.world.objective = 'release-cerberus';
     ctx.emit('warden:defeated', { entityId: e.id });
-    ctx.emit('objective:set', { objectiveId: 'release-cerberus' });
     return;
   }
   if (!w.enraged && e.health.current <= e.health.max * WARDEN.rageAt) {

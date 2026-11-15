@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { FREED_BEATS, freedPoints } from '../../sim/cutscenes/freed';
 import { GROTTO } from '../../sim/regions';
 import { fbm } from '../../sim/terrain/noise';
 import {
@@ -306,6 +307,15 @@ export function buildFields(look: Look): FieldsView {
   const beam = new THREE.Mesh(beamGeo, beamMat);
   beam.frustumCulled = false;
   group.add(beam);
+  // Poseidon's spout (M7 story): a column of sea-water that rises on the plaza for his arrival.
+  const springAt = freedPoints().spring;
+  const springMat = new THREE.MeshBasicMaterial({ color: '#7fe9f0', transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
+  const springGeo = new THREE.CylinderGeometry(1.4, 2.4, 9, 20, 1, true);
+  springGeo.translate(0, 4.5, 0);
+  const spring = new THREE.Mesh(springGeo, springMat);
+  spring.position.set(springAt.x - GROTTO.center.x, springAt.y - GROTTO.center.y, springAt.z - GROTTO.center.z);
+  spring.visible = false;
+  group.add(spring);
   const beamTo = new THREE.Vector3();
   const beamUp = new THREE.Vector3(0, 1, 0);
 
@@ -393,27 +403,30 @@ export function buildFields(look: Look): FieldsView {
       }
       drain.visible = !conduitsBurst;
       pylonGemMat.emissiveIntensity = conduitsBurst ? 0.1 : 1.1;
-      chain.visible = !(freed || (freedT !== null && freedT >= 4.5));
-      // The hound: drained and lying; in the scene he rises (6 s), howls (8.5 s) and fades into the gods (10.5–13.5 s).
-      if (freed) {
-        hound.visible = false;
-        return;
-      }
+      const sec = (beat: keyof typeof FREED_BEATS) => FREED_BEATS[beat] / 30;
+      chain.visible = !(freed || (freedT !== null && freedT >= sec('chains')));
+      const ramp = (from: number, length: number) => (freedT === null ? 0 : Math.min(1, Math.max(0, (freedT - from) / length)));
+      // The hound: drained and lying while chained; in the scene he rises, howls, then lowers his heads to Hades.
+      // Once freed he stays, standing, at the Gates.
       hound.visible = true;
-      const t = freedT ?? 0;
-      const rise = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 6) / 2));
-      const howl = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 8.5) / 0.8)) * (1 - Math.min(1, Math.max(0, (t - 10) / 0.8)));
-      const fade = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 10.5) / 3));
-      // Lying: legs folded and the body low, heads down. Rising: he stands up, a little larger, heads high.
+      const rise = freed ? 1 : ramp(sec('rise'), 2);
+      const howl = freed ? 0 : ramp(sec('howl'), 0.8) * (1 - ramp(sec('howl') + 1.6, 0.8));
+      const nuzzle = freed ? 0 : ramp(sec('nuzzle'), 0.8) * (1 - ramp(sec('bond') + 0.5, 1));
       hound.position.set(houndHome.x, 0, houndHome.z);
       hound.scale.setScalar(1 + rise * 0.3);
       houndBody.position.y = -1.25 * (1 - rise);
       for (const leg of houndLegs) leg.rotation.x = (leg.position.z > 0 ? -1.3 : 1.3) * (1 - rise);
       tail.rotation.x = -2.2 + rise * 0.6;
-      houndHeads.rotation.x = 0.35 * (1 - rise) - howl * 0.55;
+      houndHeads.rotation.x = 0.35 * (1 - rise) - howl * 0.55 + nuzzle * 0.5;
       houndEyeMat.emissiveIntensity = 0.5 + rise * 1.2;
-      spiritMat.emissiveIntensity = 0.7 + rise * 1.1;
-      spiritMat.opacity = 0.85 * (1 - fade);
+      // His fire flows into the gods at the bond: a brief, gentle swell of his glow (no flash).
+      const bond = freed ? 0 : ramp(sec('bond'), 1) * (1 - ramp(sec('bond') + 1.5, 1.5));
+      spiritMat.emissiveIntensity = 0.7 + rise * 1.1 + bond * 0.8;
+      spiritMat.opacity = 0.85;
+      // Poseidon's spout: a column of water rises, holds while he steps out, and sinks back.
+      const spout = ramp(sec('poseidon'), 1.2) * (1 - ramp(sec('poseidonOut') + 0.8, 1.2));
+      spring.visible = spout > 0.01;
+      spring.scale.set(1, Math.max(0.01, spout), 1);
     },
     update(time, camera, reduceMotion) {
       if (!active) return;
