@@ -39,7 +39,7 @@ test.describe('the Underworld route (M6)', () => {
     // Stand at the first fort's gate: its soldiers notice and attack.
     // Just inside the first fort's gate (it faces the path, east): its soldiers notice and attack.
     const chest = Object.values(s.world!.entities).find((e) => e.structure?.kind === 'chest' && e.fortId === 'fort-asphodel')!;
-    const fort = { x: chest.position.x, z: chest.position.z + 3 + 2000 * 0 };
+    const fort = { x: chest.position.x, z: chest.position.z + 3 };
     await page.evaluate((f) => window.wc!.teleport(f.x + 12, f.z, -Math.PI / 2), fort);
     await page.evaluate(() => window.wc!.step(150));
     s = await state(page);
