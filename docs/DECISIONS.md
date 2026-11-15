@@ -156,3 +156,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - The orbit is shared by the sim and the view (`daggerOrbit`), so a throw leaves from the dagger you see.
 - Revised (team request): the daggers hover in a tight pyramid above his crown, with their tips meeting at an apex, and the formation turns slowly. They fly one at a time, 0.8 s apart, and each one trails a violet tracer behind it.
 - Revised again (team request): the daggers lie flat and all point the way Hades faces. From behind they form a small pyramid above his crown, one on top and two below, and the formation turns with him. A front three-quarter test camera ('side') frames the review shot.
+- Approved by the team (Nov 15): `hades-shadow-daggers.png` recorded as the baseline.
