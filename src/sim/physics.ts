@@ -2,6 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO } from './regions';
+import { CERBERUS_POST, FIELDS, FIELDS_CELL, GATE_PILLARS, MECH_FOOTPRINT, SPIRES, TUNNEL, underworldLocalHeight } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
@@ -36,6 +37,8 @@ export class PhysicsWorld {
   private readonly world: RAPIER_NS.World;
   private readonly controller: RAPIER_NS.KinematicCharacterController;
   private readonly bodies = new Map<EntityId, BodyRecord>();
+  /** The humans' barricade across the tunnel (removed once it's torn down). */
+  private barricade: RAPIER_NS.Collider | null = null;
 
   constructor(private readonly R: Rapier) {
     this.world = new R.World({ x: 0, y: 0, z: 0 });
@@ -89,10 +92,37 @@ export class PhysicsWorld {
     const rig = GROTTO_SPOTS.rig;
     this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + rig.x, c.y + 1.4, c.z + rig.z));
     const gate = GROTTO_SPOTS.barricade;
-    // Wall to wall, so nobody slips round its ends.
-    this.world.createCollider(R.ColliderDesc.cuboid(7.5, 2.5, 0.5).setTranslation(c.x + gate.x, c.y + 2.5, c.z + gate.z));
-    // The tunnel beyond the barricade, walled off for now.
-    this.world.createCollider(R.ColliderDesc.cuboid(3.6, 4, 0.5).setTranslation(c.x + gate.x, c.y + 4, c.z + gate.z - 6));
+    // Wall to wall, so nobody slips round its ends; removed when it's torn down (M6).
+    this.barricade = this.world.createCollider(R.ColliderDesc.cuboid(7.5, 2.5, 0.5).setTranslation(c.x + gate.x, c.y + 2.5, c.z + gate.z));
+    // The tunnel's walls, out to the Asphodel Fields.
+    const length = (TUNNEL.fromZ - TUNNEL.toZ) / 2 + 3;
+    for (const side of [-1, 1]) {
+      this.world.createCollider(R.ColliderDesc.cuboid(0.6, 6, length).setTranslation(c.x + side * (TUNNEL.halfWidth + 0.6), c.y + 6, c.z + (TUNNEL.fromZ + TUNNEL.toZ) / 2 - 3));
+    }
+    // Spires, the Gates' pillars, the Mk. II's footprint and Cerberus's chain post.
+    for (const spire of SPIRES) {
+      this.world.createCollider(R.ColliderDesc.cylinder(spire.height / 2, spire.radius * 0.8).setTranslation(c.x + spire.x, c.y + underworldLocalHeight(spire.x, spire.z) + spire.height / 2 - 1, c.z + spire.z));
+    }
+    for (const pillar of GATE_PILLARS) this.world.createCollider(R.ColliderDesc.cylinder(15, 3.2).setTranslation(c.x + pillar.x, c.y + 14, c.z + pillar.z));
+    const mech = MECH_FOOTPRINT;
+    this.world.createCollider(R.ColliderDesc.cuboid(mech.halfX, 6, mech.halfZ).setTranslation(c.x + mech.x, c.y + 6, c.z + mech.z));
+    this.world.createCollider(R.ColliderDesc.cylinder(3, 1).setTranslation(c.x + CERBERUS_POST.x, c.y + 3, c.z + CERBERUS_POST.z));
+    // The fields' ground (a heightfield on the same grid the view draws).
+    const nx = Math.round((FIELDS.maxX - FIELDS.minX) / FIELDS_CELL);
+    const maxZ = TUNNEL.toZ + 22;
+    const nz = Math.round((maxZ - FIELDS.minZ) / FIELDS_CELL);
+    const heights = new Float32Array((nx + 1) * (nz + 1));
+    for (let ix = 0; ix <= nx; ix += 1) {
+      for (let iz = 0; iz <= nz; iz += 1) {
+        const x = FIELDS.minX + ix * FIELDS_CELL;
+        const z = FIELDS.minZ + iz * FIELDS_CELL;
+        heights[iz + ix * (nz + 1)] = underworldLocalHeight(x, z);
+      }
+    }
+    const extentX = nx * FIELDS_CELL;
+    const extentZ = nz * FIELDS_CELL;
+    this.world.createCollider(R.ColliderDesc.heightfield(nx, nz, heights, { x: extentX, y: 1, z: extentZ })
+      .setTranslation(c.x + FIELDS.minX + extentX / 2, c.y, c.z + FIELDS.minZ + extentZ / 2));
   }
 
   /** Static colliders: the hero rock, boulders and tree trunks. */
@@ -114,6 +144,10 @@ export class PhysicsWorld {
 
   /** Creates, moves or removes kinematic bodies so they match the world's entities. */
   syncFrom(state: WorldState): void {
+    if (state.flags.barricadeBroken && this.barricade) {
+      this.world.removeCollider(this.barricade, false);
+      this.barricade = null;
+    }
     for (const [id, record] of this.bodies) {
       if (!state.entities[id]) {
         this.world.removeRigidBody(record.body);

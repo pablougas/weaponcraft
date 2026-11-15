@@ -65,6 +65,8 @@ export interface EventMap {
   'hero:revived': { entityId: EntityId; bedId: EntityId | null };
   /** Read the humans' dispatch in the grotto. */
   'dispatch:read': { playerId: PlayerId };
+  /** The barricade over the tunnel was torn down: the way to the Asphodel Fields is open. */
+  'barricade:broken': { by: EntityId | null };
   /** Looked at the barricade over the tunnel deeper in (it opens in M6). */
   'barricade:examined': { playerId: PlayerId };
   /** Talked to a story character. */

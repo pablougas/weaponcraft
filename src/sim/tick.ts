@@ -4,6 +4,7 @@ import type { PhysicsWorld } from './physics';
 import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
 import { switchCharacter, updateCompanions } from './systems/party';
+import { updateRoute } from './systems/route';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
 import { applyItemIntent } from './systems/items';
@@ -49,6 +50,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   updateStatuses(ctx);
   updateHeroes(ctx, input.physics);
   if (input.isAuthority) updateCreatures(ctx, input.physics);
+  updateRoute(ctx, events.filter((e): e is Extract<typeof e, { type: 'entity:defeated' }> => e.type === 'entity:defeated'));
 
   // Prologue: tutorial progress, then the rocket when every step is done (SPEC §3.1–3.2).
   if (input.isAuthority) {
@@ -103,6 +105,12 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       hero.hero.grounded = true;
       hero.hero.dodge = null;
       hero.hero.lastSafe = { ...position };
+      return;
+    }
+    case 'dev:breakBarricade': {
+      const barricade = Object.values(world.entities).find((e) => e.structure?.kind === 'barricade');
+      if (barricade?.health) barricade.health.current = 0;
+      else reject('no barricade');
       return;
     }
     case 'cutscene:skip': {

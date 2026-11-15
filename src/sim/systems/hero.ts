@@ -7,7 +7,7 @@ import { interact } from './items';
 import type { Intent, PlayerAction } from '../intents';
 import type { PhysicsWorld } from '../physics';
 import { meadowHeightAt, WATER_LEVEL } from '../terrain/meadow';
-import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionOf, sameRegion, type RegionId } from '../regions';
+import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionClamp, regionOf, sameRegion, type RegionId } from '../regions';
 import { isResting, updateRest } from './rest';
 import { COMBO_WINDOW_TICKS, PUNCH_COMBO } from '../unarmed';
 import type { Entity, EntityId, HeroState, Vec3, WorldState } from '../types';
@@ -561,6 +561,21 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
  * past the edge it pushes back in.
  */
 export function applyEdge(position: Vec3, vx: number, vz: number, region: RegionId = 'surface'): { vx: number; vz: number } {
+  if (region === 'underworld') {
+    // The grotto, tunnel and fields: rock walls and cliffs stop you; past the edge, push back in.
+    const clamp = regionClamp(region, position.x, position.z);
+    if (clamp.inside) return { vx, vz };
+    const dx = clamp.x - position.x;
+    const dz = clamp.z - position.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const push = Math.min(4, d * 4 + 1);
+    const inward = vx * (dx / d) + vz * (dz / d);
+    if (inward < 0) {
+      vx -= (dx / d) * inward;
+      vz -= (dz / d) * inward;
+    }
+    return { vx: vx + (dx / d) * push, vz: vz + (dz / d) * push };
+  }
   const bounds = regionBounds(region);
   const zone = region === 'surface' ? EDGE_ZONE : 1.5;
   const dx = position.x - bounds.x;
@@ -599,9 +614,8 @@ function keepOutOfTheGround(ctx: SimContext, entity: HeroEntity, before: Vec3, t
   }
 
   const bounds = regionBounds(region);
-  const r = Math.hypot(entity.position.x - bounds.x, entity.position.z - bounds.z);
   hero.safeTimer = Math.max(0, hero.safeTimer! - 1);
-  if (hero.grounded && hero.safeTimer === 0 && r < bounds.radius - SAFE_EDGE_MARGIN && isSafeFooting(region, entity.position)) {
+  if (hero.grounded && hero.safeTimer === 0 && regionClamp(region, entity.position.x, entity.position.z, SAFE_EDGE_MARGIN).inside && isSafeFooting(region, entity.position)) {
     hero.lastSafe = { ...entity.position };
     hero.safeTimer = SAFE_EVERY;
   }
@@ -636,15 +650,9 @@ function performBlink(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld
   if (!blink || !jump) return;
   const from = { ...entity.position };
   const region = regionOf(entity);
-  const bounds = regionBounds(region);
-  let tx = from.x + jump.dx;
-  let tz = from.z + jump.dz;
-  const limit = bounds.radius - 2;
-  const r = Math.hypot(tx - bounds.x, tz - bounds.z);
-  if (r > limit) {
-    tx = bounds.x + ((tx - bounds.x) * limit) / r;
-    tz = bounds.z + ((tz - bounds.z) * limit) / r;
-  }
+  const target = regionClamp(region, from.x + jump.dx, from.z + jump.dz, 2);
+  const tx = target.x;
+  const tz = target.z;
   const dx = tx - from.x;
   const dz = tz - from.z;
   if (physics) {

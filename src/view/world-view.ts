@@ -8,6 +8,7 @@ import { createLook, type Look } from './look';
 import { buildBirds } from './meadow/birds';
 import { buildFlowers, buildGrass } from './meadow/foliage';
 import { buildOlympus, type OlympusState, type OlympusView } from './meadow/olympus';
+import { buildFields } from './underworld/fields';
 import { buildGrotto } from './underworld/grotto';
 import { GROTTO, type RegionId } from '../sim/regions';
 import { buildRocks, buildTrees } from './meadow/props';
@@ -27,6 +28,8 @@ export interface WorldView {
   readonly olympus: OlympusView;
   /** Shows the surface (meadow, sky, Olympus) or the Underworld (the grotto), with its own lighting. */
   setRegion(region: RegionId): void;
+  /** The grotto's barricade: standing, or torn down (M6). */
+  setBarricadeBroken(broken: boolean): void;
   /** Olympus intact or shattered, and the rocket cinematic's distant effects. */
   setOlympus(state: Omit<OlympusState, 'time'>): void;
   /** Extra bloom and exposure for the impact's slow swell (0 = none). */
@@ -98,6 +101,10 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const grotto = buildGrotto(look);
   scene.add(grotto.group);
   grotto.setActive(false);
+  // M6: the tunnel and the Asphodel Fields beyond it.
+  const fields = buildFields(look);
+  scene.add(fields.group);
+  fields.setActive(false);
   let region: RegionId = 'surface';
   let reduceMotionOn = false;
 
@@ -171,7 +178,8 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const underworldSun = new THREE.Vector3(-0.35, 0.85, 0.25).normalize();
   const applyUnderworldLighting = () => {
     U.sunDir.value.copy(underworldSun);
-    sun.target.position.set(GROTTO.center.x, GROTTO.center.y, GROTTO.center.z);
+    // Shadows follow the camera; out in the fields the haze thins so the Gates read from afar.
+    sun.target.position.set(camera.position.x, GROTTO.center.y, camera.position.z);
     sun.position.copy(underworldSun).multiplyScalar(60).add(sun.target.position);
     sun.color.set('#9a8ad8');
     sun.intensity = 1.5;
@@ -182,7 +190,9 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
     U.ambColor.value.set('#3a3160');
     fog.color.set('#1d1630');
     U.fogColor.value.copy(fog.color);
-    fog.density = 0.018;
+    const inFields = camera.position.z - GROTTO.center.z < -30;
+    fog.density = inFields ? 0.006 : 0.018;
+    if (inFields) hemi.intensity = 2.1;
     U.fogDensity.value = fog.density;
     post.bloom.strength = 0.4;
     post.bloom.threshold = 0.85;
@@ -236,15 +246,20 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
       if (region === 'underworld') {
         post.rays.enabled = false;
         grotto.update(timeSeconds, reduceMotionOn);
+        fields.update(timeSeconds, camera, reduceMotionOn);
       } else {
         updateGodRays();
       }
+    },
+    setBarricadeBroken(broken) {
+      grotto.setBarricadeBroken(broken);
     },
     setRegion(next) {
       if (next === region) return;
       region = next;
       surface.visible = region === 'surface';
       grotto.setActive(region === 'underworld');
+      fields.setActive(region === 'underworld');
       scene.background = region === 'underworld' ? underworldBackground : null;
     },
     render() {

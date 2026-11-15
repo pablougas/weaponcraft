@@ -1,4 +1,4 @@
-import { startDescent } from './cutscenes/descent';
+import { armBarricade, startDescent } from './cutscenes/descent';
 import { recruitHades } from './systems/party';
 import { godDef } from './defs';
 import type { GameEvent } from './events';
@@ -141,5 +141,6 @@ export function ensureStory(world: WorldState, isAuthority = true): GameEvent[] 
   if (world.flags.olympusShattered && !world.flags.descended) startDescent(ctx);
   // M6: a save from M5.1 has Hades as a story character; he joins the party.
   else if (world.flags.descended && !world.cutscene) recruitHades(ctx);
+  armBarricade(world);
   return events;
 }

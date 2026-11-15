@@ -61,12 +61,15 @@ export function switchCharacter(ctx: SimContext, playerId: PlayerId): string | n
   const next = nextId ? world.entities[nextId] : undefined;
   if (!next?.hero) return 'nobody to switch to';
   if (next.hero.down != null) return 'down';
-  if (current?.hero) {
-    current.hero.move = { x: 0, z: 0 };
-    current.hero.sprint = false;
-    current.hero.abilityHeld = false;
-    current.hero.chargeHeld = false;
-    current.hero.weaponHeld = false;
+  // Neither god keeps the other's held input (or the companion AI's steering).
+  for (const god of [current, next]) {
+    if (!god?.hero) continue;
+    god.hero.move = { x: 0, z: 0 };
+    god.hero.sprint = false;
+    god.hero.abilityHeld = false;
+    god.hero.chargeHeld = false;
+    god.hero.weaponHeld = false;
+    god.hero.lockTarget = null;
   }
   player.entityId = next.id;
   player.switchReadyTick = world.tick + SWITCH_COOLDOWN_TICKS;
@@ -115,9 +118,10 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   // Left behind, in another region, or stuck: catch up with a teleport to just behind the leader.
   const stuck = (hero.companionStuck ?? 0) >= STUCK_TICKS;
   if (!sameRegion(self, leader) || distance > CATCH_UP_DISTANCE || stuck) {
+    // Beside and a little behind, out of the follow camera's line of sight.
     const back = leader.rotationY + Math.PI;
-    const x = leader.position.x + Math.sin(back) * 2.5 + Math.cos(back) * 1.2;
-    const z = leader.position.z + Math.cos(back) * 2.5 - Math.sin(back) * 1.2;
+    const x = leader.position.x + Math.sin(back) * 1.2 + Math.cos(back) * 2.6;
+    const z = leader.position.z + Math.cos(back) * 1.2 - Math.sin(back) * 2.6;
     const from = { ...self.position };
     self.region = leader.region;
     self.position = { x, y: Math.max(groundAt(regionOf(leader), x, z), leader.position.y), z };
@@ -153,9 +157,14 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   }
   hero.lockTarget = null;
 
-  // Follow 3–6 m behind.
-  if (distance > FOLLOW_FAR || (distance > FOLLOW_NEAR && hero.moving)) {
-    hero.move = { x: dx / distance, z: dz / distance };
+  // Follow 3–6 m behind, off to the leader's side (so he isn't between you and the camera).
+  const sideX = Math.cos(leader.rotationY) * 2.4 - Math.sin(leader.rotationY) * 1.5;
+  const sideZ = -Math.sin(leader.rotationY) * 2.4 - Math.cos(leader.rotationY) * 1.5;
+  const gx = leader.position.x + sideX - self.position.x;
+  const gz = leader.position.z + sideZ - self.position.z;
+  const toSpot = Math.hypot(gx, gz);
+  if (distance > FOLLOW_FAR || (distance > FOLLOW_NEAR && hero.moving) || (toSpot > 1.5 && distance < FOLLOW_FAR && !leader.hero.moving)) {
+    hero.move = toSpot > 0.01 ? { x: gx / toSpot, z: gz / toSpot } : { x: 0, z: 0 };
     hero.sprint = distance > 10 || leader.hero.sprinting;
     trackStuck(self, true);
   } else {

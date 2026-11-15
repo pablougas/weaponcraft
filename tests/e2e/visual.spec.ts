@@ -186,4 +186,25 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
       await expect(page).toHaveScreenshot(`hades-${expression}.png`, SHOT);
     });
   }
+
+  test('the barricade torn down: the tunnel to the Asphodel Fields', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    await page.evaluate(async () => {
+      await window.wc!.breakBarricade();
+      await window.wc!.teleport(0, -9, Math.PI);
+      window.wc!.step(20);
+      await window.wc!.freeze(12);
+    });
+    await expect(page).toHaveScreenshot('grotto-tunnel-open.png', SHOT);
+  });
+
+  test('the Asphodel Fields vista toward the Gates', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    await page.evaluate(async () => {
+      await window.wc!.teleport(-2, -95, Math.PI);
+      window.wc!.step(90);
+      await window.wc!.freeze(12);
+    });
+    await expect(page).toHaveScreenshot('asphodel-fields.png', SHOT);
+  });
 });

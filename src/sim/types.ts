@@ -196,6 +196,8 @@ export interface WorldFlags {
   meadowPopulated: boolean;
   /** M5.1: Hades took Zeus down to the Outer Grotto. */
   descended?: boolean;
+  /** M6: the barricade over the tunnel has been torn down. */
+  barricadeBroken?: boolean;
   /** M5.1: the grotto's altar, bed, dispatch and barricade are placed. */
   grottoBuilt?: boolean;
   /** M5: the Forge and the bed were added when the meadow became the Refuge. */

@@ -12,6 +12,7 @@ export type Intent =
   /** The client tells the sim what this player has already seen on this browser (any save). */
   | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean; seenCutscenes?: string[] }
   /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
+  | { type: 'dev:breakBarricade'; playerId: PlayerId }
   | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }

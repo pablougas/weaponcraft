@@ -1,6 +1,7 @@
 import { MEADOW_RADIUS } from './constants';
 import { WATER_LEVEL } from './terrain/meadow';
 import { groundHeightAt } from './terrain/meadow-rocks';
+import { underworldClamp, underworldInside, underworldLocalHeight } from './terrain/underworld';
 import type { Entity, Vec3 } from './types';
 
 /**
@@ -32,8 +33,26 @@ export function sameRegion(a: Entity | undefined, b: Entity | undefined): boolea
 
 /** Ground height at (x, z) in a region. */
 export function groundAt(region: RegionId, x: number, z: number): number {
-  if (region === 'underworld') return GROTTO.center.y;
+  if (region === 'underworld') return GROTTO.center.y + underworldLocalHeight(x - GROTTO.center.x, z - GROTTO.center.z);
   return groundHeightAt(x, z);
+}
+
+/**
+ * Keeps a point inside the region: the meadow's circle, or the Underworld's
+ * grotto, tunnel and fields. Returns the nearest standable point and whether
+ * the original was inside (`margin` metres in from the edge).
+ */
+export function regionClamp(region: RegionId, x: number, z: number, margin = 0): { x: number; z: number; inside: boolean } {
+  if (region === 'underworld') {
+    const c = GROTTO.center;
+    const inside = underworldInside(x - c.x, z - c.z, margin);
+    const p = underworldClamp(x - c.x, z - c.z, margin);
+    return { x: p.x + c.x, z: p.z + c.z, inside };
+  }
+  const r = Math.hypot(x, z);
+  const limit = MEADOW_RADIUS - margin;
+  if (r <= limit) return { x, z, inside: true };
+  return { x: (x / r) * limit, z: (z / r) * limit, inside: false };
 }
 
 /** The region's walkable area: centre and radius (a soft wall pushes back beyond it). */

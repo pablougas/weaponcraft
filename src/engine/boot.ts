@@ -199,6 +199,14 @@ export async function boot(): Promise<void> {
       dirty = true;
       return nextFrame();
     },
+    breakBarricade() {
+      if (!session) return nextFrame();
+      session.sendIntent({ type: 'dev:breakBarricade' });
+      tick();
+      loop.recordTick(performance.now());
+      dirty = true;
+      return nextFrame();
+    },
     teleport(x, z, rotationY) {
       if (!session) return nextFrame();
       session.sendIntent({ type: 'dev:teleport', x, z, rotationY });
@@ -304,7 +312,8 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
     if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
-    if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. We will break through.', 4);
+    if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. Break it down.', 4);
+    if (event.type === 'barricade:broken') captions.show('[The barricade splinters] Hades: The Asphodel Fields. The hound is somewhere past the Gates.', 5);
     if (event.type === 'hero:down') captions.show('Zeus has fallen. He wakes at the Refuge.', 3.5);
     if (event.type === 'npc:talk') captions.show('Hades: Cerberus first. Then we take back what is ours.', 4);
     if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
@@ -579,6 +588,7 @@ export async function boot(): Promise<void> {
       // Show the region the local god is in (the meadow, or the Underworld's grotto).
       const region = regionOf(hero);
       meadow.setRegion(region);
+      meadow.setBarricadeBroken(!!world.flags.barricadeBroken);
       const floorAt = (x: number, z: number) => groundAt(region, x, z);
 
       // Cinematics drive the camera, HUD and effects from their sim timelines:
@@ -664,7 +674,7 @@ export async function boot(): Promise<void> {
         interpolator.position(world, hero.id, alpha, heroPoint);
         const lock = hero.hero?.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
         cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt);
-        if (region === 'underworld') {
+        if (region === 'underworld' && Math.hypot(heroPoint.x - GROTTO.center.x, heroPoint.z - GROTTO.center.z) < GROTTO.radius + 1) {
           // Keep the camera inside the grotto's walls (pull it in toward the god).
           const c = GROTTO.center;
           const dx = meadow.camera.position.x - c.x;

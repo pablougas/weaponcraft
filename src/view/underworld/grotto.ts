@@ -9,6 +9,8 @@ import { createParticles } from '../particles';
 
 export interface GrottoView {
   group: THREE.Group;
+  /** The barricade over the tunnel stands, or lies in pieces (M6). */
+  setBarricadeBroken(broken: boolean): void;
   /** Point lights (kept in the scene always; dimmed to 0 on the surface to avoid shader recompiles). */
   setActive(active: boolean): void;
   update(time: number, reduceMotion: boolean): void;
@@ -61,15 +63,46 @@ export function buildGrotto(look: Look): GrottoView {
     const n = fbm(Math.cos(a) * 3 + 7, y * 0.18 + Math.sin(a) * 3);
     let push = (n - 0.5) * 5;
     const fromTunnel = Math.abs(Math.atan2(Math.sin(a - GROTTO.tunnelBearing), Math.cos(a - GROTTO.tunnelBearing)));
-    if (fromTunnel < 0.2 && y < 1.5) push += 9 * (1 - fromTunnel / 0.2);
+    void fromTunnel;
     const r = Math.hypot(x, z) + push;
     wp.setXYZ(i, Math.sin(a) * r, y + 8.5, Math.cos(a) * r);
     c.copy(rockA).lerp(rockB, n);
     wallColors.set([c.r, c.g, c.b], i * 3);
   }
   wallGeo.setAttribute('color', new THREE.BufferAttribute(wallColors, 3));
-  wallGeo.computeVertexNormals();
-  const walls = new THREE.Mesh(wallGeo, toon({ vertexColors: true, grad: look.GRAD4, rim: false, side: THREE.BackSide }));
+  // Cut the tunnel's doorway out of the wall (north, 8 m wide, 6.4 m high).
+  const openWall = (() => {
+    const flat = wallGeo.toNonIndexed();
+    const pos = flat.attributes.position;
+    const col = flat.attributes.color;
+    const keepPos: number[] = [];
+    const keepCol: number[] = [];
+    for (let t = 0; t < pos.count; t += 3) {
+      let cx = 0;
+      let cy = 0;
+      let cz = 0;
+      let minY = Infinity;
+      for (let v = 0; v < 3; v += 1) {
+        cx += pos.getX(t + v) / 3;
+        cy += pos.getY(t + v) / 3;
+        cz += pos.getZ(t + v) / 3;
+        minY = Math.min(minY, pos.getY(t + v));
+      }
+      void cy;
+      const doorway = Math.abs(cx) < 5 && cz < 0 && minY < 6.4;
+      if (doorway) continue;
+      for (let v = 0; v < 3; v += 1) {
+        keepPos.push(pos.getX(t + v), pos.getY(t + v), pos.getZ(t + v));
+        keepCol.push(col.getX(t + v), col.getY(t + v), col.getZ(t + v));
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(keepPos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(keepCol, 3));
+    g.computeVertexNormals();
+    return g;
+  })();
+  const walls = new THREE.Mesh(openWall, toon({ vertexColors: true, grad: look.GRAD4, rim: false, side: THREE.BackSide }));
   walls.receiveShadow = true;
   group.add(walls);
 
@@ -221,6 +254,18 @@ export function buildGrotto(look: Look): GrottoView {
   for (const y of [1.1, 2.6]) barricade.add(M(new THREE.BoxGeometry(14, 0.14, 0.62), ironMat, [0, y, 0.05], { outline: 0.01 }));
   barricade.add(M(new THREE.PlaneGeometry(1.4, 2.2), toon({ color: '#9b2b2b', rim: false, side: THREE.DoubleSide }), [1.6, 2.2, 0.32], { outline: false }));
   group.add(barricade);
+  // What's left once it's torn down: splintered stumps and logs on the floor.
+  const wreck = new THREE.Group();
+  wreck.position.copy(barricade.position);
+  for (let i = 0; i < 23; i += 2) {
+    const x = -6.6 + i * 0.6;
+    wreck.add(M(new THREE.CylinderGeometry(0.24, 0.27, 0.5 + rand() * 0.6, 7), woodMat, [x, 0.4, (rand() - 0.5) * 0.2], { outline: 0.01 }));
+  }
+  for (let i = 0; i < 6; i += 1) {
+    wreck.add(M(new THREE.CylinderGeometry(0.22, 0.24, 2.4 + rand() * 1.4, 7), woodMat, [(rand() - 0.5) * 9, 0.25, 1 + rand() * 3], { rot: [Math.PI / 2, rand() * 3, 0], outline: 0.01 }));
+  }
+  wreck.visible = false;
+  group.add(wreck);
 
   // Grey asphodel flowers and drifting soul-motes.
   const asphodel = new THREE.InstancedMesh(new THREE.ConeGeometry(0.06, 0.32, 5), toon({ color: '#cfcad6', emissive: '#6d6380', emissiveIntensity: 0.3, rim: false }), 260);
@@ -257,6 +302,10 @@ export function buildGrotto(look: Look): GrottoView {
 
   return {
     group,
+    setBarricadeBroken(broken) {
+      barricade.visible = !broken;
+      wreck.visible = broken;
+    },
     setActive(on) {
       active = on;
       group.visible = on;

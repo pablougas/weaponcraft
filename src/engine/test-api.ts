@@ -52,6 +52,8 @@ export interface TestApi {
   face(expression: Expression | null): Promise<void>;
   /** Marks a prologue tutorial step done ('move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'). */
   completeTutorialStep(stepId: string): Promise<void>;
+  /** Tears down the grotto's barricade (as if it had been beaten down). */
+  breakBarricade(): Promise<void>;
   /** Moves the local god onto the ground at (x, z) via a `dev:teleport` intent, camera behind it. */
   teleport(x: number, z: number, rotationY?: number): Promise<void>;
 }

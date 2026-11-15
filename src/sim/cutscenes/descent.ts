@@ -176,7 +176,8 @@ export function ensureGrotto(ctx: SimContext): void {
   place('fusion-altar', 'fusion-altar', s.altar.x, s.altar.z, Math.PI / 2, { radius: 0.85, height: 1.2 });
   place('bed', 'bed', s.bed.x, s.bed.z, -0.5, { radius: 1.0, height: 1.0 });
   place('dispatch', 'dispatch', s.dispatch.x, s.dispatch.z, 0.3, null);
-  place('barricade', 'barricade', s.barricade.x, s.barricade.z, 0, null);
+  place('barricade', 'barricade', s.barricade.x, s.barricade.z, 0, { radius: 1.4, height: 4 });
+  armBarricade(world);
   world.flags.grottoBuilt = true;
 }
 
@@ -206,3 +207,14 @@ export function skipDescent(ctx: SimContext): string | null {
 /** How far the descent is through, in ticks, for tests and the view. */
 export const DESCENT_LENGTH = DESCENT_BEATS.end;
 export const GROTTO_FLOOR_Y = GROTTO.center.y;
+
+/** The barricade can be torn down (M6): it takes damage like anything else. */
+export const BARRICADE_HEALTH = 300;
+export function armBarricade(world: { entities: Record<string, Entity>; flags: Record<string, boolean | undefined> }): void {
+  if (world.flags.barricadeBroken) return;
+  const barricade = Object.values(world.entities).find((e) => e.structure?.kind === 'barricade');
+  if (barricade && !barricade.health) {
+    barricade.health = { current: BARRICADE_HEALTH, max: BARRICADE_HEALTH };
+    barricade.body = { radius: 1.4, height: 4 };
+  }
+}
