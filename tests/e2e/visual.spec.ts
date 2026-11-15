@@ -349,7 +349,12 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
       window.wc!.step(30);
     });
     await page.keyboard.press('KeyE');
-    await page.evaluate(async () => { window.wc!.step(8); await window.wc!.freeze(12); });
+    // Seen from the front three-quarter, so the daggers read side-on, pointing where he faces.
+    await page.evaluate(async () => {
+      window.wc!.step(8);
+      await window.wc!.freeze(12);
+      await window.wc!.snapCam('side');
+    });
     await expect(page).toHaveScreenshot('hades-shadow-daggers.png', SHOT);
   });
 

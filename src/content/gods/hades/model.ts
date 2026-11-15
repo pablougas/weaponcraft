@@ -4,7 +4,7 @@ import { attackSpecFor, DODGE_TICKS } from '../../../sim/systems/hero';
 import type { Entity } from '../../../sim/types';
 import { isKnownWeapon, weaponData } from '../../../sim/weapons';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from '../../../view/entity-model';
-import { DAGGERS, daggerApex, daggerOrbit } from '../../spirits/shadow-daggers';
+import { DAGGERS, daggerSlot } from '../../spirits/shadow-daggers';
 import { buildDagger, daggerMaterials } from '../../../view/effects/shadow';
 import { createParticles } from '../../../view/particles';
 import { buildWeaponModel } from '../../../view/weapon-model';
@@ -282,7 +282,7 @@ export const createModel: ModelFactory = (look, entityId) => {
   showFace('neutral');
 
   // Shadow Daggers (Cerberus's gift): three blades circling him while the gift lasts.
-  // They live in world-aligned space (the ring undoes his heading) so they follow the sim's orbit.
+  // They sit in his own frame (the ring turns with him), lying flat and pointing where he faces.
   const daggerRing = new THREE.Group();
   root.add(daggerRing);
   const daggers = Array.from({ length: DAGGERS.count }, () => {
@@ -327,23 +327,17 @@ export const createModel: ModelFactory = (look, entityId) => {
       const flicker = frame.reduceMotion ? 1 : 1 + Math.sin(t * 7) * 0.08 + Math.sin(t * 13) * 0.04;
       flameTongue.scale.set(1, flicker, 1);
 
-      // Shadow Daggers: a pyramid above his crown, tips meeting at the apex; a thrown one fades back in as it re-forms.
+      // Shadow Daggers: a pyramid above his crown, all pointing forward; a thrown one fades back in as it re-forms.
       const ring = hero?.daggers;
       daggerRing.visible = !!ring;
       if (ring) {
         const simT = frame.world.tick / 30;
         orbitT = Math.abs(orbitT + frame.dt - simT) > 0.1 ? simT : orbitT + frame.dt;
-        daggerRing.rotation.y = -root.rotation.y;
         const fadeOut = Math.min(1, ring.ticksLeft / 15);
-        const apex = daggerApex(origin, orbitT);
         daggers.forEach((d, i) => {
-          const p = daggerOrbit(origin, i, orbitT);
+          const p = daggerSlot(origin, 0, i, orbitT);
           d.group.position.set(p.x, p.y, p.z);
-          // Tip toward the apex (ring-local, so no lookAt: that works in world space). In YXZ, a negative X tilts +Z up.
-          const dx = apex.x - p.x;
-          const dy = apex.y - p.y;
-          const dz = apex.z - p.z;
-          d.group.rotation.set(-Math.atan2(dy, Math.hypot(dx, dz)), Math.atan2(dx, dz), 0, 'YXZ');
+          d.group.rotation.set(0, 0, 0);
           const back = ring.reform[i] > 0 ? Math.max(0, 1 - ring.reform[i] / 12) : 1;
           d.group.visible = back > 0;
           d.group.scale.setScalar(0.6 + 0.4 * back);

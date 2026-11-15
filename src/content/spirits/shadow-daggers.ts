@@ -19,14 +19,14 @@ export const DAGGERS = {
   cooldownTicks: ticks(20),
   staminaCost: 30,
   /**
-   * The pyramid above his crown (team request): three daggers close together,
-   * tips leaning in to meet at an apex, turning slowly. Base radius and height,
-   * the apex's rise above the base, and the turn rate (rad/s).
+   * The pyramid above his crown (team request): seen from behind, one dagger on
+   * top and two below, close together, all lying flat and pointing the way he
+   * faces. Half the gap between the lower two, the lower pair's height, and how
+   * far the top one sits above them.
    */
-  orbitRadius: 0.32,
-  orbitHeight: 2.75,
-  apexRise: 0.6,
-  spin: 0.9,
+  spread: 0.26,
+  baseHeight: 2.6,
+  peakRise: 0.3,
 } as const;
 
 /** The pyramid's gentle bob (the whole formation moves together, so it keeps its shape). */
@@ -34,23 +34,26 @@ function bob(seconds: number): number {
   return Math.sin(seconds * 2) * 0.05;
 }
 
-/**
- * Where dagger `i` sits in the pyramid at a given time (seconds). The sim
- * throws from here and the view draws them here, so the throw leaves from the
- * dagger you see.
- */
-export function daggerOrbit(center: Vec3, i: number, seconds: number): Vec3 {
-  const a = seconds * DAGGERS.spin + (i * Math.PI * 2) / DAGGERS.count;
-  return {
-    x: center.x + Math.sin(a) * DAGGERS.orbitRadius,
-    y: center.y + DAGGERS.orbitHeight + bob(seconds),
-    z: center.z + Math.cos(a) * DAGGERS.orbitRadius,
-  };
-}
+/** Each dagger's slot in the pyramid, in Hades's own frame: x along his local +X (sideways), y up. */
+const SLOTS = [
+  { x: 0, y: DAGGERS.peakRise },
+  { x: -DAGGERS.spread, y: 0 },
+  { x: DAGGERS.spread, y: 0 },
+] as const;
 
-/** The pyramid's apex, where the three tips meet. */
-export function daggerApex(center: Vec3, seconds: number): Vec3 {
-  return { x: center.x, y: center.y + DAGGERS.orbitHeight + DAGGERS.apexRise + bob(seconds), z: center.z };
+/**
+ * Where dagger `i` sits in the pyramid when Hades stands at `center` facing
+ * `yaw`, at a given time (seconds). The sim throws from here and the view
+ * draws them here, so the throw leaves from the dagger you see.
+ */
+export function daggerSlot(center: Vec3, yaw: number, i: number, seconds: number): Vec3 {
+  const slot = SLOTS[i % SLOTS.length];
+  // His local +X for heading `yaw` (the same axis three.js turns with rotation.y = yaw).
+  return {
+    x: center.x + Math.cos(yaw) * slot.x,
+    y: center.y + DAGGERS.baseHeight + slot.y + bob(seconds),
+    z: center.z - Math.sin(yaw) * slot.x,
+  };
 }
 
 /** The enemy Hades is focused on (his lock-on), if a dagger can reach it. */
@@ -98,7 +101,7 @@ export const shadowDaggers: SpiritAbility = {
     const target = focusOf(caster, ctx.world);
     const ready = daggers.reform.findIndex((r) => r === 0);
     if (!target || ready < 0) return;
-    const from = daggerOrbit(caster.position, ready, ctx.world.tick / TICK_HZ);
+    const from = daggerSlot(caster.position, caster.rotationY, ready, ctx.world.tick / TICK_HZ);
     daggers.reform[ready] = DAGGERS.reformTicks;
     daggers.nextShot = DAGGERS.intervalTicks;
     applyDamage(ctx, target.id, DAGGERS.damage, casterId, 'ability', 'shadow');

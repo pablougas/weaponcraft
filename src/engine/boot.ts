@@ -199,7 +199,13 @@ export async function boot(): Promise<void> {
         const len = Math.hypot(d.x, d.z) || 1;
         worldView.camera.position.set(p.x - (d.x / len) * 14 + (d.z / len) * 6, p.y + 11, p.z - (d.z / len) * 14 - (d.x / len) * 6);
         worldView.camera.lookAt(m.x, m.y + 9, m.z);
-      } else if (presetId !== 'closeup' && presetId !== 'overlook' && presetId !== 'mech') {
+      } else if (presetId === 'side' && god && worldView) {
+        // Front three-quarter, a little above the crown: what floats over the god (Shadow Daggers).
+        const f = { x: Math.sin(god.rotationY), z: Math.cos(god.rotationY) };
+        const p = god.position;
+        worldView.camera.position.set(p.x + f.x * 3 + f.z * 3.2, p.y + 3.1, p.z + f.z * 3 - f.x * 3.2);
+        worldView.camera.lookAt(p.x + f.x * 0.4, p.y + 2.1, p.z + f.z * 0.4);
+      } else if (presetId !== 'closeup' && presetId !== 'overlook' && presetId !== 'mech' && presetId !== 'side') {
         worldView?.snapCam(presetId);
       }
       dirty = true;
