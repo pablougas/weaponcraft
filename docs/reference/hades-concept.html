@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weaponcraft — Hades concept v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --violet:#a98be0; --teal:#4ff0e0; --ink:#0b0812; --glass:rgba(14,10,24,.72); --line:rgba(169,139,224,.28); --text:#eceaf4; --muted:#a39fb8; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:radial-gradient(ellipse at 50% 30%, #241a3a 0%, #0b0812 70%); color:var(--text); font-family:Inter,system-ui,sans-serif; overflow:hidden; }
+  header { position:fixed; top:0; left:0; right:0; display:flex; align-items:baseline; gap:16px; padding:16px 22px 0; z-index:5; pointer-events:none; }
+  header h1 { font-family:Cinzel,serif; font-weight:700; letter-spacing:.26em; margin:0; font-size:20px; color:var(--violet); }
+  header span { color:var(--muted); font-size:12.5px; letter-spacing:.05em; }
+  #views { position:fixed; inset:56px 12px 92px; display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+  .view { position:relative; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:transparent; }
+  .view canvas { display:block; width:100%; height:100%; }
+  .view label { position:absolute; left:14px; bottom:12px; font-family:Cinzel,serif; letter-spacing:.2em; font-size:12px; color:#e2d6ff; background:rgba(11,8,18,.75); padding:4px 10px; border-radius:999px; }
+  #bar { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center; padding:12px 14px; background:var(--glass); border:1px solid var(--line); border-radius:14px; backdrop-filter:blur(10px); width:min(980px, calc(100vw - 24px)); z-index:5; }
+  #bar .label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 4px 0 8px; }
+  button { font:inherit; font-size:12.5px; color:var(--text); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:6px 12px; cursor:pointer; }
+  button:hover { border-color:var(--line); background:rgba(169,139,224,.16); }
+  button.on { background:rgba(169,139,224,.24); border-color:#7d63b8; color:#efe6ff; }
+  #notes { position:fixed; top:14px; right:18px; max-width:340px; font-size:12px; line-height:1.5; color:#cfc9e2; background:var(--glass); border:1px solid var(--line); border-radius:12px; padding:10px 14px; z-index:6; }
+  #notes summary { cursor:pointer; font-family:Cinzel,serif; letter-spacing:.16em; color:var(--violet); list-style:none; }
+  #notes summary::-webkit-details-marker { display:none; }
+  #notes ul { margin:8px 0 2px; padding-left:16px; }
+  @media (max-width:820px) { #views { grid-template-columns:1fr; grid-template-rows:repeat(3,1fr); inset:52px 10px 132px; } #notes { display:none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header><h1>HADES</h1><span>Concept v1 · one model, three angles · generated in code</span></header>
+<details id="notes">
+  <summary>DESIGN NOTES</summary>
+  <ul>
+    <li>Ash-grey skin, short dark beard, slicked-back black hair.</li>
+    <li>Black and deep-violet robes over dark bronze armour; skull belt buckle.</li>
+    <li>Spiked black-iron crown with faint soul-fire tips.</li>
+    <li>Violet-teal soul-fire eyes; shadow wisps rise from the tattered cloak hem.</li>
+    <li>Shadow bident: dark iron shaft, two violet-edged prongs, skull at the fork.</li>
+    <li>About 10% taller than Zeus. Same toon shading, outlines and face system.</li>
+  </ul>
+</details>
+<div id="views">
+  <div class="view" data-yaw="0"><label>FRONT</label></div>
+  <div class="view" data-yaw="-0.75"><label>THREE-QUARTER</label></div>
+  <div class="view" data-yaw="3.14159"><label>BACK</label></div>
+</div>
+<div id="bar">
+  <span class="label">Expression</span>
+  <button class="e on" data-e="neutral">Neutral</button>
+  <button class="e" data-e="determined">Determined</button>
+  <button class="e" data-e="smirk">Smirk</button>
+  <button class="e" data-e="hurt">Hurt</button>
+  <span class="label">View</span>
+  <button id="spin">Turntable</button>
+  <button id="wisps" class="on">Shadow wisps</button>
+  <button id="outline" class="on">Outlines</button>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ------------------------------------------------------------ shared look (same system as Zeus)
+const U = { rimColor: { value: new THREE.Color('#8f7fe0') }, rimStrength: { value: 0.32 }, time: { value: 0 } };
+const grad = (() => { const t = new THREE.DataTexture(new Uint8Array([70, 165, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+function toon(opts = {}) {
+  const { rim = true, ...rest } = opts;
+  const m = new THREE.MeshToonMaterial({ gradientMap: grad, ...rest });
+  if (rim) {
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.rimColor = U.rimColor; sh.uniforms.rimStrength = U.rimStrength;
+      sh.fragmentShader = 'uniform vec3 rimColor; uniform float rimStrength;\n' + sh.fragmentShader.replace('#include <opaque_fragment>',
+        `#include <opaque_fragment>
+         { vec3 vd = normalize(vViewPosition); float r = pow(1.0 - clamp(dot(normal, vd), 0.0, 1.0), 3.0); gl_FragColor.rgb += rimColor * r * rimStrength; }`);
+    };
+    m.customProgramCacheKey = () => 'toonrim';
+  }
+  return m;
+}
+const outlines = [];
+const outlineGeo = new WeakMap();
+const outlineMats = new Map();
+function outlineMat(th) {
+  if (outlineMats.has(th)) return outlineMats.get(th);
+  const m = new THREE.ShaderMaterial({ side: THREE.BackSide, uniforms: { th: { value: th } },
+    vertexShader: 'uniform float th; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * th, 1.0); }',
+    fragmentShader: 'void main(){ gl_FragColor = vec4(0.03, 0.02, 0.06, 1.0); }' });
+  outlineMats.set(th, m); return m;
+}
+function addOutline(mesh, th) {
+  let g = outlineGeo.get(mesh.geometry);
+  if (!g) { g = new THREE.BufferGeometry(); g.setAttribute('position', mesh.geometry.attributes.position.clone()); if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone()); g = mergeVertices(g, 1e-3); g.computeVertexNormals(); outlineGeo.set(mesh.geometry, g); }
+  const o = new THREE.Mesh(g, outlineMat(th)); mesh.add(o); outlines.push(o);
+}
+function M(geo, mat, pos, o = {}) {
+  const m = new THREE.Mesh(geo, mat);
+  if (pos) m.position.set(...pos);
+  if (o.rot) m.rotation.set(...o.rot);
+  if (o.scale) m.scale.set(...o.scale);
+  m.castShadow = true; m.receiveShadow = true;
+  if (o.outline !== false) addOutline(m, o.outline ?? 0.012);
+  return m;
+}
+
+// ------------------------------------------------------------ palette
+const C = {
+  skin: '#878b95', robe: '#1c1426', robeViolet: '#3b2357', violet: '#5B3A8C', bronze: '#6e4a2a', bronzeLight: '#a07040',
+  iron: '#24222c', ironLight: '#3a3846', hair: '#17131d', boot: '#151219', bone: '#a9a091',
+};
+
+// ------------------------------------------------------------ face (same canvas-face system as Zeus)
+const faceCanvas = document.createElement('canvas'); faceCanvas.width = 1024; faceCanvas.height = 512;
+const glowCanvas = document.createElement('canvas'); glowCanvas.width = 1024; glowCanvas.height = 512;
+const faceTex = new THREE.CanvasTexture(faceCanvas); faceTex.colorSpace = THREE.SRGBColorSpace; faceTex.anisotropy = 4;
+const glowTex = new THREE.CanvasTexture(glowCanvas); glowTex.colorSpace = THREE.SRGBColorSpace;
+function drawFace(expr) {
+  const g = faceCanvas.getContext('2d'), k = glowCanvas.getContext('2d'), W = 1024, H = 512, cx = W / 2, ey = 266, dx = 62;
+  g.fillStyle = C.skin; g.fillRect(0, 0, W, H);
+  k.fillStyle = '#000'; k.fillRect(0, 0, W, H);
+  // cheekbone shading and under-eye shadow: gaunt, regal
+  for (const s of [-1, 1]) {
+    const gr = g.createRadialGradient(cx + s * dx * 1.35, ey + 52, 2, cx + s * dx * 1.35, ey + 52, 46);
+    gr.addColorStop(0, 'rgba(60,50,80,0.35)'); gr.addColorStop(1, 'rgba(60,50,80,0)'); g.fillStyle = gr; g.fillRect(cx + s * dx * 1.35 - 50, ey, 100, 110);
+    const ug = g.createRadialGradient(cx + s * dx, ey + 18, 2, cx + s * dx, ey + 18, 34);
+    ug.addColorStop(0, 'rgba(50,30,80,0.45)'); ug.addColorStop(1, 'rgba(50,30,80,0)'); g.fillStyle = ug; g.fillRect(cx + s * dx - 40, ey - 10, 80, 60);
+  }
+  // nose
+  g.strokeStyle = 'rgba(55,50,70,0.6)'; g.lineWidth = 4; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(cx + 3, ey + 14); g.lineTo(cx + 8, ey + 38); g.quadraticCurveTo(cx + 2, ey + 44, cx - 6, ey + 40); g.stroke();
+  const brow = (s, tilt, lift = 0) => {
+    const x = cx + s * dx; g.strokeStyle = '#1a1520'; g.lineWidth = 12;
+    g.beginPath(); g.moveTo(x - s * 32, ey - 38 - lift + tilt); g.quadraticCurveTo(x, ey - 52 - lift, x + s * 34, ey - 50 - lift - tilt * 0.3); g.stroke();
+  };
+  const eye = (s, squint = 0) => {
+    const x = cx + s * dx, y = ey;
+    g.save(); g.beginPath(); g.ellipse(x, y, 26, 24, 0, 0, Math.PI * 2); g.clip();
+    g.fillStyle = '#e8e6f0'; g.fillRect(x - 30, y - 30, 60, 60);
+    const ig = g.createRadialGradient(x + s * 2, y + 2, 2, x + s * 2, y + 2, 20);
+    ig.addColorStop(0, '#d8fffb'); ig.addColorStop(0.35, '#4ff0e0'); ig.addColorStop(0.75, '#7a52c7'); ig.addColorStop(1, '#2a1650');
+    g.fillStyle = ig; g.beginPath(); g.ellipse(x + s * 2, y + 2, 17, 19, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#12081f'; g.beginPath(); g.ellipse(x + s * 2, y + 2, 4, 11, 0, 0, Math.PI * 2); g.fill(); // slit pupil
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x + s * 2 - 6, y - 7, 4.5, 0, Math.PI * 2); g.fill();
+    if (squint) { g.fillStyle = C.skin; g.fillRect(x - 30, y - 30, 60, 12 + squint); }
+    g.restore();
+    // heavy upper lid: a sharper, older look than Zeus
+    g.strokeStyle = '#120d18'; g.lineWidth = 8; g.beginPath();
+    g.moveTo(x - s * 28, y + 4); g.quadraticCurveTo(x - s * 4, y - 26 + squint * 0.6, x + s * 30, y - 10 + squint * 0.4); g.stroke();
+    // soul-fire glow (goes to the emissive map)
+    const kg = k.createRadialGradient(x + s * 2, y + 2, 1, x + s * 2, y + 2, 22);
+    kg.addColorStop(0, 'rgba(160,255,245,1)'); kg.addColorStop(0.5, 'rgba(79,240,224,0.85)'); kg.addColorStop(1, 'rgba(110,70,200,0)');
+    k.fillStyle = kg; k.beginPath(); k.ellipse(x + s * 2, y + 2, 22, 22, 0, 0, Math.PI * 2); k.fill();
+  };
+  const my = ey + 70;
+  g.lineWidth = 6; g.strokeStyle = '#3a2430';
+  if (expr === 'neutral') { brow(-1, 8); brow(1, 8); eye(-1, 4); eye(1, 4); g.beginPath(); g.moveTo(cx - 16, my); g.lineTo(cx + 16, my); g.stroke(); }
+  if (expr === 'determined') { brow(-1, 18); brow(1, 18); eye(-1, 10); eye(1, 10); g.beginPath(); g.moveTo(cx - 18, my + 3); g.quadraticCurveTo(cx, my - 4, cx + 18, my + 3); g.stroke(); }
+  if (expr === 'smirk') { brow(-1, 4, 2); brow(1, 14); eye(-1, 2); eye(1, 8); g.beginPath(); g.moveTo(cx - 16, my + 2); g.quadraticCurveTo(cx + 4, my + 4, cx + 20, my - 8); g.stroke(); }
+  if (expr === 'hurt') {
+    brow(-1, -10, 6); brow(1, -10, 6); eye(-1, 14); eye(1, 2);
+    g.beginPath(); g.moveTo(cx - 20, my + 4); g.quadraticCurveTo(cx - 8, my - 8, cx + 2, my + 2); g.quadraticCurveTo(cx + 12, my + 10, cx + 20, my); g.stroke();
+  }
+  faceTex.needsUpdate = true; glowTex.needsUpdate = true;
+}
+drawFace('neutral');
+
+// ------------------------------------------------------------ Hades (built facing +Z, feet at origin)
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#161021');
+scene.fog = new THREE.Fog('#161021', 9, 16);
+const hades = new THREE.Group(); scene.add(hades);
+let cloakPivot, headGroup, torsoGroup;
+const wispSources = [];
+(function build() {
+  const skin = toon({ color: C.skin });
+  const robe = toon({ color: C.robe });
+  const robeV = toon({ color: C.robeViolet });
+  const violet = toon({ color: C.violet });
+  const bronze = toon({ color: C.bronze });
+  const bronzeL = toon({ color: C.bronzeLight });
+  const iron = toon({ color: C.iron });
+  const ironL = toon({ color: C.ironLight });
+  const hair = toon({ color: C.hair });
+  const boot = toon({ color: C.boot });
+  const bone = toon({ color: C.bone });
+  const soul = new THREE.MeshBasicMaterial({ color: '#8ef7ee', toneMapped: false });
+  const soulViolet = new THREE.MeshBasicMaterial({ color: '#b48cff', toneMapped: false });
+  const root = new THREE.Group(); root.scale.setScalar(1.1); hades.add(root);
+
+  // legs (mostly hidden by the robe), armoured boots
+  for (const sx of [-1, 1]) {
+    root.add(M(new THREE.CylinderGeometry(0.09, 0.08, 0.6, 10), robe, [sx * 0.12, 0.55, 0]));
+    root.add(M(new THREE.CylinderGeometry(0.1, 0.12, 0.36, 10), boot, [sx * 0.12, 0.18, 0.02]));
+    root.add(M(new THREE.ConeGeometry(0.06, 0.16, 6), bronze, [sx * 0.12, 0.42, 0.09], { rot: [0.3, 0, 0], outline: 0.008 }));
+  }
+  // long robe: dark outer skirt split at the front over a violet under-robe
+  root.add(M(new THREE.CylinderGeometry(0.25, 0.42, 0.95, 18), robeV, [0, 0.62, 0]));
+  root.add(M(new THREE.CylinderGeometry(0.27, 0.46, 0.98, 18, 1, true, Math.PI * 0.12, Math.PI * 1.76), robe, [0, 0.62, 0]));
+  root.add(M(new THREE.TorusGeometry(0.44, 0.022, 6, 28), violet, [0, 0.14, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
+  // front tabard with bronze trim
+  root.add(M(new THREE.BoxGeometry(0.2, 0.62, 0.03), robeV, [0, 0.72, 0.36], { rot: [-0.18, 0, 0], outline: 0.008 }));
+  for (const sx of [-1, 1]) root.add(M(new THREE.BoxGeometry(0.02, 0.62, 0.035), bronzeL, [sx * 0.1, 0.72, 0.365], { rot: [-0.18, 0, 0], outline: false }));
+
+  const torso = new THREE.Group(); torso.position.y = 1.08; root.add(torso); torsoGroup = torso;
+  // cuirass
+  torso.add(M(new THREE.CylinderGeometry(0.29, 0.24, 0.64, 16), bronze, [0, 0.3, 0]));
+  torso.add(M(new THREE.BoxGeometry(0.34, 0.36, 0.08), iron, [0, 0.38, 0.22], { outline: 0.01 }));
+  torso.add(M(new THREE.BoxGeometry(0.04, 0.34, 0.09), bronzeL, [0, 0.38, 0.23], { outline: false }));
+  // belt + skull buckle
+  torso.add(M(new THREE.TorusGeometry(0.25, 0.04, 6, 24), iron, [0, 0.0, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
+  const skull = new THREE.Group(); skull.position.set(0, 0.0, 0.27); skull.scale.setScalar(0.85); torso.add(skull);
+  skull.add(M(new THREE.SphereGeometry(0.06, 12, 10), bone, [0, 0.01, 0], { scale: [1, 1, 0.8], outline: 0.006 }));
+  skull.add(M(new THREE.BoxGeometry(0.06, 0.03, 0.05), bone, [0, -0.045, 0], { outline: 0.005 }));
+  for (const sx of [-1, 1]) skull.add(new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), soul).translateX(sx * 0.022).translateY(0.012).translateZ(0.045));
+  // spiked pauldrons
+  for (const sx of [-1, 1]) {
+    torso.add(M(new THREE.SphereGeometry(0.11, 14, 10), skin, [sx * 0.31, 0.56, 0]));
+    const pad = new THREE.Group(); pad.position.set(sx * 0.33, 0.6, 0); pad.rotation.z = -sx * 0.4; torso.add(pad);
+    pad.add(M(new THREE.SphereGeometry(0.16, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), iron, [0, 0, 0], { outline: 0.012 }));
+    pad.add(M(new THREE.TorusGeometry(0.155, 0.016, 6, 22), bronzeL, [0, 0.005, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
+    for (let i = 0; i < 3; i += 1) pad.add(M(new THREE.ConeGeometry(0.03, 0.17, 6), ironL, [sx * 0.03, 0.12, -0.07 + i * 0.07], { rot: [(-1 + i) * 0.25, 0, sx * 0.35], outline: 0.006 }));
+  }
+  // high collar
+  torso.add(M(new THREE.CylinderGeometry(0.16, 0.22, 0.16, 16, 1, true, Math.PI * 0.75, Math.PI * 1.5), robe, [0, 0.67, -0.02], { outline: 0.008 }));
+
+  // arms
+  const arm = (sx, upper, elbow) => {
+    const a = new THREE.Group(); a.position.set(sx * 0.35, 0.53, 0); a.rotation.set(...upper); torso.add(a);
+    a.add(M(new THREE.CylinderGeometry(0.08, 0.07, 0.36, 10), robe, [0, -0.18, 0]));
+    const el = new THREE.Group(); el.position.y = -0.36; el.rotation.x = elbow; a.add(el);
+    el.add(M(new THREE.CylinderGeometry(0.065, 0.055, 0.32, 10), skin, [0, -0.16, 0]));
+    el.add(M(new THREE.CylinderGeometry(0.08, 0.075, 0.18, 10), iron, [0, -0.19, 0]));
+    el.add(M(new THREE.TorusGeometry(0.078, 0.012, 6, 16), bronzeL, [0, -0.105, 0], { rot: [Math.PI / 2, 0, 0], outline: false }));
+    el.add(M(new THREE.SphereGeometry(0.07, 10, 8), skin, [0, -0.36, 0]));
+    return el;
+  };
+  const leftHand = arm(1, [0.12, 0, 0.16], -0.35);
+  const rightHand = arm(-1, [-0.3, 0, -0.08], -1.15);
+  // soul flame cupped in the free hand
+  const flame = new THREE.Group(); flame.position.set(0, -0.44, 0.04); leftHand.add(flame);
+  flame.add(new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), soul));
+  flame.add(new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 10), soulViolet).translateY(0.08));
+  wispSources.push(flame);
+
+  // the Shadow bident
+  const bident = new THREE.Group(); bident.position.set(0, -0.36, 0); bident.rotation.x = 1.45; rightHand.add(bident);
+  bident.add(M(new THREE.CylinderGeometry(0.026, 0.026, 2.0, 8), iron, [0, 0.35, 0], { outline: 0.008 }));
+  for (const y of [-0.45, 1.15]) bident.add(M(new THREE.CylinderGeometry(0.036, 0.036, 0.08, 8), bronzeL, [0, y, 0], { outline: false }));
+  bident.add(M(new THREE.ConeGeometry(0.04, 0.14, 8), iron, [0, -0.72, 0], { rot: [Math.PI, 0, 0], outline: 0.006 }));
+  bident.add(M(new THREE.SphereGeometry(0.05, 10, 8), iron, [0, 1.36, 0], { scale: [1.3, 0.8, 1], outline: 0.006 }));
+  const fork = new THREE.Group(); fork.position.y = 1.37; bident.add(fork);
+  const skullB = M(new THREE.SphereGeometry(0.055, 10, 8), bone, [0, 0.0, 0.03], { scale: [1, 1, 0.85], outline: 0.006 }); fork.add(skullB);
+  // two prongs flaring out in a V, each ending in a flat violet-edged blade
+  for (const sx of [-1, 1]) {
+    const prong = new THREE.Group(); prong.position.set(sx * 0.03, 0.02, 0); prong.rotation.z = -sx * 0.32; fork.add(prong);
+    prong.add(M(new THREE.CylinderGeometry(0.02, 0.026, 0.3, 6), iron, [0, 0.15, 0], { outline: 0.006 }));
+    const up = new THREE.Group(); up.position.y = 0.3; up.rotation.z = sx * 0.32; prong.add(up);
+    up.add(M(new THREE.ConeGeometry(0.05, 0.3, 4), ironL, [0, 0.15, 0], { rot: [0, Math.PI / 4, 0], scale: [1, 1, 0.42], outline: 0.006 }));
+    const edge = new THREE.Mesh(new THREE.ConeGeometry(0.053, 0.31, 4), soulViolet); edge.position.y = 0.15; edge.rotation.y = Math.PI / 4; edge.scale.set(1.08, 1.02, 0.1);
+    up.add(edge);
+  }
+  wispSources.push(fork);
+
+  // head
+  torso.add(M(new THREE.CylinderGeometry(0.075, 0.09, 0.14, 10), skin, [0, 0.7, 0]));
+  const head = new THREE.Group(); head.position.y = 0.9; torso.add(head); headGroup = head;
+  const faceMat = toon({ map: faceTex, emissive: '#ffffff', emissiveMap: glowTex, emissiveIntensity: 2.2 });
+  const skullM = M(new THREE.SphereGeometry(0.21, 40, 28), faceMat, [0, 0, 0], { scale: [0.95, 1.06, 1], outline: 0.012 });
+  skullM.rotation.y = -Math.PI / 2; head.add(skullM);
+  // slicked-back hair
+  head.add(M(new THREE.SphereGeometry(0.222, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.52), hair, [0, 0.02, -0.03], { rot: [-0.7, 0, 0], scale: [0.98, 1.05, 1.05] }));
+  head.add(M(new THREE.ConeGeometry(0.12, 0.3, 10), hair, [0, -0.06, -0.2], { rot: [-2.4, 0, 0], outline: 0.01 }));
+  // short dark beard + moustache
+  head.add(M(new THREE.ConeGeometry(0.1, 0.2, 10), hair, [0, -0.22, 0.1], { rot: [Math.PI - 0.32, 0, 0], outline: 0.008 }));
+  for (const sx of [-1, 1]) head.add(M(new THREE.ConeGeometry(0.035, 0.12, 6), hair, [sx * 0.05, -0.12, 0.19], { rot: [Math.PI / 2 + 0.6, 0, sx * 1.1], outline: 0.005 }));
+  // ears
+  for (const sx of [-1, 1]) head.add(M(new THREE.SphereGeometry(0.035, 8, 6), skin, [sx * 0.2, 0, -0.01], { scale: [0.5, 1, 0.8], outline: 0.004 }));
+  // spiked iron crown with soul-fire tips
+  const crown = new THREE.Group(); crown.position.y = 0.12; crown.rotation.x = -0.12; head.add(crown);
+  crown.add(M(new THREE.CylinderGeometry(0.205, 0.215, 0.06, 24, 1, true), iron, [0, 0, 0], { outline: 0.006 }));
+  const spikes = 9;
+  for (let i = 0; i < spikes; i += 1) {
+    const a = (i / spikes) * Math.PI * 2;
+    const tall = 0.14 + (Math.cos(a) > 0.6 ? 0.1 : 0) + (i % 2 ? 0 : 0.03);
+    const s = M(new THREE.ConeGeometry(0.026, tall, 5), ironL, [Math.sin(a) * 0.205, tall / 2 + 0.02, Math.cos(a) * 0.205], { outline: 0.005 });
+    s.rotation.set(Math.cos(a) * -0.18, 0, Math.sin(a) * 0.18); crown.add(s);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), soul); tip.position.set(Math.sin(a) * 0.205, tall + 0.03, Math.cos(a) * 0.205); crown.add(tip);
+  }
+
+  // tattered cloak: jagged hem, deep violet lining
+  cloakPivot = new THREE.Group(); cloakPivot.position.set(0, 0.64, -0.04); torso.add(cloakPivot);
+  const cg = new THREE.CylinderGeometry(0.32, 0.62, 1.72, 28, 10, true, Math.PI / 2 - 0.15, Math.PI + 0.3);
+  const cp = cg.attributes.position;
+  for (let i = 0; i < cp.count; i += 1) {
+    const y = cp.getY(i);
+    if (y < -0.84) { // bottom ring: ragged points
+      const a = Math.atan2(cp.getX(i), cp.getZ(i));
+      cp.setY(i, y + (Math.abs(Math.sin(a * 9)) * 0.22 + Math.abs(Math.sin(a * 23)) * 0.06));
+    }
+  }
+  cg.computeVertexNormals();
+  const cloakOuter = M(cg, toon({ color: '#120d19', side: THREE.FrontSide }), [0, -0.86, 0], { outline: 0.01 });
+  const cloakInner = new THREE.Mesh(cg, toon({ color: '#3a1f5c', side: THREE.BackSide })); cloakInner.position.set(0, -0.86, 0); cloakInner.scale.setScalar(0.985);
+  cloakPivot.add(cloakOuter, cloakInner);
+  // hem anchor points for the shadow wisps
+  for (let i = 0; i < 9; i += 1) {
+    const a = Math.PI / 2 - 0.15 + (i / 8) * (Math.PI + 0.3);
+    const o = new THREE.Object3D(); o.position.set(Math.sin(a) * 0.6, -1.66, Math.cos(a) * 0.6); cloakPivot.add(o); wispSources.push(o);
+  }
+})();
+
+// ------------------------------------------------------------ setting: a dark Underworld plinth
+const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 0.24, 9), toon({ color: '#2b2633', rim: false }));
+floor.position.y = -0.12; floor.receiveShadow = true; scene.add(floor);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(1.62, 0.02, 6, 72), new THREE.MeshBasicMaterial({ color: '#4ff0e0', toneMapped: false }));
+ring.rotation.x = Math.PI / 2; ring.position.y = 0.005; scene.add(ring);
+scene.add(new THREE.HemisphereLight('#8a7bc0', '#120d1c', 1.25));
+const key = new THREE.DirectionalLight('#d9d0ff', 2.4); key.position.set(2.5, 4, 3.5); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -2, right: 2, top: 3, bottom: -1 }); scene.add(key);
+const back = new THREE.DirectionalLight('#5fd8d0', 1.0); back.position.set(-2, 3, -4); scene.add(back);
+const soulLight = new THREE.PointLight('#7fe9ff', 1.2, 3, 2); soulLight.position.set(0.5, 1.4, 0.6); scene.add(soulLight);
+
+// wisps: soft violet-teal motes rising from the cloak hem, the flame and the bident
+const WISPS = 220;
+const wgeo = new THREE.BufferGeometry();
+const wpos = new Float32Array(WISPS * 3), wseed = new Float32Array(WISPS), wsrc = new Float32Array(WISPS);
+for (let i = 0; i < WISPS; i += 1) { wseed[i] = Math.random(); wsrc[i] = Math.floor(Math.random() * wispSources.length); }
+wgeo.setAttribute('position', new THREE.BufferAttribute(wpos, 3));
+wgeo.setAttribute('aSeed', new THREE.BufferAttribute(wseed, 1));
+const wmat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { scale: { value: 300 } },
+  vertexShader: `attribute float aSeed; uniform float scale; varying float vA; varying float vS;
+    void main(){ vS = aSeed; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = (6.0 + aSeed * 10.0) * scale / -mv.z * 0.01; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying float vS; void main(){ float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.0, d);
+    vec3 c = mix(vec3(0.45, 0.32, 0.95), vec3(0.35, 0.95, 0.9), step(0.6, vS)); gl_FragColor = vec4(c * 1.6, a * 0.55); }` });
+const wisps = new THREE.Points(wgeo, wmat); wisps.frustumCulled = false; scene.add(wisps);
+const tmp = new THREE.Vector3();
+function updateWisps(t) {
+  for (let i = 0; i < WISPS; i += 1) {
+    const life = (t * (0.25 + wseed[i] * 0.35) + wseed[i] * 7) % 1;
+    wispSources[wsrc[i]].getWorldPosition(tmp);
+    const ang = wseed[i] * 40 + t * 0.6;
+    wpos[i * 3] = tmp.x + Math.sin(ang) * 0.08 * (1 + life * 2);
+    wpos[i * 3 + 1] = tmp.y + life * (wsrc[i] >= 2 ? 0.9 : 0.45);
+    wpos[i * 3 + 2] = tmp.z + Math.cos(ang) * 0.08 * (1 + life * 2);
+  }
+  wgeo.attributes.position.needsUpdate = true;
+}
+
+// ------------------------------------------------------------ three views of the same model
+const views = [...document.querySelectorAll('.view')].map((el) => {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x000000, 0);
+  el.prepend(renderer.domElement);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, format: THREE.RGBAFormat }));
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.45, 0.9); composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  return { el, renderer, camera, composer, yaw: parseFloat(el.dataset.yaw) };
+});
+function resize() {
+  for (const v of views) {
+    const w = v.el.clientWidth, h = v.el.clientHeight;
+    v.renderer.setSize(w, h, false); v.composer.setSize(w, h);
+    v.camera.aspect = w / h;
+    // fit the full figure (with bident) in the frame
+    const fitH = 3.5; const dist = (fitH / 2) / Math.tan(THREE.MathUtils.degToRad(v.camera.fov / 2)) / Math.min(1, v.camera.aspect * 1.25);
+    v.dist = dist; v.camera.updateProjectionMatrix();
+  }
+}
+addEventListener('resize', resize); resize();
+
+// ------------------------------------------------------------ UI
+let spin = false;
+document.querySelectorAll('.e').forEach((b) => b.addEventListener('click', () => { drawFace(b.dataset.e); document.querySelectorAll('.e').forEach((x) => x.classList.toggle('on', x === b)); }));
+document.getElementById('spin').addEventListener('click', (e) => { spin = !spin; e.currentTarget.classList.toggle('on', spin); });
+document.getElementById('wisps').addEventListener('click', (e) => { wisps.visible = !wisps.visible; e.currentTarget.classList.toggle('on', wisps.visible); });
+document.getElementById('outline').addEventListener('click', (e) => { const on = !outlines[0].visible; outlines.forEach((o) => (o.visible = on)); e.currentTarget.classList.toggle('on', on); });
+
+// ------------------------------------------------------------ loop
+const clock = new THREE.Clock();
+let spinAngle = 0;
+window.__hades = { freeze: false };
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = window.__hades.freeze ? 1.2 : clock.elapsedTime;
+  if (spin) spinAngle += dt * 0.5;
+  cloakPivot.rotation.x = 0.1 + Math.sin(t * 1.1) * 0.04;
+  cloakPivot.rotation.z = Math.sin(t * 0.7) * 0.03;
+  torsoGroup.scale.y = 1 + Math.sin(t * 1.4) * 0.01;
+  headGroup.rotation.y = Math.sin(t * 0.3) * 0.08;
+  soulLight.intensity = 1.2 + Math.sin(t * 3) * 0.2;
+  updateWisps(t);
+  for (const v of views) {
+    const a = v.yaw + spinAngle;
+    v.camera.position.set(Math.sin(a) * v.dist, 1.8, Math.cos(a) * v.dist);
+    v.camera.lookAt(0, 1.62, 0);
+    v.composer.render();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
