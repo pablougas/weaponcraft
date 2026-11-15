@@ -284,6 +284,12 @@ export async function boot(): Promise<void> {
     if (event.type === 'forge:used') captions.show('The Forge is cold. Bring materials from the wider world to craft here.');
     altarScreen.handleEvent(event);
     labels.handleEvent(event, activeSession.world, (id) => !!id && id === localHero()?.id);
+    // A final tutorial fusion can start the rocket while its result dialog is
+    // open. Dismiss gameplay dialogs immediately so the cinematic is visible
+    // from its first frame and the player doesn't need to move or close UI.
+    if (event.type === 'cutscene:start') {
+      for (const screen of screens) screen.close();
+    }
     if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
     if (event.type === 'ability:blink') {
       // A bolt along the path, one strike down onto the landing spot, and dust where he left.

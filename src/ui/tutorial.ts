@@ -17,6 +17,17 @@ const STEP_NAMES: Record<TutorialStepId, string> = {
   fuse: 'Fuse two weapons',
 };
 
+/** The key hints shown beside each checklist item (the full prompt explains the action). */
+const STEP_ACTIONS: Record<TutorialStepId, readonly InputAction[]> = {
+  move: ['moveForward', 'moveBack', 'moveLeft', 'moveRight'],
+  sprint: ['sprint'],
+  jump: ['jump'],
+  attack: ['punch', 'weaponStrike'],
+  ability: ['godAbility'],
+  pickup: ['interact'],
+  fuse: ['interact'],
+};
+
 export interface TutorialPanel {
   update(world: WorldState, visible: boolean): void;
 }
@@ -65,7 +76,11 @@ export function createTutorialPanel(parent: HTMLElement, key: (action: InputActi
       if (signature === rendered) return;
       rendered = signature;
       if (step) {
-        const list = TUTORIAL_STEPS.map((id) => `<li class="${world.tutorial.done.includes(id) ? 'wc-done' : id === step ? 'wc-current' : ''}">${STEP_NAMES[id]}</li>`).join('');
+        const list = TUTORIAL_STEPS.map((id) => {
+          const classes = world.tutorial.done.includes(id) ? 'wc-done' : id === step ? 'wc-current' : '';
+          const keys = STEP_ACTIONS[id].map((action) => `<kbd>${escapeHtml(key(action))}</kbd>`).join(' ');
+          return `<li class="${classes}" data-step="${id}"><span>${STEP_NAMES[id]}</span><span class="wc-step-keys">${keys}</span></li>`;
+        }).join('');
         panel.innerHTML = `<h2>The Last Calm Day</h2><p class="wc-tutorial-prompt">${prompt(step)}</p><ol class="wc-tutorial-steps">${list}</ol>`;
       } else {
         panel.innerHTML = `<h2>Objective</h2><p class="wc-tutorial-prompt">${escapeHtml(objective ?? '')}</p>`;

@@ -17,6 +17,11 @@ test.describe('prologue and the rocket (M5)', () => {
   test('tutorial → cinematic (input locked, HUD hidden) → control returns with Olympus shattered', { tag: '@smoke' }, async ({ page, consoleErrors }) => {
     await start(page);
     await expect(page.locator('#wc-tutorial')).toContainText('The Last Calm Day');
+    await expect(page.locator('[data-step="move"]')).toContainText('↑');
+    await expect(page.locator('[data-step="move"]')).toContainText('↓');
+    await expect(page.locator('[data-step="attack"]')).toContainText('A');
+    await expect(page.locator('[data-step="ability"]')).toContainText('Q');
+    await expect(page.locator('[data-step="pickup"]')).toContainText('F');
     expect((await state(page)).time).toMatchObject({ source: 'prologue', phase: 'golden' });
 
     for (const step of STEPS.slice(0, -1)) await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
@@ -59,6 +64,33 @@ test.describe('prologue and the rocket (M5)', () => {
     // This browser remembers it has seen the rocket.
     expect(await page.evaluate(() => localStorage.getItem('weaponcraft:progress:v1'))).toContain('"seenRocket":true');
     expect(consoleErrors).toEqual([]);
+  });
+
+  test('finishing the last tutorial item closes the altar and starts the rocket without movement', async ({ page }) => {
+    await start(page);
+    await page.evaluate(() => window.wc!.freeze(1));
+    for (const step of ['move', 'sprint', 'jump', 'attack', 'ability']) {
+      await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
+    }
+
+    // Complete pickup through the real interaction, then open the altar.
+    await page.evaluate(() => window.wc!.teleport(12, 7));
+    await page.keyboard.press('KeyF');
+    await page.evaluate(() => window.wc!.step(1));
+    await page.evaluate(() => window.wc!.teleport(8, 3));
+    await page.keyboard.press('KeyF');
+    await page.evaluate(() => window.wc!.step(1));
+    const altar = page.locator('#wc-altar');
+    await expect(altar).toBeVisible();
+
+    await altar.locator('[data-slot="0"]').click();
+    await altar.locator('[data-slot="1"]').click();
+    await altar.locator('[data-action="fuse"]').click();
+    await page.evaluate(() => window.wc!.step(1));
+
+    await expect(altar).toBeHidden();
+    expect((await state(page)).world!.cutscene).toMatchObject({ id: 'rocket' });
+    await expect(page.locator('#wc-tutorial')).toBeHidden();
   });
 
   test('after seeing it once, a new game can skip the rocket with Enter', async ({ page }) => {

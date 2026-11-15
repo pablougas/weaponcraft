@@ -1032,11 +1032,25 @@
 }
 
 .wc-tutorial-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid rgb(255 255 255 / 16%);
   border-radius: 999px;
   padding: 1px 8px;
   color: var(--wc-muted);
   font-size: 11.5px;
+}
+
+.wc-step-keys {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.wc-step-keys kbd {
+  min-width: 16px;
+  padding: 0 3px;
+  font-size: 10px;
 }
 
 .wc-tutorial-steps li.wc-current {
