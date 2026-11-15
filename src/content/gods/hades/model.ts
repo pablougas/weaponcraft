@@ -327,7 +327,7 @@ export const createModel: ModelFactory = (look, entityId) => {
       const flicker = frame.reduceMotion ? 1 : 1 + Math.sin(t * 7) * 0.08 + Math.sin(t * 13) * 0.04;
       flameTongue.scale.set(1, flicker, 1);
 
-      // Shadow Daggers: circling at chest height, tips outward; a thrown one fades back in as it re-forms.
+      // Shadow Daggers: circling above his head, tips outward; a thrown one fades back in as it re-forms.
       const ring = hero?.daggers;
       daggerRing.visible = !!ring;
       if (ring) {

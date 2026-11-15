@@ -18,9 +18,9 @@ export const DAGGERS = {
   reformTicks: ticks(3),
   cooldownTicks: ticks(20),
   staminaCost: 30,
-  /** The circle: radius and height around Hades, and how fast it turns (rad/s). */
+  /** The circle, hovering above his crown (team request): radius and height around Hades, and how fast it turns (rad/s). */
   orbitRadius: 1.15,
-  orbitHeight: 1.9,
+  orbitHeight: 2.9,
   spin: 2.4,
 } as const;
 
