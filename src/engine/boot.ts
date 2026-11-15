@@ -320,7 +320,12 @@ export async function boot(): Promise<void> {
     if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
     if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
     if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. Break it down.', 4);
-    if (event.type === 'soldier:alarm') captions.show(event.kind === 'sentry' ? '[A sentry’s horn sounds. Soldiers are coming.]' : '[Soldier, shouting] “Over there!”', 3);
+    if (event.type === 'soldier:alarm') {
+      captions.show(event.kind === 'sentry' ? '[A sentry’s horn sounds. Soldiers are coming.]'
+        : event.kind === 'captain' ? '[Sentry Captain, bellowing] “To arms! Take the god!”'
+          : '[Soldier, shouting] “Over there!”', 3);
+    }
+    if (event.type === 'soldier:rout') captions.show('[The captain falls. His sentries break and run!]', 3);
     if (event.type === 'soldier:suspicious') captions.show('[Soldier] “Who’s there?”', 2);
     if (event.type === 'fort:cleared') captions.show('Fort cleared. Its chest is unguarded.', 3.5);
     if (event.type === 'chest:opened') captions.show(event.weaponId ? `Found a weapon in the chest (${weaponDef(event.weaponId).name}).` : 'The chest is empty.', 3.5);

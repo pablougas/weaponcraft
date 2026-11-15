@@ -71,6 +71,8 @@ export interface EventMap {
   'soldier:suspicious': { entityId: EntityId };
   /** A soldier shouted (or a sentry sounded the horn): nearby soldiers come running. */
   'soldier:alarm': { entityId: EntityId; kind: string; at: Vec3 };
+  /** A sentry captain fell: his squad breaks and runs. */
+  'soldier:rout': { squadId: string; captainId: EntityId };
   /** A soldier is winding up an attack (the god can roll out of it). */
   'soldier:windup': { entityId: EntityId; kind: string; ticks: number };
   /** A soldier's melee attack landed or missed. */

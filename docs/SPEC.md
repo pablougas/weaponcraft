@@ -143,7 +143,7 @@ Counter wheel **Light > Shadow > Poison > Lightning > Light**. Hitting the eleme
 - **Soldiers:** spear, archer, shield-bearer; later an engineer who repairs mechs. AI states: patrol → suspicious → alert (calls others) → attack → search → return.
 - **Camps:** tents, palisade, watchtower, campfire, loot chest. Clearing a camp marks it on the map. Camps respawn slowly (proposed: each new game day).
 - **Forts (M6):** smaller than camps: palisade, watchtower, 3–6 soldiers, loot chest; placed along the route in the Underworld region.
-- **Sentries (M6):** stationary lookouts with a visible sight cone; spotting a god raises the alarm and nearby soldiers come running. They can be sneaked past or taken out quietly.
+- **Sentry squads (M6):** groups of 3–4 sentries patrol the fields in formation; the leader's visible sight cone is the squad's sight. The first to spot you sounds the horn, then the squad fights. Some squads are led by a **Sentry Captain**: bigger, armoured (light hits do half), slow telegraphed halberd slams; his squad fights harder while he lives and breaks and runs when he falls.
 - **Mech drones:** sentry / crawler near lairs.
 - Patrols are stronger at night and farther from Olympus.
 

@@ -14,3 +14,5 @@ export const soldierSpear = soldier('soldier-spear', 'Spearman', 60);
 export const soldierShield = soldier('soldier-shield', 'Shield-bearer', 85);
 export const soldierArcher = soldier('soldier-archer', 'Archer', 45);
 export const sentry = soldier('sentry', 'Sentry', 40);
+/** A heavier sentry who leads a squad: bigger, armoured, with a halberd (team request, Nov 15). */
+export const sentryCaptain: EnemyDef = { ...soldier('sentry-captain', 'Sentry Captain', 180), body: { radius: 0.48, height: 2.2 } };

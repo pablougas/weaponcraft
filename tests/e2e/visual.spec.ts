@@ -220,15 +220,29 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await expect(page).toHaveScreenshot('fort.png', SHOT);
   });
 
-  test('a sentry and its sight cone', async ({ page }) => {
+  // Behind-left of a sentry squad's leader, out of its cone, looking at the squad.
+  async function behindSquad(page: Page, squadId: string) {
     await cinematicAt(page, 541 + 905);
-    // Behind the first sentry (x 14, z −120), out of its cone.
-    await page.evaluate(async () => {
-      await window.wc!.teleport(20, -104, Math.PI + 0.35);
+    await page.evaluate(async (id) => {
+      const w = window.wc!.getState().world!;
+      const leader = Object.values(w.entities).find((e) => e.soldier?.squadId === id && e.soldier.leader)!;
+      const f = leader.soldier!.facing;
+      const x = leader.position.x - Math.sin(f) * 11 + Math.cos(f) * 5;
+      const z = leader.position.z - Math.cos(f) * 11 - Math.sin(f) * 5;
+      await window.wc!.teleport(x, z, Math.atan2(leader.position.x - x, leader.position.z - z));
       window.wc!.step(2);
       await window.wc!.freeze(12);
       await window.wc!.snapCam('overlook');
-    });
+    }, squadId);
+  }
+
+  test('a sentry squad and its leader’s sight cone', async ({ page }) => {
+    await behindSquad(page, 'squad-approach');
     await expect(page).toHaveScreenshot('sentry-cone.png', SHOT);
+  });
+
+  test('a squad led by a Sentry Captain', async ({ page }) => {
+    await behindSquad(page, 'squad-river');
+    await expect(page).toHaveScreenshot('sentry-captain.png', SHOT);
   });
 });

@@ -29,12 +29,18 @@ test.describe('the Underworld route (M6)', () => {
     }
     expect((await state(page)).world!.flags.barricadeBroken).toBe(true);
 
-    // In front of the first sentry (x 14, z −120, looking north): it sounds the horn.
-    await page.evaluate(() => window.wc!.teleport(14, -134, 0));
-    await page.evaluate(() => window.wc!.step(120));
+    // 12 m in front of the first sentry squad's leader: it sounds the horn and the squad attacks.
     let s = await state(page);
-    const sentry = Object.values(s.world!.entities).find((e) => e.soldier?.kind === 'sentry' && Math.abs(e.position.z + 120) < 2)!;
-    expect(sentry.soldier!.awareness).toBeGreaterThanOrEqual(60);
+    const leader = Object.values(s.world!.entities).find((e) => e.soldier?.squadId === 'squad-approach' && e.soldier.leader)!;
+    const f = leader.soldier!.facing;
+    await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), {
+      x: leader.position.x + Math.sin(f) * 12, z: leader.position.z + Math.cos(f) * 12, yaw: f + Math.PI,
+    });
+    await page.evaluate(() => window.wc!.step(120));
+    s = await state(page);
+    const squad = Object.values(s.world!.entities).filter((e) => e.soldier?.squadId === 'squad-approach');
+    expect(squad.find((e) => e.id === leader.id)!.soldier!.awareness).toBeGreaterThanOrEqual(60);
+    expect(squad.every((e) => e.soldier!.state === 'attack')).toBe(true);
 
     // Stand at the first fort's gate: its soldiers notice and attack.
     // Just inside the first fort's gate (it faces the path, east): its soldiers notice and attack.

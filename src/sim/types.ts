@@ -154,14 +154,21 @@ export interface HeroState {
   stuckTicks?: number;
 }
 
-export type SoldierKind = 'spear' | 'shield' | 'archer' | 'sentry';
+export type SoldierKind = 'spear' | 'shield' | 'archer' | 'sentry' | 'captain';
 
 /** A human soldier or sentry (M6): perception and the patrol → alert → attack → search loop. */
 export interface SoldierState {
   kind: SoldierKind;
   /** The fort it guards (null for sentries). */
   fortId: string | null;
-  state: 'patrol' | 'suspicious' | 'attack' | 'search' | 'return';
+  /** 'flee': its squad's captain fell and it's running away. */
+  state: 'patrol' | 'suspicious' | 'attack' | 'search' | 'return' | 'flee';
+  /** The sentry squad it walks with (null for fort soldiers). Optional for older saves. */
+  squadId?: string | null;
+  /** Its place in the squad's formation (0 = front). */
+  slot?: number;
+  /** Set by the sim each tick: this soldier leads its squad (walks the route, carries the squad's sight cone). */
+  leader?: boolean;
   /** 0–100: how sure it is someone's there (suspicious at 25, alert at 60). */
   awareness: number;
   targetId: EntityId | null;

@@ -3,8 +3,8 @@ import type { Intent } from './intents';
 import { ensureMeadowPopulated } from './populate';
 import { GROTTO } from './regions';
 import { deserialize, serialize } from './serialize';
-import { ALERT_AT, SENTRY_POSTS } from './systems/soldiers';
-import { FORT_SPOTS } from './terrain/underworld';
+import { ALERT_AT, ensureGarrison, SENTRY_SQUADS } from './systems/soldiers';
+import { FORT_SPOTS, SPIRES, underworldInside, underworldLocalHeight } from './terrain/underworld';
 import { tickWorld } from './tick';
 import { TUTORIAL_STEPS } from './tutorial';
 import type { Entity } from './types';
@@ -24,14 +24,15 @@ function underworld() {
   run([{ type: 'cutscene:skip', playerId: 'p1' }], 3);
   const zeus = () => world.entities[world.players.p1.entityId!];
   const hades = () => Object.values(world.entities).find((e) => e.defId === 'hades')!;
-  const soldiers = (fortId?: string) => Object.values(world.entities).filter((e) => e.soldier && e.soldier.kind !== 'sentry' && (!fortId || e.soldier.fortId === fortId));
+  const soldiers = (fortId?: string) => Object.values(world.entities).filter((e) => e.soldier && !e.soldier.squadId && (!fortId || e.soldier.fortId === fortId));
+  const squad = (id: string) => Object.values(world.entities).filter((e) => e.soldier?.squadId === id);
   const at = (x: number, z: number, rotationY = 0) => run([{ type: 'dev:teleport', playerId: 'p1', x: GROTTO.center.x + x, z: GROTTO.center.z + z, rotationY }], 1);
   /** Parks Hades (the companion) far away and asleep so he stays out of the test. */
   const parkHades = () => {
     world.players.p1.party = [world.players.p1.entityId!];
     hades().region = 'surface';
   };
-  return { world, run, zeus, soldiers, at, parkHades };
+  return { world, run, zeus, soldiers, squad, at, parkHades };
 }
 
 /** Puts a soldier facing a point (in grotto-local coordinates). */
@@ -41,14 +42,16 @@ function face(e: Entity, x: number, z: number) {
 }
 
 describe('forts and sentries (M6)', () => {
-  it('places three forts (3, 4 and 5 soldiers, each with a chest) and four sentries, and they survive a save', () => {
-    const { world, soldiers } = underworld();
+  it('places three forts (3, 4 and 5 soldiers, each with a chest) and six sentry squads, and they survive a save', () => {
+    const { world, soldiers, squad } = underworld();
     expect(FORT_SPOTS.map((f) => soldiers(f.id).length)).toEqual([3, 4, 5]);
-    expect(Object.values(world.entities).filter((e) => e.soldier?.kind === 'sentry')).toHaveLength(SENTRY_POSTS.length);
+    // Three squads led by a captain (captain + 3 sentries), three of 3 sentries.
+    expect(SENTRY_SQUADS.map((q) => squad(q.id).length)).toEqual(SENTRY_SQUADS.map((q) => q.sentries + (q.captain ? 1 : 0)));
+    expect(Object.values(world.entities).filter((e) => e.soldier?.kind === 'captain')).toHaveLength(3);
     expect(Object.values(world.entities).filter((e) => e.structure?.kind === 'chest')).toHaveLength(3);
     expect(Object.keys(world.forts)).toHaveLength(3);
     const restored = deserialize(serialize(world));
-    expect(Object.values(restored.entities).filter((e) => e.soldier)).toHaveLength(16);
+    expect(Object.values(restored.entities).filter((e) => e.soldier)).toHaveLength(12 + 21);
   });
 
   it('sneaking up from behind goes unnoticed; standing in front gets you seen, attacked, and the fort roused', () => {
@@ -85,19 +88,26 @@ describe('forts and sentries (M6)', () => {
     void world;
   });
 
-  it('a sentry who sees you sounds the horn and soldiers nearby come running', () => {
-    const { world, run, at, parkHades } = underworld();
+  it('a squad leader who sees you sounds the horn, and the whole squad comes at you', () => {
+    const { world, run, zeus, squad, at, parkHades } = underworld();
     parkHades();
-    const sentry = Object.values(world.entities).find((e) => e.soldier?.kind === 'sentry')!;
-    const sx = sentry.position.x - GROTTO.center.x;
-    const sz = sentry.position.z - GROTTO.center.z;
-    sentry.soldier!.postFacing = Math.PI;
-    face(sentry, sx, sz - 10);
-    at(sx, sz - 12);
+    const members = squad('squad-approach');
+    const leader = members.find((e) => e.soldier!.leader)!;
+    expect(leader.soldier!.kind).toBe('sentry');
+    // Stand the squad still, leader looking at a spot 12 m ahead where Zeus appears.
+    for (const m of members) m.soldier!.patrol = [{ ...leader.position }];
+    const lx = leader.position.x - GROTTO.center.x;
+    const lz = leader.position.z - GROTTO.center.z;
+    face(leader, lx, lz - 10);
+    at(lx, lz - 12);
     const events = run([], 90);
-    const horn = events.find((e) => e.type === 'soldier:alarm' && e.entityId === sentry.id);
-    expect(horn).toBeTruthy();
-    expect(sentry.soldier!.awareness).toBeGreaterThanOrEqual(ALERT_AT);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'soldier:alarm', entityId: leader.id, kind: 'sentry' }));
+    expect(leader.soldier!.awareness).toBeGreaterThanOrEqual(ALERT_AT);
+    expect(members.every((m) => m.soldier!.state === 'attack')).toBe(true);
+    const before = zeus().health!.current;
+    run([], 150);
+    expect(zeus().health!.current).toBeLessThan(before);
+    void world;
   });
 
   it('soldiers chase a Shadow Step decoy first', () => {
@@ -163,5 +173,132 @@ describe('the Underworld map (M6)', () => {
     at(fort.x + 20, fort.z);
     expect(run([], 16)).toContainEqual(expect.objectContaining({ type: 'fort:spotted', fortId: fort.id }));
     expect(isRevealed(revealGrid(deserialize(serialize(world))), fort.x, fort.z)).toBe(true);
+  });
+});
+
+describe('sentry squads and captains (team request, Nov 15)', () => {
+  it('every squad route stays on walkable, gentle ground inside the fields', () => {
+    for (const q of SENTRY_SQUADS) {
+      const pts = [...q.route, q.route[0]];
+      for (let i = 0; i < pts.length - 1; i += 1) {
+        const a = pts[i];
+        const b = pts[i + 1];
+        const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 1.5);
+        let prev = underworldLocalHeight(a.x, a.z);
+        for (let k = 1; k <= steps; k += 1) {
+          const x = a.x + ((b.x - a.x) * k) / steps;
+          const z = a.z + ((b.z - a.z) * k) / steps;
+          expect(underworldInside(x, z, 2), `${q.id} leaves the fields at (${x.toFixed(0)}, ${z.toFixed(0)})`).toBe(true);
+          for (const sp of SPIRES) expect(Math.hypot(x - sp.x, z - sp.z), `${q.id} runs into a spire at (${x.toFixed(0)}, ${z.toFixed(0)})`).toBeGreaterThan(sp.radius + 1.5);
+          const h = underworldLocalHeight(x, z);
+          const slope = Math.atan(Math.abs(h - prev) / (Math.hypot(b.x - a.x, b.z - a.z) / steps));
+          expect(slope, `${q.id} too steep near (${x.toFixed(0)}, ${z.toFixed(0)})`).toBeLessThan((32 * Math.PI) / 180);
+          prev = h;
+        }
+      }
+    }
+  });
+
+  it('a squad walks its route together, followers in formation behind the leader', () => {
+    const { run, squad, parkHades, at } = underworld();
+    parkHades();
+    at(0, 0); // Zeus stays in the grotto, far from every squad
+    const members = squad('squad-river');
+    const leader = members.find((e) => e.soldier!.leader)!;
+    expect(leader.soldier!.kind).toBe('captain');
+    const start = { ...leader.position };
+    for (let i = 0; i < 10; i += 1) {
+      run([], 30);
+      for (const m of members) {
+        expect(Math.hypot(m.position.x - leader.position.x, m.position.z - leader.position.z)).toBeLessThan(7);
+      }
+    }
+    expect(Math.hypot(leader.position.x - start.x, leader.position.z - start.z)).toBeGreaterThan(5);
+  });
+
+  it('after a long patrol every squad is still together (no follower left stuck behind)', () => {
+    const { run, squad, parkHades, at } = underworld();
+    parkHades();
+    at(0, 0);
+    run([], 30 * 90);
+    for (const q of SENTRY_SQUADS) {
+      const members = squad(q.id);
+      const leader = members.find((e) => e.soldier!.leader)!;
+      for (const m of members) {
+        expect(Math.hypot(m.position.x - leader.position.x, m.position.z - leader.position.z), `${q.id}: ${m.id} straggling`).toBeLessThan(8);
+      }
+    }
+  });
+
+  it('only the leader watches: a follower facing you at 10 m does not notice', () => {
+    const { run, squad, at, parkHades } = underworld();
+    parkHades();
+    const members = squad('squad-gates');
+    for (const m of members) m.soldier!.patrol = [{ ...m.position }];
+    const follower = members.find((e) => !e.soldier!.leader)!;
+    const leader = members.find((e) => e.soldier!.leader)!;
+    const fx = follower.position.x - GROTTO.center.x;
+    const fz = follower.position.z - GROTTO.center.z;
+    // The leader looks the other way; the follower looks straight at Zeus.
+    face(leader, leader.position.x - GROTTO.center.x, leader.position.z - GROTTO.center.z + 20);
+    face(follower, fx + 10, fz);
+    at(fx + 10, fz);
+    run([], 60);
+    expect(follower.soldier!.awareness).toBe(0);
+    expect(leader.soldier!.awareness).toBe(0);
+  });
+
+  it("captains' armour halves punches and light strikes", () => {
+    const { world, run, squad, at, parkHades } = underworld();
+    parkHades();
+    const members = squad('squad-midfield');
+    const captain = members.find((e) => e.soldier!.kind === 'captain')!;
+    for (const m of members) {
+      m.soldier!.patrol = [{ ...m.position }];
+      m.creature!.stun = 1000;
+    }
+    const cx = captain.position.x - GROTTO.center.x;
+    const cz = captain.position.z - GROTTO.center.z;
+    at(cx, cz - 1.8, 0);
+    const events = run([{ type: 'player:action', playerId: 'p1', action: 'punch' }], 8);
+    const hit = events.find((e) => e.type === 'combat:hit' && e.targetId === captain.id) as { amount: number } | undefined;
+    expect(events).toContainEqual(expect.objectContaining({ type: 'combat:blocked', targetId: captain.id }));
+    expect(hit!.amount).toBeLessThanOrEqual(3); // a 6-damage jab, halved
+    expect(captain.health!.max).toBe(180);
+    void world;
+  });
+
+  it('when the captain falls, his squad breaks and runs, then regroups', () => {
+    const { world, run, squad, at, parkHades } = underworld();
+    parkHades();
+    const members = squad('squad-gates');
+    const captain = members.find((e) => e.soldier!.kind === 'captain')!;
+    const cx = captain.position.x - GROTTO.center.x;
+    const cz = captain.position.z - GROTTO.center.z;
+    at(cx, cz - 8);
+    captain.health!.current = 0;
+    const events = run([], 1);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'soldier:rout', squadId: 'squad-gates' }));
+    const left = squad('squad-gates');
+    expect(left).toHaveLength(3);
+    expect(left.every((m) => m.soldier!.state === 'flee')).toBe(true);
+    // A new leader takes over, and after the rout they stop running.
+    expect(left.filter((m) => m.soldier!.leader)).toHaveLength(1);
+    run([], 200);
+    expect(left.every((m) => m.soldier!.state !== 'flee')).toBe(true);
+    void world;
+  });
+
+  it('older saves with lone sentries get the squads instead', () => {
+    const { world } = underworld();
+    // Recreate the old layout: no squads, one lone sentry.
+    for (const e of Object.values(world.entities)) if (e.soldier?.squadId) delete world.entities[e.id];
+    world.flags.squadsPlaced = false;
+    const { ctx } = createSimContext(world, true);
+    const lone = spawn(ctx, 'sentry', { position: { x: GROTTO.center.x, y: GROTTO.center.y, z: GROTTO.center.z - 120 } });
+    world.entities[lone].soldier = { kind: 'sentry', fortId: null, state: 'patrol', awareness: 0, targetId: null, lastSeen: null, timer: 0, patrol: [], patrolIndex: 0, facing: 0, windup: 0, cooldown: 0, scan: 0 };
+    ensureGarrison(ctx);
+    expect(world.entities[lone]).toBeUndefined();
+    expect(Object.values(world.entities).filter((e) => e.soldier?.squadId)).toHaveLength(21);
   });
 });

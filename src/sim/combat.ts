@@ -158,6 +158,11 @@ export function applyDamage(
       ctx.emit('combat:blocked', { attackerId, targetId });
     }
   }
+  // Sentry captains' heavy armour: light strikes and punches only do half (use heavy attacks and abilities).
+  if (target.soldier?.kind === 'captain' && (kind === 'light' || kind === 'punch')) {
+    boost *= 0.5;
+    ctx.emit('combat:blocked', { attackerId, targetId });
+  }
   const dealt = Math.min(target.health.current, Math.max(0, Math.round(amount * multiplier * boost)));
   target.health.current -= dealt;
 

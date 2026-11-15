@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { groundAt } from '../../../sim/regions';
+import { SOLDIER_SPECS } from '../../../sim/systems/soldiers';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
 /** The sentry's sight cone mesh: rings out from the sentry × segments across its angle. */
@@ -9,9 +10,11 @@ const CONE_SEGMENTS = 20;
 /**
  * A human soldier of the occupying army: bronze helmet with a red crest,
  * a red tabard over grey mail, and a spear, a big round shield and a spear,
- * or a bow. Sentries carry a horn and show their sight cone on the ground
- * (yellow while calm, orange when suspicious, red once they've seen you).
- * A "?" or "!" floats above anyone who is suspicious or has raised the alarm.
+ * or a bow. Sentries carry a horn. Sentry Captains are bigger, in a bronze
+ * breastplate and heavy pauldrons with a tall black-and-red plume and a red
+ * cloak, and swing a halberd. A squad's leader shows the squad's sight cone on
+ * the ground (yellow while calm, orange when suspicious, red once they've seen
+ * you). A "?" or "!" floats above anyone who is suspicious or has raised the alarm.
  */
 export const createModel: ModelFactory = (look) => {
   const { M, toon } = look;
@@ -78,8 +81,33 @@ export const createModel: ModelFactory = (look) => {
   let coneRadius = 0;
   let coneHalf = 0;
   let built = false;
+  let captain = false;
   const build = (kind: string) => {
     built = true;
+    if (kind === 'captain') {
+      captain = true;
+      body.scale.setScalar(1.22);
+      mark.position.y = 2.95;
+      // Breastplate, heavy pauldrons, tall plume, red cloak.
+      body.add(M(new THREE.BoxGeometry(0.62, 0.62, 0.16), bronze, [0, 1.18, 0.26], { outline: 0.014 }));
+      body.add(M(new THREE.BoxGeometry(0.1, 0.5, 0.05), red, [0, 1.15, 0.35], { outline: false }));
+      for (const x of [-0.42, 0.42]) {
+        body.add(M(new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), bronze, [x, 1.46, 0], { rot: [0, 0, x > 0 ? -0.35 : 0.35], outline: 0.014 }));
+      }
+      body.add(M(new THREE.BoxGeometry(0.07, 0.34, 0.62), dark, [0, 2.1, -0.06], { outline: 0.01 }));
+      body.add(M(new THREE.BoxGeometry(0.075, 0.12, 0.66), red, [0, 2.24, -0.06], { outline: false }));
+      const cloak = M(new THREE.CylinderGeometry(0.34, 0.5, 1.1, 14, 1, true, Math.PI / 2, Math.PI), red, [0, 0.95, -0.04], { outline: 0.012 });
+      (cloak.material as THREE.MeshToonMaterial).side = THREE.DoubleSide;
+      body.add(cloak);
+      // Halberd: long shaft, axe blade, top spike.
+      arm.add(M(new THREE.CylinderGeometry(0.035, 0.035, 2.7, 8), wood, [0, -0.45, 0.3], { rot: [Math.PI / 2.4, 0, 0], outline: 0.01 }));
+      const head = new THREE.Group();
+      head.position.set(0, -0.05, 1.55);
+      head.rotation.x = Math.PI / 2.4;
+      arm.add(head);
+      head.add(M(new THREE.BoxGeometry(0.04, 0.42, 0.3), dark, [0, 0, 0.16], { outline: 0.01 }));
+      head.add(M(new THREE.ConeGeometry(0.05, 0.36, 6), dark, [0, 0.36, 0], { outline: 0.008 }));
+    }
     if (kind === 'spear' || kind === 'shield') {
       arm.add(M(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 6), wood, [0, -0.5, 0.3], { rot: [Math.PI / 2.4, 0, 0], outline: 0.008 }));
       arm.add(M(new THREE.ConeGeometry(0.06, 0.28, 6), bronze, [0, -0.08, 1.35], { rot: [Math.PI / 2.4, 0, 0], outline: 0.008 }));
@@ -95,11 +123,15 @@ export const createModel: ModelFactory = (look) => {
       offArm.add(bow);
       body.add(M(new THREE.CylinderGeometry(0.09, 0.09, 0.6, 8), wood, [0.15, 1.3, -0.3], { rot: [0.3, 0, 0.2], outline: 0.008 }));
     }
-    if (kind === 'sentry') {
-      offArm.add(M(new THREE.ConeGeometry(0.1, 0.45, 10), bronze, [0, -0.5, 0.15], { rot: [Math.PI / 2, 0, 0], outline: 0.01 }));
-      arm.add(M(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 6), wood, [0, -0.4, 0], { outline: 0.008 }));
-      coneRadius = 26;
-      coneHalf = 0.6;
+    if (kind === 'sentry' || kind === 'captain') {
+      if (kind === 'sentry') {
+        offArm.add(M(new THREE.ConeGeometry(0.1, 0.45, 10), bronze, [0, -0.5, 0.15], { rot: [Math.PI / 2, 0, 0], outline: 0.01 }));
+        arm.add(M(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 6), wood, [0, -0.5, 0.3], { rot: [Math.PI / 2.4, 0, 0], outline: 0.008 }));
+        arm.add(M(new THREE.ConeGeometry(0.05, 0.24, 6), bronze, [0, -0.08, 1.35], { rot: [Math.PI / 2.4, 0, 0], outline: 0.008 }));
+      }
+      // The squad's sight cone, shown only while this one leads (see update).
+      coneRadius = SOLDIER_SPECS[kind].sight;
+      coneHalf = SOLDIER_SPECS[kind].cone;
       // A fan of CONE_RINGS rings so it drapes over hills instead of cutting through them.
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((1 + CONE_RINGS * (CONE_SEGMENTS + 1)) * 3), 3));
@@ -129,8 +161,10 @@ export const createModel: ModelFactory = (look) => {
       const swing = moving && !frame.reduceMotion ? Math.sin(t * 7 + entity.position.x) * 0.4 : 0;
       legs[0].rotation.x = swing;
       legs[1].rotation.x = -swing;
-      arm.rotation.x = s.windup > 0 ? -1.4 : s.state === 'attack' ? -0.5 : 0;
-      offArm.rotation.x = s.kind === 'shield' && s.state === 'attack' ? -1.2 : s.kind === 'archer' && s.windup > 0 ? -1.5 : 0;
+      // A captain heaves the halberd high over his head before the slam: a clear tell to roll.
+      arm.rotation.x = s.windup > 0 ? (captain ? -2.7 : -1.4) : s.state === 'attack' ? -0.5 : 0;
+      if (captain) offArm.rotation.x = s.windup > 0 ? -2.5 : 0;
+      if (!captain) offArm.rotation.x = s.kind === 'shield' && s.state === 'attack' ? -1.2 : s.kind === 'archer' && s.windup > 0 ? -1.5 : 0;
       body.rotation.z = (entity.creature?.stun ?? 0) > 0 ? 0.15 : 0;
       const markText = s.state === 'attack' ? '!' : s.state === 'suspicious' || s.state === 'search' ? '?' : '';
       if (markText !== shownMark) {
@@ -138,7 +172,8 @@ export const createModel: ModelFactory = (look) => {
         mark.visible = markText !== '';
         if (markText) drawMark(markText, markText === '!' ? '#ff4a3a' : '#ffd35c');
       }
-      if (cone) {
+      if (cone) cone.visible = !!s.leader || !s.squadId;
+      if (cone?.visible) {
         // The cone lies on the ground in the direction the sentry looks.
         const pos = cone.geometry.attributes.position as THREE.BufferAttribute;
         const yaw = s.facing;

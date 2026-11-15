@@ -2,17 +2,24 @@ import { applyDamage, isHittable } from '../combat';
 import { DT, ticks } from '../constants';
 import type { PhysicsWorld } from '../physics';
 import { GROTTO, groundAt } from '../regions';
-import { FORT_RADIUS, FORT_SPOTS, SPIRES } from '../terrain/underworld';
+import { FORT_RADIUS, FORT_SPOTS, pathX, SPIRES, underworldClamp } from '../terrain/underworld';
 import type { Entity, EntityId, SoldierKind, SoldierState, Vec3 } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 import { isResting } from './rest';
 
 /**
  * The humans in the Underworld (SPEC §9, M6): soldiers in small forts and
- * lone sentries on the approaches. Soldiers patrol → grow suspicious → raise
- * the alarm → attack → search → return. Sentries stand still and sweep a
- * visible sight cone; if they see a god they raise the alarm and nearby
- * soldiers come running. Everything here is deterministic sim logic.
+ * sentry squads patrolling the fields. Soldiers patrol → grow suspicious →
+ * raise the alarm → attack → search → return.
+ *
+ * Sentry squads (team request, Nov 15): 3–4 sentries walk a route together in
+ * a V behind their leader. Three squads are led by a Sentry Captain: bigger,
+ * armoured, slow heavy halberd slams; while he lives his squad hits harder,
+ * and when he falls the rest break and run. Only the leader watches with a
+ * sight cone (the one drawn on the ground); followers notice you only up
+ * close or when hit, so the visible cone is always the squad's real sight.
+ * The first sentry to see you sounds the horn, then the squad attacks.
+ * Everything here is deterministic sim logic.
  */
 interface SoldierSpec {
   maxHealth: number;
@@ -34,8 +41,16 @@ export const SOLDIER_SPECS: Readonly<Record<SoldierKind, SoldierSpec>> = {
   spear: { maxHealth: 60, body: { radius: 0.36, height: 1.8 }, walk: 1.6, run: 3.8, sight: 18, cone: 0.9, notice: 1.2, attackRange: 2, windup: ticks(0.5), cooldown: ticks(1.4), damage: 10 },
   shield: { maxHealth: 85, body: { radius: 0.42, height: 1.8 }, walk: 1.4, run: 3.2, sight: 16, cone: 0.9, notice: 1.2, attackRange: 1.9, windup: ticks(0.55), cooldown: ticks(1.6), damage: 8 },
   archer: { maxHealth: 45, body: { radius: 0.34, height: 1.8 }, walk: 1.6, run: 3.6, sight: 22, cone: 0.8, notice: 1.4, attackRange: 14, windup: ticks(0.9), cooldown: ticks(1.8), damage: 9 },
-  sentry: { maxHealth: 40, body: { radius: 0.34, height: 1.8 }, walk: 0, run: 0, sight: 26, cone: 0.6, notice: 1.6, attackRange: 0, windup: 0, cooldown: 0, damage: 0 },
+  sentry: { maxHealth: 40, body: { radius: 0.34, height: 1.8 }, walk: 1.5, run: 3.6, sight: 22, cone: 0.7, notice: 1.5, attackRange: 1.9, windup: ticks(0.5), cooldown: ticks(1.5), damage: 7 },
+  captain: { maxHealth: 180, body: { radius: 0.48, height: 2.2 }, walk: 1.5, run: 3.0, sight: 20, cone: 0.85, notice: 1.3, attackRange: 2.6, windup: ticks(0.9), cooldown: ticks(2.2), damage: 22 },
 };
+
+/** A captain's halberd slam hits everything in front of him within this half-angle. */
+const CAPTAIN_SLAM_ARC = 1.2;
+/** While their captain lives, a squad's sentries hit this much harder. */
+const CAPTAIN_RALLY = 1.25;
+/** When the captain falls, the squad runs for this long before regrouping. */
+const ROUT_TICKS = ticks(6);
 
 /** Awareness levels (0–100): suspicious, then alert. */
 export const SUSPICIOUS_AT = 25;
@@ -56,19 +71,54 @@ const FORT_GARRISONS: ReadonlyArray<readonly SoldierKind[]> = [
   ['spear', 'shield', 'archer', 'spear'],
   ['shield', 'spear', 'archer', 'archer', 'spear'],
 ];
-export const SENTRY_POSTS: ReadonlyArray<{ x: number; z: number; facing: number }> = [
-  { x: 14, z: -120, facing: 0 },
-  { x: -22, z: -268, facing: 0.4 },
-  { x: 36, z: -410, facing: -0.3 },
-  { x: -14, z: -540, facing: 0 },
+/** Waypoints (grotto-local) along the main path between z0 and z1, offset sideways by `dx`, there and back. */
+const alongPath = (z0: number, z1: number, dx: number, steps = 4): Array<{ x: number; z: number }> => {
+  const out: Array<{ x: number; z: number }> = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const z = z0 + ((z1 - z0) * i) / steps;
+    out.push({ x: pathX(z) + dx, z });
+  }
+  for (let i = steps - 1; i >= 1; i -= 1) out.push({ x: out[i].x - dx * 2, z: out[i].z });
+  return out;
+};
+/** A loop round a fort, outside its palisade. */
+const aroundFort = (fort: { x: number; z: number }, radius: number, steps = 8): Array<{ x: number; z: number }> =>
+  Array.from({ length: steps }, (_, i) => ({ x: fort.x + Math.cos((i / steps) * Math.PI * 2) * radius, z: fort.z + Math.sin((i / steps) * Math.PI * 2) * radius }));
+
+/**
+ * Six sentry squads on the fields (team request, Nov 15): three led by a
+ * captain (captain + 3 sentries), three of 3 sentries. Routes follow the main
+ * path or loop round the first two forts.
+ */
+export const SENTRY_SQUADS: ReadonlyArray<{ id: string; captain: boolean; sentries: number; route: ReadonlyArray<{ x: number; z: number }> }> = [
+  { id: 'squad-approach', captain: false, sentries: 3, route: alongPath(-95, -165, 5) },
+  { id: 'squad-river', captain: true, sentries: 3, route: alongPath(-210, -300, -4) },
+  { id: 'squad-asphodel-ring', captain: false, sentries: 3, route: aroundFort(FORT_SPOTS[0], FORT_RADIUS + 5, 10) },
+  { id: 'squad-styx-ring', captain: false, sentries: 3, route: aroundFort(FORT_SPOTS[1], FORT_RADIUS + 5, 10) },
+  { id: 'squad-midfield', captain: true, sentries: 3, route: alongPath(-370, -445, 5) },
+  { id: 'squad-gates', captain: true, sentries: 3, route: alongPath(-505, -560, -5) },
+];
+/** Where followers walk relative to their leader: x to the leader's right, z ahead (negative = behind). */
+const FORMATION: ReadonlyArray<{ x: number; z: number }> = [
+  { x: 0, z: 0 },
+  { x: -1.8, z: -2 },
+  { x: 1.8, z: -2 },
+  { x: 0, z: -3.8 },
 ];
 
 const local = (x: number, z: number): Vec3 => ({ x: GROTTO.center.x + x, y: groundAt('underworld', GROTTO.center.x + x, GROTTO.center.z + z), z: GROTTO.center.z + z });
 
-/** Places the forts' soldiers and the sentries, once (when the Underworld opens up). */
+/** Places the forts' soldiers and the sentry squads, once (when the Underworld opens up). */
 export function ensureGarrison(ctx: SimContext): void {
   const { world } = ctx;
-  if (world.flags.garrisonPlaced) return;
+  if (world.flags.garrisonPlaced) {
+    // Saves from before the squads: swap the old lone sentries for squads.
+    if (!world.flags.squadsPlaced) {
+      for (const e of Object.values(world.entities)) if (e.soldier?.kind === 'sentry' && !e.soldier.squadId) despawn(ctx, e.id);
+      placeSquads(ctx);
+    }
+    return;
+  }
   FORT_SPOTS.forEach((fort, f) => {
     const kinds = FORT_GARRISONS[f];
     kinds.forEach((kind, i) => {
@@ -86,13 +136,66 @@ export function ensureGarrison(ctx: SimContext): void {
     const chest = spawn(ctx, 'chest', { position: local(fort.x, fort.z - 3), rotationY: 0 });
     Object.assign(world.entities[chest], { structure: { kind: 'chest' }, region: 'underworld', fortId: fort.id, body: { radius: 0.6, height: 0.8 } });
   });
-  for (const post of SENTRY_POSTS) spawnSoldier(ctx, 'sentry', local(post.x, post.z), Math.PI + post.facing, null, []);
+  placeSquads(ctx);
   world.flags.garrisonPlaced = true;
+}
+
+function placeSquads(ctx: SimContext): void {
+  for (const squad of SENTRY_SQUADS) {
+    const route = squad.route.map((p) => local(p.x, p.z));
+    const start = route[0];
+    const next = route[1] ?? route[0];
+    const heading = Math.atan2(next.x - start.x, next.z - start.z);
+    const kinds: SoldierKind[] = [...(squad.captain ? ['captain' as const] : []), ...Array.from({ length: squad.sentries }, () => 'sentry' as const)];
+    kinds.forEach((kind, slot) => {
+      const offset = FORMATION[slot % FORMATION.length];
+      const x = start.x + Math.cos(heading) * offset.x + Math.sin(heading) * offset.z;
+      const z = start.z - Math.sin(heading) * offset.x + Math.cos(heading) * offset.z;
+      const id = spawnSoldier(ctx, kind, { x, y: groundAt('underworld', x, z), z }, heading, null, route);
+      Object.assign(ctx.world.entities[id].soldier!, { squadId: squad.id, slot, leader: slot === 0 });
+    });
+  }
+  ctx.world.flags.squadsPlaced = true;
+}
+
+/** Living members of a squad, leader first: the captain if alive, else the lowest slot. */
+function squadMembers(ctx: SimContext, squadId: string): Array<Entity & { soldier: SoldierState }> {
+  return (Object.values(ctx.world.entities).filter((e) => e.soldier?.squadId === squadId && (e.health?.current ?? 0) > 0) as Array<Entity & { soldier: SoldierState }>)
+    .sort((a, b) => (a.soldier.kind === 'captain' ? 0 : 1) - (b.soldier.kind === 'captain' ? 0 : 1) || (a.soldier.slot ?? 0) - (b.soldier.slot ?? 0) || a.id.localeCompare(b.id));
+}
+
+/** Marks each squad's leader and hands the route position on when a leader falls. */
+function updateSquadLeaders(ctx: SimContext): void {
+  for (const squad of SENTRY_SQUADS) {
+    const members = squadMembers(ctx, squad.id);
+    members.forEach((m, i) => {
+      if (i === 0 && !m.soldier.leader) {
+        // New leader: carry on from where the old one was heading.
+        const old = Object.values(ctx.world.entities).find((e) => e.soldier?.squadId === squad.id && e.soldier.leader && e.id !== m.id);
+        if (old?.soldier) m.soldier.patrolIndex = old.soldier.patrolIndex;
+      }
+      m.soldier.leader = i === 0;
+    });
+  }
+}
+
+/** The captain fell: everyone left in his squad breaks and runs. */
+function rout(ctx: SimContext, captain: Entity & { soldier: SoldierState }): void {
+  const squadId = captain.soldier.squadId;
+  if (!squadId) return;
+  for (const m of squadMembers(ctx, squadId)) {
+    if (m.id === captain.id) continue;
+    m.soldier.state = 'flee';
+    m.soldier.timer = 0;
+    m.soldier.windup = 0;
+  }
+  ctx.emit('soldier:rout', { squadId, captainId: captain.id });
 }
 
 function spawnSoldier(ctx: SimContext, kind: SoldierKind, home: Vec3, facing: number, fortId: string | null, patrol: Vec3[]): EntityId {
   const spec = SOLDIER_SPECS[kind];
-  const id = spawn(ctx, kind === 'sentry' ? 'sentry' : `soldier-${kind}`, { position: { ...home }, rotationY: facing });
+  const defId = kind === 'sentry' ? 'sentry' : kind === 'captain' ? 'sentry-captain' : `soldier-${kind}`;
+  const id = spawn(ctx, defId, { position: { ...home }, rotationY: facing });
   const e = ctx.world.entities[id];
   e.region = 'underworld';
   e.body = { ...spec.body };
@@ -126,6 +229,8 @@ export function canSee(soldier: Entity & { soldier: SoldierState }, target: Enti
   const dz = target.position.z - soldier.position.z;
   const d = Math.hypot(dx, dz);
   if (d > spec.sight) return false;
+  // In a squad only the leader watches (its cone is the one drawn); the others notice you up close.
+  if (soldier.soldier.squadId && !soldier.soldier.leader && d > HEAR_RANGE) return false;
   if (d > HEAR_RANGE) {
     const facing = soldier.soldier.facing;
     const angle = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - facing), Math.cos(Math.atan2(dx, dz) - facing)));
@@ -141,7 +246,7 @@ function targetsFor(ctx: SimContext): Entity[] {
 
 function raiseAlarm(ctx: SimContext, from: Entity & { soldier: SoldierState }, at: Vec3, range: number): void {
   for (const other of Object.values(ctx.world.entities)) {
-    if (!other.soldier || other.id === from.id || other.soldier.kind === 'sentry') continue;
+    if (!other.soldier || other.id === from.id || other.soldier.state === 'flee') continue;
     if (Math.hypot(other.position.x - from.position.x, other.position.z - from.position.z) > range) continue;
     if (other.soldier.state === 'attack') continue;
     other.soldier.state = 'attack';
@@ -184,6 +289,7 @@ export function updateSoldiers(ctx: SimContext, physics?: PhysicsWorld): void {
   if (!ctx.isAuthority) return;
   const { world } = ctx;
   const targets = targetsFor(ctx);
+  updateSquadLeaders(ctx);
   for (const entity of Object.values(world.entities)) {
     if (entity.projectile) {
       updateArrow(ctx, entity);
@@ -192,6 +298,7 @@ export function updateSoldiers(ctx: SimContext, physics?: PhysicsWorld): void {
     if (!entity.soldier || !entity.health) continue;
     if (entity.health.current <= 0) {
       const fortId = entity.soldier.fortId;
+      if (entity.soldier.kind === 'captain') rout(ctx, entity as Entity & { soldier: SoldierState });
       despawn(ctx, entity.id);
       if (fortId) checkFortCleared(ctx, fortId);
       continue;
@@ -242,8 +349,8 @@ function updateSoldier(ctx: SimContext, e: Entity & { soldier: SoldierState }, t
     if (s.state === 'patrol' || s.state === 'suspicious') s.awareness = Math.max(0, s.awareness - 0.4);
   }
 
-  if (s.kind === 'sentry') {
-    updateSentry(ctx, e, !!seen);
+  if (s.state === 'flee') {
+    updateFlee(ctx, e, targets, physics);
     return;
   }
 
@@ -255,7 +362,8 @@ function updateSoldier(ctx: SimContext, e: Entity & { soldier: SoldierState }, t
   if ((s.state === 'patrol' || s.state === 'suspicious' || s.state === 'search' || s.state === 'return') && s.awareness >= ALERT_AT && s.lastSeen) {
     s.state = 'attack';
     s.timer = 0;
-    raiseAlarm(ctx, e, s.lastSeen, SHOUT_RANGE);
+    // A sentry sounds the horn (it carries far); everyone else shouts.
+    raiseAlarm(ctx, e, s.lastSeen, s.kind === 'sentry' ? HORN_RANGE : SHOUT_RANGE);
   }
   if (s.state === 'suspicious' && s.awareness <= 0) s.state = 'return';
   if (s.state === 'attack' && s.timer > LOSE_TARGET_TICKS) {
@@ -266,6 +374,10 @@ function updateSoldier(ctx: SimContext, e: Entity & { soldier: SoldierState }, t
 
   switch (s.state) {
     case 'patrol': {
+      if (s.squadId && !s.leader) {
+        followLeader(ctx, e, physics);
+        return;
+      }
       if (s.patrol.length === 0) {
         walkToward(e, creature.home, spec.walk, 0.3, physics);
         return;
@@ -320,6 +432,15 @@ function updateSoldier(ctx: SimContext, e: Entity & { soldier: SoldierState }, t
       return;
     }
     case 'return': {
+      if (s.squadId && !s.leader) {
+        // Fall back into formation; once there, carry on patrolling.
+        if (followLeader(ctx, e, physics) < 1.2) {
+          s.state = 'patrol';
+          s.awareness = 0;
+          s.targetId = null;
+        }
+        return;
+      }
       const home = s.patrol[s.patrolIndex % Math.max(1, s.patrol.length)] ?? creature.home;
       if (walkToward(e, home, spec.walk, 0.4, physics) <= 0.5) {
         s.state = 'patrol';
@@ -347,8 +468,19 @@ function tryAttack(ctx: SimContext, e: Entity & { soldier: SoldierState }, targe
     const dz = target.position.z - e.position.z;
     const angle = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - s.facing), Math.cos(Math.atan2(dx, dz) - s.facing)));
     ctx.emit('soldier:strike', { entityId: e.id, kind: s.kind });
+    if (s.kind === 'captain') {
+      // Halberd slam: everything in front of him, not just the target.
+      for (const other of Object.values(ctx.world.entities)) {
+        if (!other.hero || !isHittable(other) || (other.region ?? 'surface') !== 'underworld') continue;
+        const ox = other.position.x - e.position.x;
+        const oz = other.position.z - e.position.z;
+        const off = Math.abs(Math.atan2(Math.sin(Math.atan2(ox, oz) - s.facing), Math.cos(Math.atan2(ox, oz) - s.facing)));
+        if (Math.hypot(ox, oz) <= spec.attackRange + 0.8 && off < CAPTAIN_SLAM_ARC) applyDamage(ctx, other.id, spec.damage, e.id, 'heavy');
+      }
+      return;
+    }
     if (Math.hypot(dx, dz) <= spec.attackRange + 0.6 && angle < 0.8 && target.hero) {
-      applyDamage(ctx, target.id, spec.damage, e.id, 'light');
+      applyDamage(ctx, target.id, spec.damage * rally(ctx, e), e.id, 'light');
     }
     return;
   }
@@ -392,38 +524,73 @@ function updateArrow(ctx: SimContext, arrow: Entity): void {
   if (p.ticksLeft <= 0 || arrow.position.y < groundAt('underworld', arrow.position.x, arrow.position.z) - 0.2) despawn(ctx, arrow.id);
 }
 
-/** Sentries sweep their cone; seeing a god long enough sounds the horn. */
-function updateSentry(ctx: SimContext, e: Entity & { soldier: SoldierState }, seeing: boolean): void {
+/** A squad's sentries hit harder while their captain is alive. */
+function rally(ctx: SimContext, e: Entity & { soldier: SoldierState }): number {
+  const squadId = e.soldier.squadId;
+  if (!squadId || e.soldier.kind === 'captain') return 1;
+  return squadMembers(ctx, squadId).some((m) => m.soldier.kind === 'captain') ? CAPTAIN_RALLY : 1;
+}
+
+/** Walks to this follower's place in the V behind its leader. Returns the distance to it. */
+function followLeader(ctx: SimContext, e: Entity & { soldier: SoldierState }, physics?: PhysicsWorld): number {
+  const leader = squadMembers(ctx, e.soldier.squadId!)[0];
+  if (!leader || leader.id === e.id) return 0;
+  const members = squadMembers(ctx, e.soldier.squadId!);
+  const slot = Math.max(1, members.findIndex((m) => m.id === e.id));
+  const offset = FORMATION[slot % FORMATION.length];
+  const h = leader.soldier.facing;
+  const goal = {
+    x: leader.position.x + Math.cos(h) * offset.x + Math.sin(h) * offset.z,
+    y: leader.position.y,
+    z: leader.position.z - Math.sin(h) * offset.x + Math.cos(h) * offset.z,
+  };
+  const d = Math.hypot(goal.x - e.position.x, goal.z - e.position.z);
+  // Hurry to catch up; once in place, match the leader's pace and heading.
+  const speed = d > 2.5 ? SOLDIER_SPECS[e.soldier.kind].run * 0.7 : SOLDIER_SPECS[e.soldier.kind].walk * 1.15;
+  const before = { x: e.position.x, z: e.position.z };
+  const creature = e.creature!;
+  // Caught on a spire or a ledge: try going round it via the leader's own spot first.
+  const target = (creature.blocked ?? 0) > ticks(1) ? leader.position : goal;
+  walkToward(e, target, speed, 0.25, physics);
+  if (d < 0.6) {
+    e.soldier.facing = h;
+    e.rotationY = h;
+  }
+  const moved = Math.hypot(e.position.x - before.x, e.position.z - before.z);
+  creature.blocked = d > 4 && moved < speed * DT * 0.3 ? (creature.blocked ?? 0) + 1 : 0;
+  // Still stuck after a few seconds and no god nearby to see it: rejoin the formation.
+  if ((creature.blocked ?? 0) > ticks(3) && !nearAGod(ctx, e, 30)) {
+    e.position = { x: goal.x, y: groundAt('underworld', goal.x, goal.z), z: goal.z };
+    creature.blocked = 0;
+  }
+  return d;
+}
+
+function nearAGod(ctx: SimContext, e: Entity, range: number): boolean {
+  return Object.values(ctx.world.entities).some((g) => g.hero && (g.region ?? 'surface') === 'underworld'
+    && Math.hypot(g.position.x - e.position.x, g.position.z - e.position.z) < range);
+}
+
+/** Routed: run from the nearest god for a few seconds, then regroup. */
+function updateFlee(ctx: SimContext, e: Entity & { soldier: SoldierState }, targets: Entity[], physics?: PhysicsWorld): void {
   const s = e.soldier;
-  if (s.state === 'attack') {
-    // Horn sounded: keep watching the spot; calm down after a while unseen.
-    if (s.lastSeen) s.facing = Math.atan2(s.lastSeen.x - e.position.x, s.lastSeen.z - e.position.z);
-    e.rotationY = s.facing;
-    if (s.timer > ticks(8)) {
-      s.state = 'patrol';
-      s.awareness = 0;
-    }
-    return;
-  }
-  if (!seeing) {
-    // A slow ±40° sweep around their post's heading.
-    s.scan += 1;
-    s.facing = (s.postFacing ?? s.facing) + Math.sin(s.scan / ticks(3)) * 0.7;
-    e.rotationY = s.facing;
-  } else if (s.lastSeen) {
-    s.facing = Math.atan2(s.lastSeen.x - e.position.x, s.lastSeen.z - e.position.z);
-    e.rotationY = s.facing;
-  }
-  if (s.state === 'patrol' && s.awareness >= SUSPICIOUS_AT) {
-    s.state = 'suspicious';
-    ctx.emit('soldier:suspicious', { entityId: e.id });
-  }
-  if (s.awareness >= ALERT_AT && s.lastSeen) {
-    s.state = 'attack';
+  s.timer += 1;
+  s.windup = 0;
+  const threat = targets
+    .map((t) => ({ t, d: Math.hypot(t.position.x - e.position.x, t.position.z - e.position.z) }))
+    .sort((a, b) => a.d - b.d || a.t.id.localeCompare(b.t.id))[0]?.t;
+  const from = threat?.position ?? s.lastSeen ?? e.creature!.home;
+  const dx = e.position.x - from.x;
+  const dz = e.position.z - from.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const away = underworldClamp(e.position.x - GROTTO.center.x + (dx / len) * 8, e.position.z - GROTTO.center.z + (dz / len) * 8, 2);
+  walkToward(e, local(away.x, away.z), SOLDIER_SPECS[s.kind].run * 1.1, 0, physics);
+  if (s.timer >= ROUT_TICKS) {
+    s.state = 'return';
+    s.awareness = 0;
+    s.targetId = null;
     s.timer = 0;
-    raiseAlarm(ctx, e, s.lastSeen, HORN_RANGE);
   }
-  if (s.state === 'suspicious' && s.awareness <= 0) s.state = 'patrol';
 }
 
 function checkFortCleared(ctx: SimContext, fortId: string): void {
