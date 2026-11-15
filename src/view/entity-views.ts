@@ -3,7 +3,6 @@ import { enemies } from '../content/enemies';
 import { gods } from '../content/gods';
 import { regionOf, type RegionId } from '../sim/regions';
 import { restPose } from '../sim/systems/rest';
-import { hadesLook } from '../content/gods/hades';
 import { structures } from '../content/structures';
 import type { ModelLoader } from '../content/types';
 import type { Entity, EntityId, GameEvent, WorldState } from '../sim';
@@ -11,6 +10,7 @@ import type { EntityModel, Expression, ModelFactory, ModelFrame } from './entity
 import type { Interpolator } from './interpolation';
 import type { Look } from './look';
 import { createPickupModel } from './pickup-model';
+import { createDecoyModel } from './effects/shadow';
 
 /** Every approved def that has a model, by def ID. */
 function modelLoaders(): Map<string, ModelLoader> {
@@ -29,8 +29,11 @@ export async function preloadModels(): Promise<Map<string, ModelFactory>> {
   }));
   // Weapons lying in the world use one built-in model that shows whichever weapon it is.
   factories.set('weapon-pickup', createPickupModel);
-  // Hades's story cameo (M5.1): his look isn't in the gods registry until he's playable (M6).
-  if (hadesLook.approved) factories.set(hadesLook.id, (await hadesLook.model()).createModel);
+  // Shadow Step's decoy (M6).
+  factories.set('shadow-decoy', () => {
+    const decoy = createDecoyModel();
+    return { root: decoy.root, update: (entity) => decoy.update(entity) };
+  });
   return factories;
 }
 

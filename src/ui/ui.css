@@ -1088,3 +1088,32 @@
   background: #000;
   pointer-events: none;
 }
+
+/* The other god in the party (M6): name, health and the switch key. */
+.wc-ally {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #d9def0;
+}
+.wc-ally-bar {
+  width: 90px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 45%);
+  overflow: hidden;
+}
+.wc-ally-bar > span {
+  display: block;
+  height: 100%;
+  background: #b48cff;
+  transform-origin: left;
+}
+.wc-ally kbd {
+  font: 600 11px ui-monospace, Menlo, monospace;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgb(255 255 255 / 35%);
+}

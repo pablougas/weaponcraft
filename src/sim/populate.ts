@@ -1,4 +1,5 @@
 import { startDescent } from './cutscenes/descent';
+import { recruitHades } from './systems/party';
 import { godDef } from './defs';
 import type { GameEvent } from './events';
 import { worldRng } from './rng';
@@ -33,6 +34,7 @@ export function spawnHero(ctx: SimContext, playerId: PlayerId, godId = 'zeus'): 
   entity.health = { current: def.maxHealth, max: def.maxHealth };
   entity.stamina = { current: def.maxStamina, max: def.maxStamina };
   entity.hero = newHeroState(def.starterWeaponId);
+  if (def.passive) entity.hero.passiveDamage = def.passive.damageMultiplier;
   ctx.world.players[playerId].entityId = id;
   return id;
 }
@@ -134,8 +136,10 @@ export function ensureRefuge(ctx: SimContext): void {
  * Refuge. Loading it continues the story with Hades's arrival.
  */
 export function ensureStory(world: WorldState, isAuthority = true): GameEvent[] {
-  if (!isAuthority || !world.flags.olympusShattered || world.flags.descended || world.cutscene) return [];
+  if (!isAuthority || world.cutscene) return [];
   const { ctx, events } = createSimContext(world, isAuthority);
-  startDescent(ctx);
+  if (world.flags.olympusShattered && !world.flags.descended) startDescent(ctx);
+  // M6: a save from M5.1 has Hades as a story character; he joins the party.
+  else if (world.flags.descended && !world.cutscene) recruitHades(ctx);
   return events;
 }

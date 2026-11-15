@@ -2,6 +2,7 @@ import { ticks } from '../constants';
 import { GROTTO, grottoPoint } from '../regions';
 import { groundHeightAt } from '../terrain/meadow-rocks';
 import type { Entity, HeroState, Vec3 } from '../types';
+import { recruitHades } from '../systems/party';
 import { spawn, type SimContext } from '../world';
 
 /**
@@ -190,6 +191,8 @@ function finishDescent(ctx: SimContext, skipped: boolean): void {
   ctx.emit('cutscene:end', { cutsceneId: DESCENT_ID, skipped });
   world.objective = 'find-and-free-cerberus';
   ctx.emit('objective:set', { objectiveId: 'find-and-free-cerberus' });
+  // M6: Hades joins the party (V switches; the other god follows as a companion).
+  recruitHades(ctx);
 }
 
 export function skipDescent(ctx: SimContext): string | null {

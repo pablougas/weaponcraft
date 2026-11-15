@@ -19,6 +19,7 @@ export type InputAction =
   | 'ultimate'
   | 'lockOn'
   | 'blink'
+  | 'switchCharacter'
   | 'skipCutscene'
   | 'interact'
   | 'inventory'
@@ -51,6 +52,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   lockOn: ['Tab'],
   // Bolt Step: W is free since the arrow keys move (M3.1), and sits next to Q and R.
   blink: ['KeyW'],
+  // Switch between Zeus and Hades (M6).
+  switchCharacter: ['KeyV'],
   skipCutscene: ['Enter'],
   interact: ['KeyF'],
   inventory: ['KeyI'],

@@ -1,3 +1,4 @@
+import { regionOf } from './regions';
 import { TICK_HZ, ticks } from './constants';
 import { elementMultiplier } from './elements';
 import type { AttackKind, Element, Entity, EntityId, StatusEffect, StatusKind, Vec3, WorldState } from './types';
@@ -36,7 +37,7 @@ export function targetsInArc(world: WorldState, attacker: Entity, range: number,
   const halfArc = ((arcDeg / 2) * Math.PI) / 180;
   const found: Array<{ id: EntityId; distance: number }> = [];
   for (const target of Object.values(world.entities)) {
-    if (target.id === attacker.id || !isHittable(target)) continue;
+    if (target.id === attacker.id || !isHittable(target) || (attacker.hero && target.hero)) continue;
     const dx = target.position.x - attacker.position.x;
     const dz = target.position.z - attacker.position.z;
     const centre = Math.hypot(dx, dz);
@@ -55,7 +56,8 @@ export function targetsInArc(world: WorldState, attacker: Entity, range: number,
 /** Hittable entities within `range` of a point, nearest first. */
 export function targetsNear(world: WorldState, point: Vec3, range: number, exclude: ReadonlySet<EntityId>): EntityId[] {
   return Object.values(world.entities)
-    .filter((e) => !exclude.has(e.id) && isHittable(e) && flatDistance(e.position, point) <= range && Math.abs(e.position.y - point.y) < 6)
+    // Gods never hit each other (Zeus and Hades fight side by side).
+    .filter((e) => !exclude.has(e.id) && isHittable(e) && !e.hero && flatDistance(e.position, point) <= range && Math.abs(e.position.y - point.y) < 6)
     .map((e) => ({ id: e.id, distance: flatDistance(e.position, point) }))
     .sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id))
     .map((t) => t.id);
@@ -95,7 +97,7 @@ export function hasStatus(entity: Entity | undefined, kind: StatusKind): boolean
   return !!entity?.statuses?.some((s) => s.kind === kind && s.ticksLeft > 0);
 }
 
-function addStatus(target: Entity, status: StatusEffect): void {
+export function addStatus(target: Entity, status: StatusEffect): void {
   target.statuses ??= [];
   const existing = target.statuses.find((s) => s.kind === status.kind);
   if (existing) {
@@ -140,6 +142,13 @@ export function applyDamage(
     && weaponData(world, attacker.hero.weaponId).element === element) {
     boost = ABILITY_BOOST;
   }
+  // Hades's passive and Shadow Step's ambush.
+  const passive = attacker?.hero?.passiveDamage;
+  if (passive && regionOf(attacker) === 'underworld') boost *= passive;
+  if (attacker?.hero?.ambush && attacker.hero.ambush.ticks > 0 && kind !== 'status') {
+    boost *= attacker.hero.ambush.multiplier;
+    attacker.hero.ambush = null;
+  }
   const dealt = Math.min(target.health.current, Math.max(0, Math.round(amount * multiplier * boost)));
   target.health.current -= dealt;
 
@@ -178,7 +187,7 @@ export function updateStatuses(ctx: SimContext): void {
     if (!entity.statuses?.length) continue;
     for (const status of entity.statuses) {
       status.ticksLeft -= 1;
-      if (status.kind === 'poison' && status.ticksLeft % TICK_HZ === 0 && status.ticksLeft >= 0) {
+      if ((status.kind === 'poison' || status.kind === 'crush') && status.ticksLeft % TICK_HZ === 0 && status.ticksLeft >= 0) {
         applyDamage(ctx, entity.id, status.power, status.sourceId, 'status');
       }
     }

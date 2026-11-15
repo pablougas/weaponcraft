@@ -11,6 +11,7 @@ import { createTutorialPanel } from '../ui/tutorial';
 import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
 import { ShadowPortal } from '../view/effects/portal';
+import { ShadowEffects } from '../view/effects/shadow';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
 import { restPose } from '../sim/systems/rest';
@@ -166,7 +167,17 @@ export async function boot(): Promise<void> {
     },
     snapCam(presetId) {
       cameraMode = 'preset';
-      worldView?.snapCam(presetId);
+      const god = localHero();
+      if (presetId === 'closeup' && god && worldView) {
+        // In front of the god's face, a little to one side (like the 'hero' shot, but anywhere).
+        const s = (god.body?.height ?? 1.9) / 1.9;
+        const f = { x: Math.sin(god.rotationY), z: Math.cos(god.rotationY) };
+        const p = god.position;
+        worldView.camera.position.set(p.x + f.x * 1.8 + f.z * 0.5, p.y + 1.95 * s, p.z + f.z * 1.8 - f.x * 0.5);
+        worldView.camera.lookAt(p.x, p.y + 1.82 * s, p.z);
+      } else if (presetId !== 'closeup') {
+        worldView?.snapCam(presetId);
+      }
       dirty = true;
       return nextFrame();
     },
@@ -248,6 +259,7 @@ export async function boot(): Promise<void> {
   worldView = meadow;
   entityViews = views;
   const lightning = new LightningEffects(meadow.scene);
+  const shadow = new ShadowEffects(meadow.scene);
   const skyStrikes = new SkyStrikeEffects(meadow.scene, lightning);
   /** When the player last turned the camera themselves (mouse or , .); auto-follow waits after it. */
   let lastCameraInputAt = -Infinity;
@@ -307,7 +319,11 @@ export async function boot(): Promise<void> {
       for (const screen of screens) screen.close();
     }
     if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
-    if (event.type === 'ability:blink') {
+    const rm = settings.get().reduceMotion;
+    if (event.type === 'ability:blink' && event.abilityId === 'shadow-step') {
+      shadow.puff(event.from, rm);
+      shadow.puff(event.to, rm);
+    } else if (event.type === 'ability:blink') {
       // A bolt along the path, one strike down onto the landing spot, and dust where he left.
       const lift = (p: { x: number; y: number; z: number }, h: number) => ({ x: p.x, y: p.y + h, z: p.z });
       lightning.spawn([lift(event.from, 1.1), lift(event.to, 1.1)], event.tick, settings.get().reduceMotion);
@@ -318,7 +334,10 @@ export async function boot(): Promise<void> {
       const roller = activeSession.world.entities[event.entityId];
       if (roller) dust.spawn(roller.position, roller.rotationY, settings.get().reduceMotion);
     }
-    if (event.type === 'ability:cast' && event.points.length > 1) {
+    if (event.type === 'ability:cast' && event.abilityId === 'soul-bolts' && event.points.length > 1) {
+      const hand = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
+      shadow.soulBolt(hand ? { x: hand.x, y: hand.y, z: hand.z } : event.points[0], event.points[1], rm);
+    } else if (event.type === 'ability:cast' && event.points.length > 1) {
       const points = event.points.map((p) => ({ ...p }));
       // Chain Lightning leaves from the spear tip; the Lightning Fist's arc starts at its target.
       if (event.abilityId === 'chain-lightning') {
@@ -327,14 +346,22 @@ export async function boot(): Promise<void> {
       }
       lightning.spawn(points, event.tick, settings.get().reduceMotion);
     }
-    if (event.type === 'ability:telegraph') skyStrikes.telegraph(event.point, event.radius, event.ticks / 30);
-    if (event.type === 'ability:strike') skyStrikes.strike(event.point, event.radius, event.tick, settings.get().reduceMotion);
+    if (event.type === 'ability:telegraph' && event.abilityId === 'skull-cage') shadow.cageWarning(event.point, event.radius, event.ticks / 30);
+    else if (event.type === 'ability:telegraph') skyStrikes.telegraph(event.point, event.radius, event.ticks / 30);
+    if (event.type === 'ability:strike' && event.abilityId === 'skull-cage') shadow.cage(event.point, event.radius, 4, rm);
+    else if (event.type === 'ability:strike') skyStrikes.strike(event.point, event.radius, event.tick, settings.get().reduceMotion);
+    if (event.type === 'hero:attack' && event.abilityId === 'grasp-of-the-dead') {
+      const caster = activeSession.world.entities[event.entityId];
+      if (caster) shadow.grasp(caster.position, 3 + 2 * (event.power ?? 0), rm);
+    }
+    if (event.type === 'party:joined') captions.show(`Hades: I will walk with you, brother. (${keyLabel(inputMap.codesFor('switchCharacter')[0] ?? 'KeyV')} to switch)`, 5);
   });
   activeSession.onReset(() => {
     interpolator.clear();
     loop.reset();
     views.clear();
     lightning.clear();
+    shadow.clear();
     skyStrikes.clear();
     dust.clear();
     labels.clear();
@@ -538,6 +565,7 @@ export async function boot(): Promise<void> {
       frame = { time: viewSeconds, dt, world, reduceMotion: settings.get().reduceMotion };
       views.sync(world, interpolator, alpha, frame, regionOf(localHero()));
       lightning.update(dt);
+      shadow.update(dt);
       skyStrikes.update(dt);
       dust.update(dt);
 

@@ -41,11 +41,11 @@ test.describe('Hades and the descent (M5.1)', () => {
     expect(s.world!.flags).toMatchObject({ olympusShattered: true, prologueDone: true, descended: true, grottoBuilt: true });
     await expect(page.locator('#wc-hud')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('#wc-tutorial')).toContainText('Find and free Cerberus.', { timeout: 20_000 });
-    // Zeus is the one under control; Hades stands in the grotto as a story character.
+    // Zeus is the one under control; Hades has joined the party (M6) and stands with him.
     expect(hero(s).defId).toBe('zeus');
     const hades = Object.values(s.world!.entities).find((e) => e.defId === 'hades')!;
-    expect(hades).toMatchObject({ npc: { name: 'Hades' }, region: 'underworld' });
-    expect(hades.hero).toBeUndefined();
+    expect(hades).toMatchObject({ region: 'underworld', hero: expect.any(Object) });
+    expect(s.world!.players[s.localPlayerId!].party).toContain(hades.id);
 
     await page.keyboard.down('ArrowLeft');
     await page.evaluate(() => window.wc!.step(30));

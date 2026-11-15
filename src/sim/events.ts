@@ -21,7 +21,7 @@ export interface EventMap {
   };
   'combat:evaded': { attackerId: EntityId | null; targetId: EntityId };
   'entity:defeated': { entityId: EntityId; defId: string; by: EntityId | null };
-  'hero:attack': { entityId: EntityId; kind: AttackKind };
+  'hero:attack': { entityId: EntityId; kind: AttackKind; power?: number; abilityId?: string };
   'hero:jump': { entityId: EntityId };
   'hero:dodge': { entityId: EntityId };
   /** An ability went off. `points` runs from the caster through each target, for drawing. */
@@ -53,6 +53,10 @@ export interface EventMap {
   'objective:set': { objectiveId: string };
   /** A god rested at a bed: healed (and later, respawns there). */
   'hero:rested': { playerId: PlayerId };
+  /** A god joined a player's party (Hades, M6). */
+  'party:joined': { playerId: PlayerId; entityId: EntityId; defId: string };
+  /** A player switched which god they control (V). */
+  'party:switched': { playerId: PlayerId; entityId: EntityId; defId: string };
   /** A god lay down at a bed. */
   'hero:resting': { entityId: EntityId; bedId: EntityId };
   /** A god fell in battle. */

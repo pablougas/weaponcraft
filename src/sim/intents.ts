@@ -44,7 +44,7 @@ export type Intent =
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 
-export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn' | 'interact' | 'blink';
+export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn' | 'interact' | 'blink' | 'switchCharacter';
 
 export type IntentType = Intent['type'];
 

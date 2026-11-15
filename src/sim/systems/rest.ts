@@ -24,6 +24,8 @@ export const REST_HEAL_TICK = REST.lie + REST.fadeOut;
 export const REST_TOTAL = REST.lie + REST.fadeOut + REST.dark + REST.fadeIn + REST.rise;
 /** Falling in battle: collapse, then fade out before waking at the bed. */
 export const DOWN = { fall: ticks(0.8), fadeOut: ticks(1.2), total: ticks(2.2) } as const;
+/** A companion stays down this long, then gets up near the god you're controlling. */
+export const COMPANION_DOWN_TICKS = ticks(10);
 
 /** How far lying down (0 standing → 1 lying) and how dark (0–1) a hero is, for the view. */
 export function restPose(hero: HeroState | undefined): { lay: number; fade: number; onBed: boolean } {
@@ -109,6 +111,20 @@ export function updateRest(ctx: SimContext, entity: Entity & { hero: HeroState }
   }
   if (hero.down != null) {
     hero.down += 1;
+    // A companion (the god you're not controlling) is down for 10 s, then gets up near you.
+    const leaderId = Object.values(ctx.world.players).find((p) => p.party?.includes(entity.id) && p.entityId !== entity.id)?.entityId;
+    const leader = leaderId ? ctx.world.entities[leaderId] : undefined;
+    if (leader && hero.down >= COMPANION_DOWN_TICKS && ctx.isAuthority) {
+      hero.down = null;
+      if (entity.health) entity.health.current = Math.round(entity.health.max / 2);
+      const x = leader.position.x - Math.sin(leader.rotationY) * 2;
+      const z = leader.position.z - Math.cos(leader.rotationY) * 2;
+      entity.region = leader.region;
+      entity.position = { x, y: Math.max(groundAt(regionOf(leader), x, z), leader.position.y), z };
+      ctx.emit('hero:revived', { entityId: entity.id, bedId: null });
+      return true;
+    }
+    if (leader) return true;
     if (hero.down >= DOWN.total && ctx.isAuthority) {
       hero.down = null;
       const bed = respawnBed(ctx, entity);

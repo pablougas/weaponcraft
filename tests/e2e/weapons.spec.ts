@@ -10,8 +10,8 @@ test.describe('weapons and fusion (M4)', () => {
   test('?preview=weapons shows every weapon as a contact sheet', async ({ page, consoleErrors }) => {
     await page.goto('/?preview=weapons');
     await expect(page.locator('body[data-ready="true"]')).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.locator('.wc-preview-card')).toHaveCount(14);
-    // Approved: the starter spear, the three meadow weapons and their three legendaries.
+    await expect(page.locator('.wc-preview-card')).toHaveCount(15);
+    // Approved: the starter spear, the three meadow weapons, their three legendaries and Hades’s bident.
     await expect(page.locator('.wc-preview-card.wc-unapproved')).toHaveCount(7);
     const renders = await page.locator('[data-render]').evaluateAll((imgs) => imgs.map((img) => (img as HTMLImageElement).src.startsWith('data:image/png')));
     expect(renders.every(Boolean)).toBe(true);

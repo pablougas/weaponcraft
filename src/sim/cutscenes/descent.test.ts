@@ -56,7 +56,7 @@ describe('the descent (M5.1)', () => {
     run([], DESCENT_BEATS.arrive - world.tick + world.cutscene!.startTick + 1);
     expect(zeus()).toMatchObject({ region: 'underworld' });
     expect(zeus().position.y).toBeCloseTo(GROTTO.center.y, 3);
-    expect(hades()).toMatchObject({ region: 'underworld' });
+    expect(hades()).toMatchObject({ region: 'underworld', npc: { name: 'Hades' } });
     expect(world.flags.descended).toBe(true);
     const grottoKinds = Object.values(world.entities).filter((e) => e.region === 'underworld' && e.structure).map((e) => e.structure!.kind).sort();
     expect(grottoKinds).toEqual(['barricade', 'bed', 'dispatch', 'fusion-altar']);
@@ -128,8 +128,6 @@ describe('the Outer Grotto (with physics)', () => {
     const at = (x: number, z: number) => run([{ type: 'dev:teleport', playerId: 'p1', x: GROTTO.center.x + x, z: GROTTO.center.z + z }], 2);
     at(GROTTO_SPOTS.dispatch.x + 1, GROTTO_SPOTS.dispatch.z + 1);
     expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'dispatch:read' }));
-    at(GROTTO_SPOTS.hades.x - 1.4, GROTTO_SPOTS.hades.z + 0.5);
-    expect(run([{ type: 'player:action', playerId: 'p1', action: 'interact' }])).toContainEqual(expect.objectContaining({ type: 'npc:talk', name: 'Hades' }));
     // The grotto's bed: lie down, the screen fades, health comes back, get up.
     zeus().health!.current = 30;
     at(GROTTO_SPOTS.bed.x - 1.4, GROTTO_SPOTS.bed.z);

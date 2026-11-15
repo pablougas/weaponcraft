@@ -40,6 +40,10 @@ const BASE: WeaponDef[] = [
     id: 'gearbreaker', name: 'Gearbreaker', archetype: 'axe', material: 'mech-brass', element: null, approved: false,
     description: 'Cut from a fallen mech’s armour.',
   }),
+  makeWeapon({
+    id: 'shadow-bident', name: 'Shadow Bident', archetype: 'spear', material: 'storm-iron', element: 'shadow', approved: true,
+    parts: { head: 'crescent' }, description: 'Hades’s own two-pronged spear. What it wounds feeds its master.',
+  }),
 ];
 
 /** The 6 named legendaries, made only by fusion (see FUSIONS). Divine ore, mixed parts. */

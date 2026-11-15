@@ -40,6 +40,8 @@ export interface ChargedMove {
   attack(power: number): AttackSpec;
   /** Extra effect on each target hit (knockback, a lightning arc…). */
   onHit?(ctx: SimContext, casterId: EntityId, targetId: EntityId, power: number): void;
+  /** Drawn as a ring around the caster (Grasp of the Dead) instead of a punch. */
+  ring?: boolean;
 }
 
 /**
@@ -61,6 +63,12 @@ export interface BlinkMove {
   iframeTicks: number;
   burstRadius: number;
   burstDamage: number;
+  /** Shadow Step: land behind the lock-on target instead of in front of it. */
+  behindTarget?: boolean;
+  /** Leave a decoy at the start point that enemies chase, for this many ticks. */
+  decoyTicks?: number;
+  /** The next attack within `ticks` deals `multiplier` × damage. */
+  ambush?: { ticks: number; multiplier: number };
 }
 
 /**

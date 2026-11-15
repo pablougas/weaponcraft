@@ -120,6 +120,15 @@ export function createHud(parent: HTMLElement): Hud {
       slot.key.textContent = code ? keyLabel(code) : '';
     }
   };
+  // The other god in the party (M6): a small portrait chip with his health and the switch key.
+  const ally = document.createElement('div');
+  ally.className = 'wc-ally';
+  ally.hidden = true;
+  ally.innerHTML = '<span class="wc-ally-name"></span><span class="wc-ally-bar"><span></span></span><kbd></kbd>';
+  element.append(ally);
+  const allyName = ally.querySelector<HTMLElement>('.wc-ally-name')!;
+  const allyFill = ally.querySelector<HTMLElement>('.wc-ally-bar > span')!;
+  const allyKey = ally.querySelector<HTMLElement>('kbd')!;
   const target = get('target');
   const targetName = get('target-name');
   const targetHealth = get('target-health');
@@ -148,6 +157,15 @@ export function createHud(parent: HTMLElement): Hud {
       setMeter(staminaMeter, stamina, hero.stamina?.current ?? 0, hero.stamina?.max ?? 0);
 
       if (builtFor !== hero.defId) buildSlots(hero.defId);
+      const player = Object.values(world.players).find((p) => p.entityId === hero.id);
+      const otherId = player?.party?.find((id) => id !== hero.id);
+      const other = otherId ? world.entities[otherId] : undefined;
+      ally.hidden = !other?.hero;
+      if (other?.hero) {
+        allyName.textContent = godDef(other.defId).name + (other.hero.down != null ? ' (down)' : '');
+        allyFill.style.transform = `scaleX(${other.health ? Math.max(0, other.health.current / other.health.max) : 0})`;
+        allyKey.textContent = keyLabel(codesFor('switchCharacter')[0] ?? 'KeyV');
+      }
       const weapon = isKnownWeapon(world, hero.hero.weaponId) ? weaponData(world, hero.hero.weaponId) : undefined;
       if (weapon && weapon.id !== shownWeapon) {
         shownWeapon = weapon.id;

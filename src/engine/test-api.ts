@@ -44,7 +44,8 @@ export interface TestApi {
   /** Overrides the time of day (0 = midnight, 0.5 = noon, 0.7 = golden hour). */
   setTime(dayFraction: number): Promise<void>;
   /** Moves the camera to a preset shot: 'vista', 'hero' or 'wide'. */
-  snapCam(presetId: CameraPresetId): Promise<void>;
+  /** A fixed style-test shot, or 'closeup': a face close-up of whichever god you control. */
+  snapCam(presetId: CameraPresetId | 'closeup'): Promise<void>;
   /** Starts a new game with this world seed. */
   setSeed(seed: number): Promise<void>;
   /** Forces the local god's face ('neutral' | 'determined' | 'happy' | 'hurt'); null for automatic. */

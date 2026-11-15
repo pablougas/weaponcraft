@@ -25,6 +25,15 @@ export interface BodySize {
   height: number;
 }
 
+export interface GodPassive {
+  id: string;
+  name: string;
+  damageMultiplier: number;
+  staminaRegenMultiplier: number;
+  /** When it applies: in the Underworld, or at night on the surface. */
+  when: 'underworld-or-night';
+}
+
 export interface GodDef extends ContentDef {
   name: string;
   /** The god's power: weapons this god fuses take this element (Zeus → Lightning). */
@@ -47,6 +56,8 @@ export interface GodDef extends ContentDef {
   blink?: BlinkMove;
   /** Called-down ultimate on R (Sky Strike), if this god has one. */
   ultimate?: UltimateModule;
+  /** Always-on bonus (Hades's Lord of the Dead). */
+  passive?: GodPassive;
   starterWeaponId: string;
   model: ModelLoader;
 }

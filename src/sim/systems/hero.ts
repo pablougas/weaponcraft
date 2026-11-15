@@ -11,7 +11,7 @@ import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionOf, sameReg
 import { isResting, updateRest } from './rest';
 import { COMBO_WINDOW_TICKS, PUNCH_COMBO } from '../unarmed';
 import type { Entity, EntityId, HeroState, Vec3, WorldState } from '../types';
-import type { SimContext } from '../world';
+import { despawn, spawn, type SimContext } from '../world';
 
 /** Dodge roll (M3.1): fast and short, invulnerable at the start. */
 export const DODGE_TICKS = 8; // ≈0.26 s
@@ -159,7 +159,7 @@ export function applyHeroIntent(ctx: SimContext, intent: Extract<Intent, { type:
 }
 
 /** Performs one button action now. Returns a rejection reason, or null on success. */
-function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): string | null {
+export function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): string | null {
   const hero = entity.hero;
   const god = godDef(entity.defId);
 
@@ -226,7 +226,8 @@ function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): st
       let distance = blink.range;
       if (lock && toLock <= blink.lockRange && toLock > 0.01) {
         dir = { x: (lock.position.x - entity.position.x) / toLock, z: (lock.position.z - entity.position.z) / toLock };
-        distance = Math.max(0, toLock - (lock.body?.radius ?? 0.4) - 1);
+        // Bolt Step stops just in front; Shadow Step reappears just behind.
+        distance = blink.behindTarget ? toLock + (lock.body?.radius ?? 0.4) + 1.1 : Math.max(0, toLock - (lock.body?.radius ?? 0.4) - 1);
       } else {
         const length = Math.hypot(hero.move.x, hero.move.z);
         dir = length > 0.1 ? { x: hero.move.x / length, z: hero.move.z / length } : { x: Math.sin(entity.rotationY), z: Math.cos(entity.rotationY) };
@@ -237,6 +238,13 @@ function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerAction): st
       hero.attack = null;
       hero.dodge = null;
       entity.rotationY = Math.atan2(dir.x, dir.z);
+      if (blink.ambush) hero.ambush = { ...blink.ambush };
+      if (blink.decoyTicks && ctx.isAuthority) {
+        const id = spawn(ctx, 'shadow-decoy', { position: { ...entity.position }, rotationY: entity.rotationY });
+        const decoy = ctx.world.entities[id];
+        decoy.decoy = { ownerId: entity.id, ticksLeft: blink.decoyTicks };
+        decoy.region = entity.region;
+      }
       return null;
     }
     case 'ultimate': {
@@ -274,7 +282,7 @@ function faceLockTarget(ctx: SimContext, entity: HeroEntity): void {
 }
 
 /** Casts the god ability if it's ready and affordable. */
-function castAbility(ctx: SimContext, entity: HeroEntity): string | null {
+export function castAbility(ctx: SimContext, entity: HeroEntity): string | null {
   const hero = entity.hero;
   const ability = godDef(entity.defId).ability;
   if ((hero.cooldowns[ability.id] ?? 0) > 0) return 'cooling down';
@@ -291,7 +299,7 @@ function findLockTarget(ctx: SimContext, entity: Entity): EntityId | null {
   const fz = Math.cos(entity.rotationY);
   let best: { id: EntityId; score: number } | null = null;
   for (const other of Object.values(ctx.world.entities)) {
-    if (other.id === entity.id || !isHittable(other) || !sameRegion(other, entity)) continue;
+    if (other.id === entity.id || other.hero || !isHittable(other) || !sameRegion(other, entity)) continue;
     const dx = other.position.x - entity.position.x;
     const dz = other.position.z - entity.position.z;
     const distance = Math.hypot(dx, dz);
@@ -306,6 +314,11 @@ function findLockTarget(ctx: SimContext, entity: Entity): EntityId | null {
 /** Advances every hero by one tick: timers, stamina, attacks, movement and physics. */
 export function updateHeroes(ctx: SimContext, physics: PhysicsWorld | undefined): void {
   for (const entity of Object.values(ctx.world.entities)) {
+    // Shadow decoys fade on their own.
+    if (entity.decoy && --entity.decoy.ticksLeft <= 0 && ctx.isAuthority) {
+      despawn(ctx, entity.id);
+      continue;
+    }
     if (entity.hero) {
       heroDefaults(entity.hero);
       updateHero(ctx, entity as HeroEntity, physics);
@@ -351,7 +364,7 @@ function updateHeldButtons(ctx: SimContext, entity: HeroEntity): void {
         hero.cooldowns[move.id] = move.cooldownTicks;
         hero.attack = { kind: 'fist', tick: 0, hit: false, power };
         faceLockTarget(ctx, entity);
-        ctx.emit('hero:attack', { entityId: entity.id, kind: 'fist' });
+        ctx.emit('hero:attack', { entityId: entity.id, kind: 'fist', power, abilityId: move.id });
         // Don't start charging again until the button is pressed again.
         hero.chargeHeld = false;
       }
@@ -390,6 +403,7 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
   }
 
   hero.iframes = Math.max(0, hero.iframes - 1);
+  if (hero.ambush && --hero.ambush.ticks <= 0) hero.ambush = null;
   hero.hurtTicks = Math.max(0, hero.hurtTicks - 1);
   hero.staminaDelay = Math.max(0, hero.staminaDelay - 1);
   for (const id of Object.keys(hero.cooldowns)) {
@@ -491,7 +505,8 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
       entity.stamina.current = Math.max(0, entity.stamina.current - perTick(SPRINT_DRAIN_PER_SEC));
       hero.staminaDelay = Math.max(hero.staminaDelay, STAMINA_DELAY);
     } else if (hero.staminaDelay === 0 && hero.charge == null) {
-      entity.stamina.current = Math.min(entity.stamina.max, entity.stamina.current + perTick(STAMINA_REGEN_PER_SEC));
+      const passive = god.passive && regionOf(entity) === 'underworld' ? god.passive.staminaRegenMultiplier : 1;
+      entity.stamina.current = Math.min(entity.stamina.max, entity.stamina.current + perTick(STAMINA_REGEN_PER_SEC * passive));
     }
   }
 
@@ -647,7 +662,10 @@ function performBlink(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld
   const ground = groundAt(region, entity.position.x, entity.position.z);
   if (entity.position.y < ground) entity.position.y = ground;
   const to = { ...entity.position };
-  const targetIds = targetsNear(ctx.world, to, blink.burstRadius, new Set([entity.id]));
+  // Shadow Step lands behind the target, facing it.
+  const lock = hero.lockTarget ? ctx.world.entities[hero.lockTarget] : undefined;
+  if (blink.behindTarget && lock) entity.rotationY = Math.atan2(lock.position.x - to.x, lock.position.z - to.z);
+  const targetIds = blink.burstRadius > 0 ? targetsNear(ctx.world, to, blink.burstRadius, new Set([entity.id])) : [];
   for (const id of targetIds) applyDamage(ctx, id, blink.burstDamage, entity.id, 'ability', blink.element);
   ctx.emit('ability:blink', { casterId: entity.id, abilityId: blink.id, from, to, targetIds });
 }

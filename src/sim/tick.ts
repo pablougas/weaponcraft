@@ -3,6 +3,7 @@ import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
 import type { PhysicsWorld } from './physics';
 import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
+import { switchCharacter, updateCompanions } from './systems/party';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
 import { applyItemIntent } from './systems/items';
@@ -37,6 +38,8 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   for (const intent of input.intents) {
     applyIntent(ctx, intent);
   }
+  // Companions decide before physics syncs, so a catch-up teleport moves their body too.
+  updateCompanions(ctx);
 
   // Rapier steps with the sim: sync bodies from state, then update queries.
   if (input.physics) {
@@ -128,6 +131,11 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     }
     case 'player:move':
     case 'player:action': {
+      if (intent.type === 'player:action' && intent.action === 'switchCharacter') {
+        const reason = switchCharacter(ctx, intent.playerId);
+        if (reason) reject(reason);
+        return;
+      }
       const reason = applyHeroIntent(ctx, intent);
       // Held-input updates are sent every tick; only report rejected button presses.
       if (reason && intent.type === 'player:action') reject(reason);

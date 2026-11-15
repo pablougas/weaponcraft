@@ -50,13 +50,15 @@ export interface Entity {
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
   structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' };
+  /** A short-lived shadow decoy (Shadow Step): enemies chase it until it fades. */
+  decoy?: { ownerId: EntityId; ticksLeft: number };
   /** A story character you can talk to (F). */
   npc?: { name: string };
   /** Which region this entity is in (default: the surface). */
   region?: RegionId;
 }
 
-export type StatusKind = 'blind' | 'poison' | 'stun';
+export type StatusKind = 'blind' | 'poison' | 'stun' | 'crush';
 
 export interface StatusEffect {
   kind: StatusKind;
@@ -130,6 +132,13 @@ export interface HeroState {
   blink?: { dx: number; dz: number } | null;
   /** Resting at a bed: ticks into the rest timeline (systems/rest.ts) and which bed. */
   rest?: { t: number; bedId: EntityId } | null;
+  /** Hades's Lord of the Dead: his damage multiplier underground (copied from his GodDef). */
+  passiveDamage?: number;
+  /** Companion AI bookkeeping: ticks it has tried to move without getting anywhere, and where it was. */
+  companionStuck?: number;
+  companionLast?: Vec3 | null;
+  /** Shadow Step's ambush: the next attack within these ticks deals extra damage. */
+  ambush?: { ticks: number; multiplier: number } | null;
   /** Fallen in battle: ticks since falling (then wakes at the Refuge bed). */
   down?: number | null;
   /** Last spot the hero stood safely on, and ticks until it's updated again. */
@@ -158,6 +167,8 @@ export interface CreatureState {
   knock?: { x: number; z: number; ticks: number } | null;
   /** Ticks in a row a move was blocked (by a rock, another creature…). */
   blocked?: number;
+  /** Fights the gods (soldiers and sentries, M6); companions help against these. */
+  hostile?: boolean;
 }
 
 export interface PlayerState {
@@ -169,6 +180,10 @@ export interface PlayerState {
   inventory: string[];
   /** This player has watched the rocket cinematic before (on any save), so they may skip it. */
   seenRocket?: boolean;
+  /** The gods this player can switch between (M6: Zeus and Hades); `entityId` is the active one. */
+  party?: EntityId[];
+  /** World tick before which V can't switch again. */
+  switchReadyTick?: number;
   /** Cutscene IDs this player has seen before on this browser (any save): those may be skipped. */
   seenCutscenes?: string[];
 }

@@ -177,4 +177,13 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await page.evaluate(async () => { window.wc!.step(31); await window.wc!.freeze(12); });
     await expect(page).toHaveScreenshot('grotto-resting.png', SHOT);
   });
+
+  for (const expression of ['neutral', 'determined', 'happy', 'hurt'] as const) {
+    test(`Hades close-up, ${expression}`, async ({ page }) => {
+      await cinematicAt(page, 541 + 905);
+      await page.keyboard.press('KeyV');
+      await page.evaluate(async (e) => { window.wc!.step(2); await window.wc!.freeze(12); await window.wc!.snapCam('closeup'); await window.wc!.face(e); }, expression);
+      await expect(page).toHaveScreenshot(`hades-${expression}.png`, SHOT);
+    });
+  }
 });
