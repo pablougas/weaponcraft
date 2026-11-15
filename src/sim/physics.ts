@@ -2,7 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO } from './regions';
-import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_FOOTPRINT, palisadeSegments, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
+import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_FOOTPRINT, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
@@ -101,7 +101,7 @@ export class PhysicsWorld {
     }
     // Spires, the Gates' pillars, the Mk. II's footprint and Cerberus's chain post.
     for (const spire of SPIRES) {
-      this.world.createCollider(R.ColliderDesc.cylinder(spire.height / 2, spire.radius * 0.8).setTranslation(c.x + spire.x, c.y + underworldLocalHeight(spire.x, spire.z) + spire.height / 2 - 1, c.z + spire.z));
+      this.world.createCollider(R.ColliderDesc.cylinder(spire.height / 2, spire.radius * 0.8).setTranslation(c.x + spire.x, c.y + spireBase(spire) + spire.height / 2, c.z + spire.z));
     }
     for (const pillar of GATE_PILLARS) this.world.createCollider(R.ColliderDesc.cylinder(15, 3.2).setTranslation(c.x + pillar.x, c.y + 14, c.z + pillar.z));
     const mech = MECH_FOOTPRINT;

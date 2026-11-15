@@ -4,7 +4,7 @@ import { GROTTO } from '../../sim/regions';
 import { fbm } from '../../sim/terrain/noise';
 import {
   CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, GATES, MECH_FOOTPRINT, SPIRES, TUNNEL,
-  palisadeSegments, pathX, riverZ, underworldLocalHeight, watchtowerSpot,
+  palisadeSegments, pathX, riverZ, spireBase, underworldLocalHeight, watchtowerSpot,
 } from '../../sim/terrain/underworld';
 import type { Look } from '../look';
 
@@ -53,20 +53,25 @@ export function buildFields(look: Look): FieldsView {
   const moss = new THREE.Color('#4a7a76');
   const cliff = new THREE.Color('#3a3150');
   const bank = new THREE.Color('#2b3f48');
+  const highland = new THREE.Color('#a49ac4');
   const c = new THREE.Color();
+  for (let i = 0; i < gp.count; i += 1) gp.setY(i, h(gp.getX(i), gp.getZ(i)));
+  ground.computeVertexNormals();
+  const normals = ground.attributes.normal;
   for (let i = 0; i < gp.count; i += 1) {
     const x = gp.getX(i);
     const z = gp.getZ(i);
-    const y = h(x, z);
-    gp.setY(i, y);
+    const y = gp.getY(i);
     c.copy(ash).lerp(meadow, fbm(x * 0.03, z * 0.03 + 5)).lerp(moss, Math.max(0, fbm(x * 0.02 + 9, z * 0.02) - 0.55) * 2);
-    if (y > 4) c.lerp(cliff, Math.min(1, (y - 4) / 12));
+    // Higher ledges go paler (dusted with ash); steep risers and cliffs are dark rock.
+    if (y > 3) c.lerp(highland, Math.min(0.7, (y - 3) / 30));
+    const steep = 1 - normals.getY(i);
+    if (steep > 0.1) c.lerp(cliff, Math.min(1, (steep - 0.1) * 5));
     if (Math.abs(z - riverZ(x)) < 14) c.lerp(bank, 0.6);
     if (Math.abs(x - pathX(z)) < 3 && z < TUNNEL.toZ) c.lerp(new THREE.Color('#6a5f78'), 0.5);
     colors.set([c.r, c.g, c.b], i * 3);
   }
   ground.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  ground.computeVertexNormals();
   const groundMesh = new THREE.Mesh(ground, toon({ vertexColors: true, grad: look.GRAD4, rim: false }));
   groundMesh.receiveShadow = true;
   group.add(groundMesh);
@@ -119,7 +124,7 @@ export function buildFields(look: Look): FieldsView {
   const q = new THREE.Quaternion();
   let k = 0;
   for (const spire of SPIRES) {
-    const base = h(spire.x, spire.z) - 1;
+    const base = spireBase(spire);
     q.setFromEuler(new THREE.Euler((rand() - 0.5) * 0.12, rand() * 6, (rand() - 0.5) * 0.12));
     m4.compose(new THREE.Vector3(spire.x, base, spire.z), q, new THREE.Vector3(spire.radius, spire.height, spire.radius));
     spires.setMatrixAt(k++, m4);
@@ -127,7 +132,7 @@ export function buildFields(look: Look): FieldsView {
     const a = rand() * Math.PI * 2;
     const sx = spire.x + Math.cos(a) * spire.radius * 1.6;
     const sz = spire.z + Math.sin(a) * spire.radius * 1.6;
-    m4.compose(new THREE.Vector3(sx, h(sx, sz) - 0.5, sz), q, new THREE.Vector3(spire.radius * 0.5, spire.height * 0.45, spire.radius * 0.5));
+    m4.compose(new THREE.Vector3(sx, spireBase({ x: sx, z: sz, radius: spire.radius * 0.5, height: 0 }) + 0.5, sz), q, new THREE.Vector3(spire.radius * 0.5, spire.height * 0.45, spire.radius * 0.5));
     spires.setMatrixAt(k++, m4);
   }
   spires.castShadow = true;

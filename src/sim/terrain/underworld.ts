@@ -35,20 +35,35 @@ export const FORT_SPOTS = [
 ] as const;
 export const FORT_RADIUS = 16;
 
+/** Height of one highland terrace step, metres. */
+const TERRACE_STEP = 5;
+
+/** Quantises a height into flat ledges joined by steep risers (the riser is the top 30% of each step). */
+function terrace(v: number): number {
+  const k = Math.floor(v / TERRACE_STEP);
+  return (k + smoothstep(0.65, 0.95, v / TERRACE_STEP - k)) * TERRACE_STEP;
+}
+
 /** Ground height relative to the grotto floor. */
 export function underworldLocalHeight(x: number, z: number): number {
   if (z > TUNNEL.toZ) return 0;
   const d = TUNNEL.toZ - z; // metres past the tunnel mouth
   const open = smoothstep(0, 45, d);
-  let h = (fbm(x * 0.011 + 40, z * 0.011) - 0.5) * 9 + (ridged(x * 0.02, z * 0.02) - 0.5) * 2;
+  const path = Math.abs(x - pathX(z));
+  const river = Math.abs(z - riverZ(x));
+  // Gentle rolling ground everywhere (all walkable).
+  let h = (fbm(x * 0.011 + 40, z * 0.011) - 0.5) * 7 + (ridged(x * 0.02, z * 0.02) - 0.5) * 2;
+  // Highlands: terraced mesas and ridges rising away from the path, cut by the Styx's valley.
+  // Ledges are walkable; the steeper risers are cliffs (the controller climbs ≤52°).
+  const wild = smoothstep(18, 80, path) * smoothstep(12, 45, river);
+  const massif = Math.max(0, fbm(x * 0.006 - 17, z * 0.006 + 8, 4) - 0.36) * 90 + ridged(x * 0.013 + 5, z * 0.013 - 3) * 6 * smoothstep(0, 4, path - 30);
+  h += terrace(massif) * wild;
   // Cliffs at the edge of the fields.
   const edge = Math.min(x - FIELDS.minX, FIELDS.maxX - x, z - FIELDS.minZ);
-  h += (1 - smoothstep(0, 32, edge)) * 26;
+  h += (1 - smoothstep(0, 40, edge)) * 34;
   // The river channel.
-  const river = Math.abs(z - riverZ(x));
   h -= (1 - smoothstep(5, 14, river)) * 3.2;
   // Flatten the main path a little, the forts and the Gates' plaza fully.
-  const path = Math.abs(x - pathX(z));
   h *= 1 - (1 - smoothstep(4, 14, path)) * 0.6;
   for (const fort of FORT_SPOTS) {
     const r = Math.hypot(x - fort.x, z - fort.z);
@@ -117,6 +132,16 @@ export const SPIRES: readonly Spire[] = (() => {
   }
   return out;
 })();
+
+/** Where a spire's base sits: the lowest ground under it, so it never floats on a slope. */
+export function spireBase(spire: Spire): number {
+  let low = underworldLocalHeight(spire.x, spire.z);
+  for (let i = 0; i < 6; i += 1) {
+    const a = (i / 6) * Math.PI * 2;
+    low = Math.min(low, underworldLocalHeight(spire.x + Math.cos(a) * spire.radius, spire.z + Math.sin(a) * spire.radius));
+  }
+  return low - 1;
+}
 
 /** Bearing (like rotationY) from a fort's centre to its gate, which faces the main path. */
 export function fortGateBearing(fort: { x: number; z: number }): number {

@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { groundAt } from '../../../sim/regions';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
+/** The sentry's sight cone mesh: rings out from the sentry × segments across its angle. */
+const CONE_RINGS = 6;
+const CONE_SEGMENTS = 20;
+
 /**
  * A human soldier of the occupying army: bronze helmet with a red crest,
  * a red tabard over grey mail, and a spear, a big round shield and a spear,
@@ -96,11 +100,15 @@ export const createModel: ModelFactory = (look) => {
       arm.add(M(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 6), wood, [0, -0.4, 0], { outline: 0.008 }));
       coneRadius = 26;
       coneHalf = 0.6;
-      const segments = 20;
+      // A fan of CONE_RINGS rings so it drapes over hills instead of cutting through them.
       const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((segments + 2) * 3), 3));
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((1 + CONE_RINGS * (CONE_SEGMENTS + 1)) * 3), 3));
       const index: number[] = [];
-      for (let i = 1; i <= segments; i += 1) index.push(0, i, i + 1);
+      const at = (ring: number, i: number) => 1 + (ring - 1) * (CONE_SEGMENTS + 1) + i;
+      for (let i = 0; i < CONE_SEGMENTS; i += 1) index.push(0, at(1, i), at(1, i + 1));
+      for (let ring = 2; ring <= CONE_RINGS; ring += 1) {
+        for (let i = 0; i < CONE_SEGMENTS; i += 1) index.push(at(ring - 1, i), at(ring, i), at(ring, i + 1), at(ring - 1, i), at(ring, i + 1), at(ring - 1, i + 1));
+      }
       geometry.setIndex(index);
       cone = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: '#ffd35c', transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
       cone.frustumCulled = false;
@@ -136,15 +144,18 @@ export const createModel: ModelFactory = (look) => {
         const yaw = s.facing;
         const lift = 0.15;
         pos.setXYZ(0, 0, lift, 0);
-        const segments = pos.count - 2;
-        for (let i = 0; i <= segments; i += 1) {
-          const a = -coneHalf + (2 * coneHalf * i) / segments;
-          // Local to the root (which is rotated by rotationY).
-          const lx = Math.sin(a + yaw - entity.rotationY) * coneRadius;
-          const lz = Math.cos(a + yaw - entity.rotationY) * coneRadius;
-          const wx = entity.position.x + Math.sin(a + yaw) * coneRadius;
-          const wz = entity.position.z + Math.cos(a + yaw) * coneRadius;
-          pos.setXYZ(i + 1, lx, groundAt('underworld', wx, wz) - entity.position.y + lift, lz);
+        let v = 1;
+        for (let ring = 1; ring <= CONE_RINGS; ring += 1) {
+          const r = (coneRadius * ring) / CONE_RINGS;
+          for (let i = 0; i <= CONE_SEGMENTS; i += 1) {
+            const a = -coneHalf + (2 * coneHalf * i) / CONE_SEGMENTS;
+            // Local to the root (which is rotated by rotationY).
+            const lx = Math.sin(a + yaw - entity.rotationY) * r;
+            const lz = Math.cos(a + yaw - entity.rotationY) * r;
+            const wx = entity.position.x + Math.sin(a + yaw) * r;
+            const wz = entity.position.z + Math.cos(a + yaw) * r;
+            pos.setXYZ(v++, lx, groundAt('underworld', wx, wz) - entity.position.y + lift, lz);
+          }
         }
         pos.needsUpdate = true;
         const alarm = s.state === 'attack';
