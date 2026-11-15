@@ -36,10 +36,14 @@ test.describe('the Underworld route (M6)', () => {
     await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), {
       x: leader.position.x + Math.sin(f) * 12, z: leader.position.z + Math.cos(f) * 12, yaw: f + Math.PI,
     });
-    await page.evaluate(() => window.wc!.step(120));
+    // Half a second later the leader has spotted you (the companion Hades soon cuts him down, so check now).
+    await page.evaluate(() => window.wc!.step(15));
+    s = await state(page);
+    expect(s.world!.entities[leader.id]!.soldier!.awareness).toBeGreaterThanOrEqual(60);
+    await page.evaluate(() => window.wc!.step(105));
     s = await state(page);
     const squad = Object.values(s.world!.entities).filter((e) => e.soldier?.squadId === 'squad-approach');
-    expect(squad.find((e) => e.id === leader.id)!.soldier!.awareness).toBeGreaterThanOrEqual(60);
+    expect(squad.length).toBeGreaterThan(0);
     expect(squad.every((e) => e.soldier!.state === 'attack')).toBe(true);
 
     // Stand at the first fort's gate: its soldiers notice and attack.
