@@ -48,7 +48,7 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' };
 }
 
 export type StatusKind = 'blind' | 'poison' | 'stun';
@@ -158,6 +158,8 @@ export interface PlayerState {
   entityId: EntityId | null;
   /** Weapon IDs carried (the equipped one included), in slot order. */
   inventory: string[];
+  /** This player has watched the rocket cinematic before (on any save), so they may skip it. */
+  seenRocket?: boolean;
 }
 
 /** Story and progress flags (SPEC §11). Unknown keys are allowed for content. */
@@ -166,6 +168,8 @@ export interface WorldFlags {
   olympusShattered: boolean;
   /** The meadow's god, dummies and wildlife have been spawned (false/missing in older saves). */
   meadowPopulated: boolean;
+  /** M5: the Forge and the bed were added when the meadow became the Refuge. */
+  refugeBuilt?: boolean;
   /** M4: the Fusion Altar, the weapons to find and elemental dummies are placed. */
   armoryPlaced?: boolean;
   [flag: string]: boolean | undefined;
@@ -175,6 +179,17 @@ export interface CutsceneState {
   id: string;
   /** Tick the cutscene started on. */
   startTick: number;
+  /** Can the players skip it? (Not the first time anyone here sees it, SPEC §3.2.) */
+  skippable?: boolean;
+}
+
+/** Prologue tutorial progress (SPEC §3.1), saved with the world. */
+export interface TutorialState {
+  /** IDs of the steps done so far. */
+  done: string[];
+  /** Ticks spent walking and sprinting, toward the move and sprint steps. */
+  movedTicks: number;
+  sprintTicks: number;
 }
 
 export interface WorldState {
@@ -199,6 +214,12 @@ export interface WorldState {
   customWeapons: Record<string, WeaponData>;
   /** Fusion Codex: every fusion discovered in this world, by pair key. */
   codex: Record<string, CodexEntry>;
+  /** The prologue tutorial. */
+  tutorial: TutorialState;
+  /** Current objective ID shown to players (e.g. 'find-the-others'), or null. */
+  objective: string | null;
+  /** World clock time (ms) when the rocket hit Olympus, or null before. */
+  olympusShatteredAtMs: number | null;
 }
 
 export type WeaponArchetype = 'spear' | 'sword' | 'axe' | 'staff';

@@ -7,6 +7,11 @@ import { godDef } from '../sim/defs';
 import { createDevMenu, type DevMenu } from '../ui/dev-menu';
 import { createAltarScreen } from '../ui/altar';
 import { createCaptions } from '../ui/captions';
+import { createTutorialPanel } from '../ui/tutorial';
+import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
+import { rocketTicks } from '../sim/cutscenes/rocket';
+import { DAY_MS } from '../sim/time';
+import { loadProgress, saveProgress } from './progress';
 import { createCodex } from '../ui/codex';
 import { createInventory } from '../ui/inventory';
 import { WorldLabels } from '../ui/world-labels';
@@ -72,6 +77,9 @@ export async function boot(): Promise<void> {
   const cameraRig = new CameraRig();
   /** 'preset' while a fixed shot is shown (title screen, tests); 'follow' during play. */
   let cameraMode: 'preset' | 'follow' = 'preset';
+  /** Camera pose when the rocket cinematic began (it eases from there), and the latest shake (tests). */
+  let cinematicStart: CameraPose | null = null;
+  let cameraShake = 0;
   const storage = browserStorage();
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const settings = new SettingsStore(storage, defaultSettings(prefersReducedMotion));
@@ -125,6 +133,7 @@ export async function boot(): Promise<void> {
     settings: settings.get(),
     quality: worldView ? activeQuality() : null,
     frozenAt,
+    cameraShake,
   });
 
   installTestApi({
@@ -162,6 +171,14 @@ export async function boot(): Promise<void> {
     },
     face(expression) {
       entityViews?.setFaceOverride(expression);
+      dirty = true;
+      return nextFrame();
+    },
+    completeTutorialStep(stepId) {
+      if (!session) return nextFrame();
+      session.sendIntent({ type: 'dev:tutorial', stepId });
+      tick();
+      loop.recordTick(performance.now());
       dirty = true;
       return nextFrame();
     },
@@ -235,6 +252,7 @@ export async function boot(): Promise<void> {
 
   const hud = createHud(document.body);
   const captions = createCaptions(document.body);
+  const progress = loadProgress(storage);
   const dust = new DustEffects(meadow.scene);
   const sfx = new Sfx((entityId) => !!entityId && entityId === localHero()?.id, (text) => captions.show(text));
   /** Auto-follow waits this long after the player last turned the camera. */
@@ -256,6 +274,14 @@ export async function boot(): Promise<void> {
   activeSession.bus.onAny((event) => {
     views.handleEvent(event, frame);
     sfx.handle(event);
+    if (event.type === 'cutscene:beat' && ROCKET_CAPTIONS[event.beat]) captions.show(ROCKET_CAPTIONS[event.beat], event.beat === 'pan' ? 5 : 3.5);
+    if (event.type === 'cutscene:end') {
+      progress.seenRocket = true;
+      saveProgress(storage, progress);
+    }
+    if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
+    if (event.type === 'hero:rested') captions.show('You rest. Health and stamina restored.');
+    if (event.type === 'forge:used') captions.show('The Forge is cold. Bring materials from the wider world to craft here.');
     altarScreen.handleEvent(event);
     labels.handleEvent(event, activeSession.world, (id) => !!id && id === localHero()?.id);
     if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
@@ -348,8 +374,16 @@ export async function boot(): Promise<void> {
   if (devMenuEnabled()) {
     devMenu = createDevMenu(document.body, activeSession, settings, loop, newGame);
   }
+  const tutorialPanel = createTutorialPanel(document.body, (action) => keyLabel(inputMap.codesFor(action)[0] ?? ''));
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return;
+    // A skippable cinematic: Enter (or Esc) skips it.
+    if (activeSession.world.cutscene?.skippable && shell.screen === 'playing' && !settingsMenu?.isOpen
+      && (inputMap.matches('skipCutscene', event) || inputMap.matches('settings', event))) {
+      event.preventDefault();
+      activeSession.sendIntent({ type: 'cutscene:skip' });
+      return;
+    }
     if (devMenu && inputMap.matches('devMenu', event)) {
       event.preventDefault();
       devMenu.toggle();
@@ -445,6 +479,7 @@ export async function boot(): Promise<void> {
   };
 
   const lockPoint = new THREE.Vector3();
+  const followCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
   const heroPoint = { x: 0, y: 0, z: 0 };
   let firstFrame = true;
   let lastFrameMs: number | undefined;
@@ -484,7 +519,48 @@ export async function boot(): Promise<void> {
         && Math.hypot(hero.position.x, hero.position.z) > MEADOW_RADIUS - 3) {
         captions.show('The rest of the world can wait. For now.');
       }
-      if (cameraMode === 'follow' && hero) {
+      // The rocket cinematic drives the camera, HUD and Olympus from its timeline (SPEC §3.2).
+      const cinematicTicks = rocketTicks(world);
+      const cinematic = cinematicTicks !== null && cameraMode === 'follow' && hero;
+      const reduceMotion = settings.get().reduceMotion;
+      let olympusTiming: { rocketFlight: number | null; sinceImpact: number | null; columns: number | null } = { rocketFlight: null, sinceImpact: null, columns: null };
+      if (cinematic && hero) {
+        interpolator.position(world, hero.id, alpha, heroPoint);
+        if (!cinematicStart) {
+          const target = new THREE.Vector3();
+          meadow.camera.getWorldDirection(target).multiplyScalar(10).add(meadow.camera.position);
+          cinematicStart = { position: meadow.camera.position.clone(), target, fov: meadow.camera.fov };
+        }
+        cameraRig.update(followCamera, heroPoint, 0, null);
+        const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
+        const t = (cinematicTicks + (frozen ? 0 : alpha)) / 30;
+        const frame = rocketFrame(t, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
+        meadow.camera.position.copy(frame.pose.position);
+        meadow.camera.fov = frame.pose.fov;
+        meadow.camera.updateProjectionMatrix();
+        meadow.camera.lookAt(frame.pose.target);
+        meadow.setCinematicBoost(frame.bloom, frame.exposure);
+        cameraShake = frame.shake;
+        olympusTiming = frame;
+      } else {
+        if (cinematicStart) {
+          cinematicStart = null;
+          meadow.camera.fov = 50;
+          meadow.camera.updateProjectionMatrix();
+          meadow.setCinematicBoost(0, 0);
+          cameraRig.reset();
+        }
+        cameraShake = 0;
+      }
+      meadow.setOlympus({
+        shattered: world.flags.olympusShattered,
+        ...olympusTiming,
+        // Smoke rises from the broken summit through the first in-game day (SPEC §3.3).
+        smoke: world.flags.olympusShattered && world.olympusShatteredAtMs !== null && world.nowMs - world.olympusShatteredAtMs < DAY_MS,
+        reduceMotion,
+      });
+
+      if (cameraMode === 'follow' && hero && !cinematic) {
         // Keyboard camera (, and .) and auto-follow, so the game plays without a mouse.
         const turn = (input?.isHeld('cameraRight') ? 1 : 0) - (input?.isHeld('cameraLeft') ? 1 : 0);
         if (turn !== 0) {
@@ -498,9 +574,13 @@ export async function boot(): Promise<void> {
         const lock = hero.hero?.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
         cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null);
       }
+      // The HUD fades out for the cinematic and comes back after.
+      const showHud = shell.screen === 'playing' && !world.cutscene;
+      hud.setVisible(showHud);
       hud.update(world, hero?.id ?? null);
+      tutorialPanel.update(world, showHud);
       for (const screen of screens) screen.refresh();
-      labels.update(world, meadow.camera, activeSession.localPlayerId, dt, settings.get().reduceMotion, shell.screen === 'playing');
+      labels.update(world, meadow.camera, activeSession.localPlayerId, dt, settings.get().reduceMotion, showHud);
 
       meadow.update(viewSeconds, activeSession.worldTime().dayFraction);
       meadow.render();
@@ -525,6 +605,8 @@ export async function boot(): Promise<void> {
         cameraRig.reset();
         cameraMode = 'follow';
         hud.setVisible(true);
+        // Tell the sim whether this browser has seen the rocket before (then it's skippable).
+        activeSession.sendIntent({ type: 'player:declare', seenRocket: progress.seenRocket });
         requestLock();
         view.canvas.focus();
       },

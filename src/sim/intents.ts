@@ -7,6 +7,12 @@ import type { PlayerId, Vec3 } from './types';
 export type Intent =
   | { type: 'dev:spawn'; playerId: PlayerId; defId: string; position?: Vec3 }
   | { type: 'dev:despawn'; playerId: PlayerId; entityId: string }
+  /** Skip the running cutscene (only if it's skippable). */
+  | { type: 'cutscene:skip'; playerId: PlayerId }
+  /** The client tells the sim what this player has already seen on this browser (any save). */
+  | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean }
+  /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
+  | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }
   /** Equip the weapon in inventory slot `slot`. */
@@ -46,4 +52,4 @@ export type IntentType = Intent['type'];
 export type IntentInput = Intent extends infer I ? (I extends Intent ? Omit<I, 'playerId'> : never) : never;
 
 /** Intents that still apply while a cutscene has locked player input. */
-export const CUTSCENE_ALLOWED_INTENTS: ReadonlySet<IntentType> = new Set<IntentType>([]);
+export const CUTSCENE_ALLOWED_INTENTS: ReadonlySet<IntentType> = new Set<IntentType>(['cutscene:skip', 'player:declare']);

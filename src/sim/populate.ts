@@ -106,3 +106,24 @@ export function ensureArmory(world: WorldState, isAuthority = true): GameEvent[]
   world.flags.armoryPlaced = true;
   return events;
 }
+
+/** The Refuge (SPEC §3.3): after the rocket, a Forge and a bed join the Fusion Altar. */
+export const FORGE_SPOT = { x: 11, z: -1 } as const;
+export const BED_SPOT = { x: 4.5, z: 6.5 } as const;
+
+function spawnStructure(ctx: SimContext, kind: 'forge' | 'bed', x: number, z: number, rotationY: number, body: { radius: number; height: number }): EntityId {
+  const id = spawn(ctx, kind, { position: { x, y: groundHeightAt(x, z), z }, rotationY });
+  const entity = ctx.world.entities[id];
+  entity.structure = { kind };
+  entity.body = body;
+  return id;
+}
+
+/** Turns the meadow into the Refuge once (also for saves made after the rocket). */
+export function ensureRefuge(ctx: SimContext): void {
+  const { world } = ctx;
+  if (world.flags.refugeBuilt || !world.flags.prologueDone) return;
+  spawnStructure(ctx, 'forge', FORGE_SPOT.x, FORGE_SPOT.z, -Math.PI / 2, { radius: 0.9, height: 1.6 });
+  spawnStructure(ctx, 'bed', BED_SPOT.x, BED_SPOT.z, 0.4, { radius: 0.7, height: 0.7 });
+  world.flags.refugeBuilt = true;
+}

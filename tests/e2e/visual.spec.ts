@@ -22,7 +22,7 @@ async function frozenScene(page: Page, dayFraction: number, camera: Camera = 'vi
   await openGame(page);
   await page.locator('#wc-title').click();
   await expect(page.locator('#wc-title, #wc-loading')).toHaveCount(0);
-  if (!hud) await page.addStyleTag({ content: '#wc-hud, #wc-labels { display: none !important; }' });
+  if (!hud) await page.addStyleTag({ content: '#wc-hud, #wc-labels, #wc-tutorial, #wc-captions, #wc-skip { display: none !important; }' });
   await page.evaluate(async ({ dayFraction, camera }) => {
     await window.wc!.freeze(12);
     await window.wc!.setSeed(7);
@@ -132,5 +132,27 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await expect(page.locator('#wc-codex')).toBeVisible();
     await page.evaluate(() => window.wc!.freeze(12));
     await expect(page).toHaveScreenshot('codex.png', SHOT);
+  });
+
+  /** Completes the tutorial and steps the (frozen) rocket cinematic to `ticks` after it starts. */
+  async function cinematicAt(page: Page, ticks: number) {
+    await frozenScene(page, 0.7, 'follow');
+    for (const step of ['move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse']) {
+      await page.evaluate((s) => window.wc!.completeTutorialStep(s), step);
+    }
+    await page.evaluate(async (n) => { window.wc!.step(n); await window.wc!.freeze(12); }, ticks);
+  }
+
+  for (const [name, ticks] of [['rocket', 105], ['impact', 186], ['pan', 400]] as const) {
+    test(`rocket cinematic: ${name}`, async ({ page }) => {
+      await cinematicAt(page, ticks);
+      await expect(page).toHaveScreenshot(`cinematic-${name}.png`, SHOT);
+    });
+  }
+
+  test('the shattered summit after the rocket', async ({ page }) => {
+    await cinematicAt(page, 560);
+    await page.evaluate(async () => { await window.wc!.setTime(0.7); await window.wc!.snapCam('vista'); });
+    await expect(page).toHaveScreenshot('vista-shattered.png', SHOT);
   });
 });

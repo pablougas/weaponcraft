@@ -90,6 +90,16 @@ Zeus starts on the rock. Behind it (south) are three practice dummies and a
 small flock of sheep to try attacks on. Dummies reset a few seconds after you
 stop hitting them.
 
+**The prologue:** a new game starts in "The Last Calm Day": golden hour,
+frozen. Prompts at the top left teach moving, sprinting, jumping, attacking,
+Chain Lightning, picking up a weapon and fusing two at the altar. When all are
+done, the rocket cinematic plays (about 18 s, no control). It can't be skipped
+the first time; after that this browser remembers, and **Enter** skips it in
+later games. Afterwards Olympus is shattered, the clock runs again, the meadow
+becomes the Refuge (a Forge and a bed join the altar; **F** at the bed restores
+health) and the objective is "Find the others. Survive." **New game** replays
+the prologue.
+
 **Weapons and fusion:** three weapons lie in the meadow east and south of the
 rock (they glow and float; press **F** next to one). Open the inventory with
 **I** to see and equip them. At the **Fusion Altar** east of the rock, press

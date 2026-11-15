@@ -25,6 +25,9 @@ export function createWorld(seed: number, nowMs: number, playerIds: readonly Pla
     rngStreams: {},
     customWeapons: {},
     codex: {},
+    tutorial: { done: [], movedTicks: 0, sprintTicks: 0 },
+    objective: null,
+    olympusShatteredAtMs: null,
   };
 }
 

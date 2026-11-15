@@ -44,6 +44,17 @@ export interface EventMap {
   'weapon:equipped': { playerId: PlayerId; weaponId: string };
   /** Two weapons were fused. `newDiscovery` = first time this pair was fused in this world. */
   'fusion:created': { playerId: PlayerId; resultId: string; key: string; legendary: boolean; newDiscovery: boolean; inputs: [string, string] };
+  /** A prologue tutorial step was completed; `next` is the step now shown (null when all are done). */
+  'tutorial:step': { stepId: string; next: string | null };
+  'cutscene:start': { cutsceneId: string; skippable: boolean };
+  /** A named moment in a cutscene's timeline (rocket: launch, impact, collapse, pan, return). */
+  'cutscene:beat': { cutsceneId: string; beat: string };
+  'cutscene:end': { cutsceneId: string; skipped: boolean };
+  'objective:set': { objectiveId: string };
+  /** A god rested at a bed: healed (and later, respawns there). */
+  'hero:rested': { playerId: PlayerId };
+  /** Someone used the Forge. */
+  'forge:used': { playerId: PlayerId };
   /** The hero was put back on safe ground (stuck or fell out of the world). */
   'hero:recovered': { entityId: EntityId; reason: string };
 }

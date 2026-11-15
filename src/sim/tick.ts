@@ -3,7 +3,9 @@ import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
 import type { PhysicsWorld } from './physics';
 import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
+import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
 import { applyItemIntent } from './systems/items';
+import { completeStep, tutorialComplete, updateTutorial } from './tutorial';
 import { updateCreatures } from './systems/wildlife';
 import { groundHeightAt } from './terrain/meadow-rocks';
 import type { WorldState } from './types';
@@ -43,6 +45,13 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   updateStatuses(ctx);
   updateHeroes(ctx, input.physics);
   if (input.isAuthority) updateCreatures(ctx, input.physics);
+
+  // Prologue: tutorial progress, then the rocket when every step is done (SPEC §3.1–3.2).
+  if (input.isAuthority) {
+    updateTutorial(ctx, events);
+    if (!world.flags.prologueDone && !world.cutscene && tutorialComplete(world)) startRocket(ctx);
+    else if (rocketTicks(world) !== null) updateRocket(ctx);
+  }
 
   return events;
 }
@@ -91,6 +100,17 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       hero.hero.lastSafe = { ...position };
       return;
     }
+    case 'cutscene:skip': {
+      const reason = skipRocket(ctx);
+      if (reason) reject(reason);
+      return;
+    }
+    case 'player:declare':
+      world.players[intent.playerId].seenRocket = world.players[intent.playerId].seenRocket || intent.seenRocket;
+      return;
+    case 'dev:tutorial':
+      if (!completeStep(ctx, intent.stepId)) reject('unknown or already done');
+      return;
     case 'dev:give':
     case 'player:equip':
     case 'player:fuse': {

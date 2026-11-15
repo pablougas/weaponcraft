@@ -19,6 +19,7 @@ export type InputAction =
   | 'ultimate'
   | 'lockOn'
   | 'blink'
+  | 'skipCutscene'
   | 'interact'
   | 'inventory'
   | 'codex'
@@ -50,6 +51,7 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   lockOn: ['Tab'],
   // Bolt Step: W is free since the arrow keys move (M3.1), and sits next to Q and R.
   blink: ['KeyW'],
+  skipCutscene: ['Enter'],
   interact: ['KeyF'],
   inventory: ['KeyI'],
   codex: ['KeyC'],

@@ -7,7 +7,7 @@ import { CAMERA_PRESETS, type CameraPresetId } from './cameras';
 import { createLook, type Look } from './look';
 import { buildBirds } from './meadow/birds';
 import { buildFlowers, buildGrass } from './meadow/foliage';
-import { buildOlympus } from './meadow/olympus';
+import { buildOlympus, type OlympusState, type OlympusView } from './meadow/olympus';
 import { buildRocks, buildTrees } from './meadow/props';
 import { buildTerrainMesh, buildWater } from './meadow/terrain-mesh';
 import { createMeadowParticles } from './particles';
@@ -22,6 +22,11 @@ import { lerp, lightingSegment } from './time-of-day';
 export interface WorldView {
   readonly scene: THREE.Scene;
   readonly look: Look;
+  readonly olympus: OlympusView;
+  /** Olympus intact or shattered, and the rocket cinematic's distant effects. */
+  setOlympus(state: Omit<OlympusState, 'time'>): void;
+  /** Extra bloom and exposure for the impact's slow swell (0 = none). */
+  setCinematicBoost(bloom: number, exposure: number): void;
   readonly camera: THREE.PerspectiveCamera;
   /** Advance animation to `timeSeconds` and light the scene for `dayFraction`. */
   update(timeSeconds: number, dayFraction: number): void;
@@ -66,7 +71,11 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   scene.add(buildTerrainMesh(look));
   const water = buildWater();
   scene.add(water);
-  scene.add(buildOlympus(look));
+  const olympus = buildOlympus(look);
+  scene.add(olympus.group);
+  let olympusState: OlympusState = { shattered: false, sinceImpact: null, rocketFlight: null, columns: null, smoke: false, time: 0, reduceMotion: false };
+  let bloomBoost = 0;
+  let exposureBoost = 0;
   // Build order matters: each builder draws from the shared layout RNG.
   scene.add(buildRocks(look));
   scene.add(buildTrees(look, rand));
@@ -158,10 +167,22 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const view: WorldView = {
     scene,
     look,
+    olympus,
+    setOlympus(state) {
+      olympusState = { ...state, time: olympusState.time };
+    },
+    setCinematicBoost(bloom, exposure) {
+      bloomBoost = bloom;
+      exposureBoost = exposure;
+    },
     camera,
     update(timeSeconds, dayFraction) {
       U.time.value = timeSeconds;
       applyLighting(dayFraction);
+      post.bloom.strength += bloomBoost;
+      renderer.toneMappingExposure += exposureBoost;
+      olympusState.time = timeSeconds;
+      olympus.update(olympusState);
       birds.update(timeSeconds);
       sky.position.copy(camera.position);
       updateGodRays();

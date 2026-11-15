@@ -87,6 +87,9 @@ export class Sfx {
         this.noiseBurst(ctx, { duration: 0.12, volume: 0.45, type: 'highpass', freq: 3000 });
         this.tone(ctx, { from: 300, to: 2400, duration: 0.14, volume: 0.1, type: 'sawtooth', delay: 0.03 });
         return;
+      case 'cutscene:beat':
+        if (ctx) this.cinematic(ctx, event.beat);
+        return;
       case 'ability:telegraph':
         if (!this.isLocal(event.casterId)) return;
         this.onCaption('[Storm clouds gather]');
@@ -154,5 +157,33 @@ export class Sfx {
     }
     const power = Math.min(1, charge / fullChargeTicks);
     this.hum.osc.frequency.setTargetAtTime(90 + power * 260, ctx.currentTime, 0.05);
+  }
+
+  /** The rocket cinematic's sting (SPEC §3.2): whine, boom, rumble, drums and horn, a closing chord. */
+  private cinematic(ctx: AudioContext, beat: string): void {
+    switch (beat) {
+      case 'launch':
+        this.tone(ctx, { from: 140, to: 1100, duration: 4.4, volume: 0.09, type: 'sawtooth' });
+        this.noiseBurst(ctx, { duration: 4.4, volume: 0.18, type: 'bandpass', freq: 400, freqEnd: 2200 });
+        return;
+      case 'impact':
+        this.noiseBurst(ctx, { duration: 0.4, volume: 0.6, type: 'highpass', freq: 900 });
+        this.noiseBurst(ctx, { duration: 3.2, volume: 0.75, type: 'lowpass', freq: 700, freqEnd: 60 });
+        this.tone(ctx, { from: 80, to: 28, duration: 2.6, volume: 0.45, type: 'sine' });
+        return;
+      case 'collapse':
+        this.noiseBurst(ctx, { duration: 3.8, volume: 0.35, type: 'lowpass', freq: 260, freqEnd: 90 });
+        return;
+      case 'pan':
+        for (let i = 0; i < 8; i += 1) {
+          this.tone(ctx, { from: 110, to: 48, duration: 0.35, volume: i % 2 ? 0.28 : 0.4, type: 'sine', delay: i * 0.55 });
+        }
+        this.tone(ctx, { from: 146, to: 140, duration: 2.2, volume: 0.07, type: 'sawtooth', delay: 1.1 });
+        return;
+      case 'return':
+        for (const [i, f] of [220, 277, 330].entries()) this.tone(ctx, { from: f, to: f, duration: 2.4, volume: 0.06, type: 'sine', delay: i * 0.08 });
+        return;
+      default:
+    }
   }
 }

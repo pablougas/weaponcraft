@@ -65,6 +65,9 @@ export function deserialize(text: string): WorldState {
 function migrate(world: WorldState): WorldState {
   world.customWeapons ??= {};
   world.codex ??= {};
+  world.tutorial ??= { done: [], movedTicks: 0, sprintTicks: 0 };
+  world.objective ??= null;
+  world.olympusShatteredAtMs ??= null;
   for (const player of Object.values(world.players)) player.inventory ??= [];
   return world;
 }

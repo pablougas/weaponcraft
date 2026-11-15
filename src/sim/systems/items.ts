@@ -57,6 +57,18 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
     ctx.emit('altar:opened', { playerId, altarId: target.id });
     return null;
   }
+  if (target.structure?.kind === 'bed') {
+    // Rest: back to full health. The world clock is global, so sleeping never skips time (SPEC §6).
+    const hero = heroOf(world, playerId);
+    if (hero?.health) hero.health.current = hero.health.max;
+    if (hero?.stamina) hero.stamina.current = hero.stamina.max;
+    ctx.emit('hero:rested', { playerId });
+    return null;
+  }
+  if (target.structure?.kind === 'forge') {
+    ctx.emit('forge:used', { playerId });
+    return null;
+  }
   return 'nothing to use';
 }
 

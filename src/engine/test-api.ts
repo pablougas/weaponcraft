@@ -23,12 +23,14 @@ export interface TestState extends ShellState {
   quality: QualityPreset | null;
   /** Seconds the view clock is frozen at, or null if running. */
   frozenAt: number | null;
+  /** How far the cinematic camera is shaken this frame, metres (0 with Reduce motion). */
+  cameraShake: number;
 }
 
 /**
  * Deterministic test API for Playwright (see CLAUDE.md). Mutators resolve
  * after the next rendered frame, so a screenshot taken afterwards shows the
- * change. `completeTutorialStep` arrives with M5.
+ * change.
  */
 export interface TestApi {
   /** Resolves once the scene is built and a frame has been rendered. */
@@ -47,6 +49,8 @@ export interface TestApi {
   setSeed(seed: number): Promise<void>;
   /** Forces the local god's face ('neutral' | 'determined' | 'happy' | 'hurt'); null for automatic. */
   face(expression: Expression | null): Promise<void>;
+  /** Marks a prologue tutorial step done ('move', 'sprint', 'jump', 'attack', 'ability', 'pickup', 'fuse'). */
+  completeTutorialStep(stepId: string): Promise<void>;
   /** Moves the local god onto the ground at (x, z) via a `dev:teleport` intent, camera behind it. */
   teleport(x: number, z: number, rotationY?: number): Promise<void>;
 }
