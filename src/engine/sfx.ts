@@ -79,6 +79,10 @@ export class Sfx {
     switch (event.type) {
       case 'ability:cast':
         if (!this.isLocal(event.casterId) || !ctx) return;
+        if (event.abilityId === 'three-fold-howl') {
+          this.howl(ctx, 0.7);
+          return;
+        }
         if (event.abilityId === 'soul-bolts') {
           // A ghostly wail: a falling, wavering tone over a breathy whoosh.
           this.noiseBurst(ctx, { duration: 0.3, volume: 0.18, type: 'bandpass', freq: 1400, freqEnd: 300 });
@@ -209,6 +213,39 @@ export class Sfx {
         this.noiseBurst(ctx, { duration: 0.25, volume: 0.12, type: 'bandpass', freq: 600, freqEnd: 2000 });
         this.tone(ctx, { from: event.defId === 'hades' ? 330 : 440, to: event.defId === 'hades' ? 165 : 880, duration: 0.25, volume: 0.07, type: 'triangle' });
         return;
+      case 'mech:alarm':
+        if (!ctx) return;
+        // A metal roar: three detuned saws through a falling low-pass, over grinding noise.
+        for (const f of [55, 58, 82]) this.tone(ctx, { from: f * 1.4, to: f, duration: 1.6, volume: 0.09, type: 'sawtooth' });
+        this.noiseBurst(ctx, { duration: 1.4, volume: 0.25, type: 'lowpass', freq: 900, freqEnd: 150 });
+        return;
+      case 'mech:windup':
+        if (!ctx) return;
+        if (event.kind === 'stomp') {
+          // Pistons straining as it rears up.
+          this.tone(ctx, { from: 50, to: 120, duration: event.ticks / 30, volume: 0.16, type: 'sawtooth' });
+          this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.1, type: 'bandpass', freq: 400, freqEnd: 1400 });
+        } else {
+          // Drawing breath: a rising, roaring hiss.
+          this.noiseBurst(ctx, { duration: event.ticks / 30, volume: 0.18, type: 'bandpass', freq: 300, freqEnd: 2200 });
+        }
+        return;
+      case 'mech:strike':
+        if (!ctx) return;
+        if (event.kind === 'stomp') {
+          this.noiseBurst(ctx, { duration: 1.6, volume: 0.7, type: 'lowpass', freq: 600, freqEnd: 50 });
+          this.tone(ctx, { from: 70, to: 26, duration: 1.2, volume: 0.45, type: 'sine' });
+        } else {
+          this.noiseBurst(ctx, { duration: 1.3, volume: 0.4, type: 'bandpass', freq: 1200, freqEnd: 500 });
+          this.noiseBurst(ctx, { duration: 1.3, volume: 0.25, type: 'lowpass', freq: 400 });
+        }
+        return;
+      case 'mech:down':
+        if (!ctx) return;
+        // Powering down: a long falling whine and a last hiss of steam.
+        this.tone(ctx, { from: 420, to: 40, duration: 2.6, volume: 0.12, type: 'sawtooth' });
+        this.noiseBurst(ctx, { duration: 2, volume: 0.2, type: 'highpass', freq: 2500, freqEnd: 600, delay: 0.4 });
+        return;
       case 'hero:exhausted':
         if (!this.isLocal(event.entityId)) return;
         this.onCaption('[Out of breath]');
@@ -228,6 +265,26 @@ export class Sfx {
       this.noiseBurst(ctx, { duration: 0.06, volume: volume * 1.2, type: 'bandpass', freq: 900, freqEnd: 500 });
       this.tone(ctx, { from: 120, to: 80, duration: 0.06, volume: volume * 0.8, type: 'sine' });
     }
+  }
+
+  /** Three-Fold Howl: three voices gliding up and falling away, a beat apart. */
+  private howl(ctx: AudioContext, volume: number): void {
+    [[260, 0], [330, 0.18], [390, 0.36]].forEach(([f, delay]) => {
+      const start = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f * 0.7, start);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.25, start + 0.45);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.8, start + 1.5);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09 * volume, start + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.6);
+      osc.connect(gain).connect(this.master!);
+      osc.start(start);
+      osc.stop(start + 1.7);
+    });
+    this.noiseBurst(ctx, { duration: 1.2, volume: 0.08 * volume, type: 'bandpass', freq: 700, freqEnd: 300 });
   }
 
   /** A reedy horn note (sentries' alarm). */
@@ -304,6 +361,24 @@ export class Sfx {
         return;
       case 'return':
         for (const [i, f] of [220, 277, 330].entries()) this.tone(ctx, { from: f, to: f, duration: 2.4, volume: 0.06, type: 'sine', delay: i * 0.08 });
+        return;
+      // "Cerberus Freed" (M7).
+      case 'conduits':
+        for (let i = 0; i < 5; i += 1) this.noiseBurst(ctx, { duration: 0.18, volume: 0.3, type: 'highpass', freq: 1800, delay: i * 0.17 });
+        this.tone(ctx, { from: 600, to: 90, duration: 1.2, volume: 0.1, type: 'sawtooth' });
+        return;
+      case 'chains':
+        for (let i = 0; i < 3; i += 1) this.tone(ctx, { from: 1500 - i * 200, to: 900 - i * 100, duration: 0.25, volume: 0.1, type: 'square', delay: i * 0.12 });
+        this.noiseBurst(ctx, { duration: 0.5, volume: 0.25, type: 'highpass', freq: 3000 });
+        return;
+      case 'rise':
+        for (const [i, f] of [147, 220, 294].entries()) this.tone(ctx, { from: f * 0.9, to: f, duration: 2.4, volume: 0.06, type: 'sine', delay: i * 0.25 });
+        return;
+      case 'howl':
+        this.howl(ctx, 1);
+        return;
+      case 'bond':
+        for (const [i, f] of [294, 370, 440, 587].entries()) this.tone(ctx, { from: f, to: f, duration: 3, volume: 0.05, type: 'sine', delay: i * 0.15 });
         return;
       default:
     }

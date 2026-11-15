@@ -10,12 +10,15 @@ import { createCaptions } from '../ui/captions';
 import { createTutorialPanel } from '../ui/tutorial';
 import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
+import { FREED_CAPTIONS, freedFrame } from '../view/cinematics/freed';
 import { ShadowPortal } from '../view/effects/portal';
 import { ShadowEffects } from '../view/effects/shadow';
 import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
+import { FREED_ID, freedTicks } from '../sim/cutscenes/freed';
+import { findMech } from '../sim/systems/mech';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
-import { GATES } from '../sim/terrain/underworld';
+import { CERBERUS_HOUND, GATES } from '../sim/terrain/underworld';
 import { restPose } from '../sim/systems/rest';
 import { rocketTicks } from '../sim/cutscenes/rocket';
 import { DAY_MS } from '../sim/time';
@@ -184,7 +187,16 @@ export async function boot(): Promise<void> {
         const p = god.position;
         worldView.camera.position.set(p.x - f.x * 9, p.y + 8, p.z - f.z * 9);
         worldView.camera.lookAt(p.x + f.x * 14, p.y, p.z + f.z * 14);
-      } else if (presetId !== 'closeup' && presetId !== 'overlook') {
+      } else if (presetId === 'mech' && god && worldView) {
+        // Behind and above the god, framing Cerberus Mk. II (M7 review shots).
+        const mech = findMech(activeSession.world);
+        const p = god.position;
+        const m = mech?.position ?? p;
+        const d = { x: m.x - p.x, z: m.z - p.z };
+        const len = Math.hypot(d.x, d.z) || 1;
+        worldView.camera.position.set(p.x - (d.x / len) * 14 + (d.z / len) * 6, p.y + 11, p.z - (d.z / len) * 14 - (d.x / len) * 6);
+        worldView.camera.lookAt(m.x, m.y + 9, m.z);
+      } else if (presetId !== 'closeup' && presetId !== 'overlook' && presetId !== 'mech') {
         worldView?.snapCam(presetId);
       }
       dirty = true;
@@ -211,6 +223,14 @@ export async function boot(): Promise<void> {
     breakBarricade() {
       if (!session) return nextFrame();
       session.sendIntent({ type: 'dev:breakBarricade' });
+      tick();
+      loop.recordTick(performance.now());
+      dirty = true;
+      return nextFrame();
+    },
+    weakenMech(fraction) {
+      if (!session) return nextFrame();
+      session.sendIntent({ type: 'dev:weakenMech', fraction });
       tick();
       loop.recordTick(performance.now());
       dirty = true;
@@ -339,6 +359,16 @@ export async function boot(): Promise<void> {
           : '[Soldier, shouting] “Over there!”', 3);
     }
     if (event.type === 'soldier:rout') captions.show('[The captain falls. His sentries break and run!]', 3);
+    // Cerberus Mk. II (M7).
+    if (event.type === 'mech:alarm') captions.show('[Cerberus Mk. II roars and turns toward you]', 3);
+    if (event.type === 'mech:windup') captions.show(event.kind === 'stomp' ? '[The Mk. II rears up. Get clear!]' : '[Its three heads glow with stolen fire]', 2.5);
+    if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
+    if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], 3.2);
+    if (event.type === 'spirit:freed') {
+      const key = keyLabel(inputMap.codesFor('spiritAbility')[0] ?? 'KeyE');
+      captions.show(`Three-Fold Howl unlocked for both gods: press ${key}.`, 6);
+    }
+    if (event.type === 'ability:cast' && event.abilityId === 'three-fold-howl' && localHero()?.id === event.casterId) captions.show('[Cerberus howls through you]', 2);
     if (event.type === 'soldier:suspicious') captions.show('[Soldier] “Who’s there?”', 2);
     if (event.type === 'fort:cleared') captions.show('Fort cleared. Its chest is unguarded.', 3.5);
     if (event.type === 'chest:opened') captions.show(event.weaponId ? `Found a weapon in the chest (${weaponDef(event.weaponId).name}).` : 'The chest is empty.', 3.5);
@@ -633,10 +663,10 @@ export async function boot(): Promise<void> {
       } else {
         lastStepPos = null;
       }
-      if (!gatesSeen && hero && shell.screen === 'playing' && regionOf(hero) === 'underworld'
+      if (!gatesSeen && hero && shell.screen === 'playing' && regionOf(hero) === 'underworld' && !world.flags.cerberusFreed
         && Math.hypot(hero.position.x - GROTTO.center.x - GATES.x, hero.position.z - GROTTO.center.z - GATES.z) < 70) {
         gatesSeen = true;
-        captions.show('Hades: There. Cerberus, chained to their machine, his fire feeding it. We take that thing apart, brother. But not blind.', 7);
+        captions.show('Hades: There. Cerberus, chained to their machine, his fire feeding it. Its hide is iron up front, brother. Get behind it and break the plating on its back.', 8);
       }
       // The meadow's edge during the prologue (the wider world opens after the rocket, M6).
       if (hero && shell.screen === 'playing' && !world.flags.prologueDone
@@ -653,7 +683,16 @@ export async function boot(): Promise<void> {
       // the rocket (SPEC §3.2), then straight on, Hades's arrival and the descent (§3.3).
       const rocketT = rocketTicks(world);
       const descentT = descentTicks({ world });
-      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : null;
+      const freedT = freedTicks(world);
+      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : freedT !== null ? FREED_ID : null;
+      // The Gates: the pylon's beam follows the Mk. II; the hound plays the freeing scene.
+      const mechEntity = findMech(world);
+      const mechPoint = mechEntity ? interpolator.position(world, mechEntity.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
+      meadow.setGates({
+        mech: mechEntity && mechPoint && mechEntity.mech.mode !== 'down' ? { ...mechPoint, yaw: interpolator.rotation(world, mechEntity.id, alpha) ?? mechEntity.rotationY } : null,
+        freedT: freedT === null ? null : (freedT + (frozen ? 0 : alpha)) / 30,
+        freed: !!world.flags.cerberusFreed,
+      });
       const cinematic = cutsceneId !== null && cameraMode === 'follow' && !!hero;
       const reduceMotion = settings.get().reduceMotion;
       let olympusTiming: { rocketFlight: number | null; sinceImpact: number | null; columns: number | null } = { rocketFlight: null, sinceImpact: null, columns: null };
@@ -670,7 +709,7 @@ export async function boot(): Promise<void> {
         }
         cameraRig.update(followCamera, heroPoint, 0, null, floorAt);
         const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
-        const ticksIn = (rocketT ?? descentT ?? 0) + (frozen ? 0 : alpha);
+        const ticksIn = (rocketT ?? descentT ?? freedT ?? 0) + (frozen ? 0 : alpha);
         let pose: CameraPose;
         if (cutsceneId === 'rocket') {
           const frame = rocketFrame(ticksIn / 30, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
@@ -678,6 +717,11 @@ export async function boot(): Promise<void> {
           meadow.setCinematicBoost(frame.bloom, frame.exposure);
           cameraShake = frame.shake;
           olympusTiming = frame;
+        } else if (cutsceneId === FREED_ID) {
+          const hound = { x: GROTTO.center.x + CERBERUS_HOUND.x, y: GROTTO.center.y, z: GROTTO.center.z + CERBERUS_HOUND.z };
+          pose = freedFrame(ticksIn / 30, mechPoint ?? world.cutscene?.points?.mech ?? hound, hound, CERBERUS_HOUND.yaw, cinematicStart, followPose);
+          meadow.setCinematicBoost(0, 0);
+          cameraShake = 0;
         } else {
           const hades = Object.values(world.entities).find((e) => e.npc && e.defId === 'hades');
           const hadesPoint = hades ? interpolator.position(world, hades.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;

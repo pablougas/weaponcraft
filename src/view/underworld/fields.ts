@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { GROTTO } from '../../sim/regions';
 import { fbm } from '../../sim/terrain/noise';
 import {
-  CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, GATES, MECH_FOOTPRINT, SPIRES, TUNNEL,
+  BEACON, CERBERUS_HOUND, CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, GATES, MECH_SIZE, POWER_PYLON, SPIRES, TUNNEL,
   palisadeSegments, pathX, riverZ, spireBase, underworldLocalHeight, watchtowerSpot,
 } from '../../sim/terrain/underworld';
 import type { Look } from '../look';
@@ -12,6 +12,11 @@ export interface FieldsView {
   group: THREE.Group;
   setActive(active: boolean): void;
   update(time: number, camera: THREE.Camera, reduceMotion: boolean): void;
+  /**
+   * The Mk. II's back (world position and heading), so the pylon's beam follows it; null hides the beam.
+   * `freedT` is seconds into the freeing scene (null outside it); `freed` once Cerberus is free.
+   */
+  setGates(state: { mech: { x: number; y: number; z: number; yaw: number } | null; freedT: number | null; freed: boolean }): void;
 }
 
 /** Seeded random for scenery (view-only: not world state). */
@@ -212,7 +217,7 @@ export function buildFields(look: Look): FieldsView {
     const x = pathX(z) + 2.2;
     conduitPoints.push(new THREE.Vector3(x, h(x, z) + 0.35, z));
   }
-  conduitPoints.push(new THREE.Vector3(MECH_FOOTPRINT.x + 3, 0.6, MECH_FOOTPRINT.z + MECH_FOOTPRINT.halfZ));
+  conduitPoints.push(new THREE.Vector3(POWER_PYLON.x + 1.5, 0.6, POWER_PYLON.z + 3));
   const conduit = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(conduitPoints), 400, 0.2, 8, false), conduitMat);
   group.add(conduit);
 
@@ -226,43 +231,50 @@ export function buildFields(look: Look): FieldsView {
   // A beacon above the Gates so they read from anywhere in the fields (no fog, steady).
   const beaconMat = new THREE.MeshBasicMaterial({ color: '#5ff0e0', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(3, 7, 160, 16, 1, true), beaconMat);
-  beacon.position.set(MECH_FOOTPRINT.x, 80, MECH_FOOTPRINT.z);
+  beacon.position.set(BEACON.x, 80, BEACON.z);
   group.add(beacon);
 
-  // Cerberus Mk. II (inactive until M7): a three-headed brass-and-iron war machine.
-  const mech = new THREE.Group();
-  mech.position.set(MECH_FOOTPRINT.x, 0, MECH_FOOTPRINT.z);
-  const brass = toon({ color: '#a8863a' });
+  // (Cerberus Mk. II is an entity since M7: content/mechs/cerberus-mk2.)
   const iron = toon({ color: '#3d3f4a' });
-  const eye = toon({ color: '#ffb35c', emissive: '#ff7a1a', emissiveIntensity: 0.6, rim: false });
-  mech.add(M(new THREE.BoxGeometry(8, 5, 15), iron, [0, 8.5, 0], { outline: 0.06 }));
-  mech.add(M(new THREE.BoxGeometry(7, 2.2, 12), brass, [0, 11.6, 0.5], { outline: 0.05 }));
-  for (const [x, z] of [[-3.5, 5.5], [3.5, 5.5], [-3.5, -5.5], [3.5, -5.5]]) {
-    mech.add(M(new THREE.BoxGeometry(1.8, 6.5, 2), iron, [x, 3.3, z], { outline: 0.04 }));
-    mech.add(M(new THREE.BoxGeometry(2.4, 1, 3), brass, [x, 0.5, z + 0.4], { outline: 0.03 }));
-  }
-  for (const [i, x] of [[0, -3], [1, 0], [2, 3]] as const) {
-    const neck = new THREE.Group();
-    neck.position.set(x, 10.5, 7.5);
-    neck.rotation.y = (i - 1) * 0.35;
-    neck.add(M(new THREE.CylinderGeometry(0.9, 1.2, 4, 8), iron, [0, 1.6, 0.8], { rot: [0.6, 0, 0], outline: 0.03 }));
-    neck.add(M(new THREE.BoxGeometry(2.4, 2, 3.4), brass, [0, 3.6, 2.4], { outline: 0.04 }));
-    neck.add(M(new THREE.BoxGeometry(2, 0.7, 2), iron, [0, 2.6, 3.4], { outline: 0.03 }));
-    for (const ex of [-0.6, 0.6]) neck.add(M(new THREE.SphereGeometry(0.25, 8, 6), eye, [ex, 4, 4.05], { outline: false }));
-    mech.add(neck);
-  }
-  mech.rotation.y = 0;
-  group.add(mech);
 
-  // The real Cerberus, chained beside it: a pale spectral hound (three heads), drained, lying down.
+  // The real Cerberus, chained by the Gates: a pale spectral hound (three heads), drained, lying down.
   const spiritMat = toon({ color: '#9fe8ff', emissive: '#3fa8d8', emissiveIntensity: 0.7, rim: false, transparent: true, opacity: 0.85 });
   const hound = new THREE.Group();
-  hound.position.set(CERBERUS_POST.x + 5, 0, CERBERUS_POST.z + 2);
-  hound.rotation.y = -0.9;
-  hound.add(M(new THREE.CapsuleGeometry(1.4, 4, 4, 10), spiritMat, [0, 1.5, 0], { rot: [Math.PI / 2, 0, 0], outline: 0.03 }));
-  for (const [x, ry] of [[-1, 0.5], [0, 0], [1, -0.5]] as const) {
-    hound.add(M(new THREE.SphereGeometry(0.85, 12, 10), spiritMat, [x * 1.2, 2.1, 3.2], { rot: [0, ry, 0], scale: [1, 0.85, 1.3], outline: 0.02 }));
+  const houndHome = new THREE.Vector3(CERBERUS_HOUND.x, 0, CERBERUS_HOUND.z);
+  hound.position.copy(houndHome);
+  hound.rotation.y = CERBERUS_HOUND.yaw;
+  // Body, four legs (folded under him while he's chained), a tail, three necks and heads.
+  const houndBody = new THREE.Group();
+  hound.add(houndBody);
+  houndBody.add(M(new THREE.CapsuleGeometry(1.35, 3.6, 4, 12), spiritMat, [0, 2.3, 0], { rot: [Math.PI / 2, 0, 0], outline: 0.03 }));
+  const houndLegs = [[-0.8, 1.6], [0.8, 1.6], [-0.8, -1.7], [0.8, -1.7]].map(([x, z]) => {
+    const leg = new THREE.Group();
+    leg.position.set(x, 1.8, z);
+    leg.add(M(new THREE.CapsuleGeometry(0.38, 1.3, 3, 8), spiritMat, [0, -0.9, 0], { outline: 0.02 }));
+    leg.add(M(new THREE.SphereGeometry(0.45, 8, 6), spiritMat, [0, -1.75, 0.2], { scale: [1, 0.55, 1.3], outline: 0.015 }));
+    houndBody.add(leg);
+    return leg;
+  });
+  const tail = M(new THREE.ConeGeometry(0.35, 2.6, 8), spiritMat, [0, 2.9, -3.4], { rot: [-2.2, 0, 0], outline: 0.02 });
+  houndBody.add(tail);
+  const houndEyeMat = toon({ color: '#ffffff', emissive: '#bff8ff', emissiveIntensity: 1.2, rim: false });
+  const houndHeads = new THREE.Group();
+  houndHeads.position.set(0, 3, 2.4);
+  for (const [x, ry] of [[-1, 0.3], [0, 0], [1, -0.3]] as const) {
+    const head = new THREE.Group();
+    // Necks splay outward so the three heads read apart.
+    head.position.set(x * 1.3, 0, 0);
+    head.rotation.set(0, ry, -x * 0.42);
+    head.add(M(new THREE.CylinderGeometry(0.42, 0.55, 1.6, 8), spiritMat, [0, 0.4, 0.5], { rot: [0.9, 0, 0], outline: 0.015 }));
+    head.add(M(new THREE.SphereGeometry(0.72, 12, 10), spiritMat, [0, 1, 1.2], { scale: [1, 0.9, 1.1], outline: 0.02 }));
+    head.add(M(new THREE.BoxGeometry(0.62, 0.5, 0.95), spiritMat, [0, 0.82, 1.95], { outline: 0.015 }));
+    for (const side of [-1, 1]) {
+      head.add(M(new THREE.ConeGeometry(0.2, 0.6, 6), spiritMat, [side * 0.38, 1.7, 1.05], { rot: [-0.2, 0, side * -0.25], outline: 0.012 }));
+      head.add(M(new THREE.SphereGeometry(0.1, 8, 6), houndEyeMat, [side * 0.26, 1.12, 1.82], { outline: false }));
+    }
+    houndHeads.add(head);
   }
+  houndBody.add(houndHeads);
   group.add(hound);
   const chainMat = toon({ color: '#5c5f6b' });
   group.add(M(new THREE.CylinderGeometry(0.7, 0.9, 6, 8), iron, [CERBERUS_POST.x, 3, CERBERUS_POST.z], { outline: 0.03 }));
@@ -271,14 +283,31 @@ export function buildFields(look: Look): FieldsView {
     new THREE.Vector3(CERBERUS_POST.x + 2.5, 2.2, CERBERUS_POST.z + 1.5),
     new THREE.Vector3(CERBERUS_POST.x + 5, 2.6, CERBERUS_POST.z + 3.5),
   ]);
-  group.add(new THREE.Mesh(new THREE.TubeGeometry(chainCurve, 20, 0.14, 6, false), chainMat));
-  // Pulsing conduits from the hound to the mech.
+  const chain = new THREE.Mesh(new THREE.TubeGeometry(chainCurve, 20, 0.14, 6, false), chainMat);
+  group.add(chain);
+
+  // The power pylon: gathers the hound's drained fire and beams it to the Mk. II's back.
+  const pylonTop = new THREE.Vector3(POWER_PYLON.x, 11, POWER_PYLON.z);
+  group.add(M(new THREE.CylinderGeometry(0.9, 1.6, 10, 6), iron, [POWER_PYLON.x, 5, POWER_PYLON.z], { outline: 0.03 }));
+  const pylonGemMat = toon({ color: '#9ff6ec', emissive: '#2fb8b0', emissiveIntensity: 1.1, rim: false });
+  const pylonGem = M(new THREE.OctahedronGeometry(1.3, 0), pylonGemMat, [pylonTop.x, pylonTop.y, pylonTop.z], { outline: 0.02 });
+  group.add(pylonGem);
+  // The drain: pulsing conduits from the hound to the pylon.
   const drain = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-    new THREE.Vector3(CERBERUS_POST.x + 5, 2.5, CERBERUS_POST.z + 2),
-    new THREE.Vector3(-10, 6, MECH_FOOTPRINT.z + 4),
-    new THREE.Vector3(MECH_FOOTPRINT.x - 4, 9, MECH_FOOTPRINT.z),
+    new THREE.Vector3(CERBERUS_HOUND.x, 2.5, CERBERUS_HOUND.z),
+    new THREE.Vector3((CERBERUS_HOUND.x + POWER_PYLON.x) / 2, 5, (CERBERUS_HOUND.z + POWER_PYLON.z) / 2),
+    new THREE.Vector3(POWER_PYLON.x, 9.5, POWER_PYLON.z),
   ]), 40, 0.3, 8, false), conduitMat);
   group.add(drain);
+  // The beam to the mech: a thin glowing rod re-aimed every frame.
+  const beamMat = new THREE.MeshBasicMaterial({ color: '#7ff6ea', transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const beamGeo = new THREE.CylinderGeometry(0.22, 0.22, 1, 8, 1, true);
+  beamGeo.translate(0, 0.5, 0);
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.frustumCulled = false;
+  group.add(beam);
+  const beamTo = new THREE.Vector3();
+  const beamUp = new THREE.Vector3(0, 1, 0);
 
   // The humans' forts: a log palisade with a gate toward the path, a watchtower, tents, a campfire and a banner.
   const logMat = toon({ color: '#5e4330' });
@@ -350,10 +379,47 @@ export function buildFields(look: Look): FieldsView {
       active = on;
       group.visible = on;
     },
+    setGates({ mech, freedT, freed }) {
+      // The beam reaches the mech's back while it's powered (and until the conduits burst in the scene).
+      const conduitsBurst = freed || (freedT !== null && freedT >= 2.5);
+      beam.visible = !!mech && !conduitsBurst;
+      if (mech && beam.visible) {
+        const back = { x: -Math.sin(mech.yaw), z: -Math.cos(mech.yaw) };
+        beamTo.set(mech.x - group.position.x + back.x * (MECH_SIZE.halfZ - 1), mech.y - group.position.y + 17, mech.z - group.position.z + back.z * (MECH_SIZE.halfZ - 1));
+        const dir = beamTo.clone().sub(pylonTop);
+        beam.position.copy(pylonTop);
+        beam.scale.set(1, dir.length(), 1);
+        beam.quaternion.setFromUnitVectors(beamUp, dir.normalize());
+      }
+      drain.visible = !conduitsBurst;
+      pylonGemMat.emissiveIntensity = conduitsBurst ? 0.1 : 1.1;
+      chain.visible = !(freed || (freedT !== null && freedT >= 4.5));
+      // The hound: drained and lying; in the scene he rises (6 s), howls (8.5 s) and fades into the gods (10.5–13.5 s).
+      if (freed) {
+        hound.visible = false;
+        return;
+      }
+      hound.visible = true;
+      const t = freedT ?? 0;
+      const rise = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 6) / 2));
+      const howl = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 8.5) / 0.8)) * (1 - Math.min(1, Math.max(0, (t - 10) / 0.8)));
+      const fade = freedT === null ? 0 : Math.min(1, Math.max(0, (t - 10.5) / 3));
+      // Lying: legs folded and the body low, heads down. Rising: he stands up, a little larger, heads high.
+      hound.position.set(houndHome.x, 0, houndHome.z);
+      hound.scale.setScalar(1 + rise * 0.3);
+      houndBody.position.y = -1.25 * (1 - rise);
+      for (const leg of houndLegs) leg.rotation.x = (leg.position.z > 0 ? -1.3 : 1.3) * (1 - rise);
+      tail.rotation.x = -2.2 + rise * 0.6;
+      houndHeads.rotation.x = 0.35 * (1 - rise) - howl * 0.55;
+      houndEyeMat.emissiveIntensity = 0.5 + rise * 1.2;
+      spiritMat.emissiveIntensity = 0.7 + rise * 1.1;
+      spiritMat.opacity = 0.85 * (1 - fade);
+    },
     update(time, camera, reduceMotion) {
       if (!active) return;
       const speed = reduceMotion ? 0.8 : 2;
       conduitMat.emissiveIntensity = 0.9 + Math.sin(time * speed) * 0.25;
+      beamMat.opacity = 0.6 + Math.sin(time * speed * 1.5) * 0.15;
       // Keep the motes around the camera (they wrap as it moves) and let them drift.
       motes.position.set(
         Math.round((camera.position.x - group.position.x) / 120) * 120,

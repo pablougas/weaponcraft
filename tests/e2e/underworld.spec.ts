@@ -36,10 +36,17 @@ test.describe('the Underworld route (M6)', () => {
     await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), {
       x: leader.position.x + Math.sin(f) * 12, z: leader.position.z + Math.cos(f) * 12, yaw: f + Math.PI,
     });
-    // Half a second later the leader has spotted you (the companion Hades soon cuts him down, so check now).
-    await page.evaluate(() => window.wc!.step(15));
-    s = await state(page);
-    expect(s.world!.entities[leader.id]!.soldier!.awareness).toBeGreaterThanOrEqual(60);
+    // The leader spots you and raises the alarm. The clock is frozen so only explicit steps count, and we
+    // check in small steps (the companion Hades soon cuts him down, so look before he does).
+    await page.evaluate(() => window.wc!.freeze(12));
+    let peak = 0;
+    for (let i = 0; i < 40 && peak < 60; i += 1) {
+      await page.evaluate(() => window.wc!.step(3));
+      const leaderNow = (await state(page)).world!.entities[leader.id];
+      if (!leaderNow) break;
+      peak = Math.max(peak, leaderNow.soldier!.awareness);
+    }
+    expect(peak).toBeGreaterThanOrEqual(60);
     await page.evaluate(() => window.wc!.step(105));
     s = await state(page);
     const squad = Object.values(s.world!.entities).filter((e) => e.soldier?.squadId === 'squad-approach');

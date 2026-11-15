@@ -45,7 +45,7 @@ export interface TestApi {
   setTime(dayFraction: number): Promise<void>;
   /** Moves the camera to a preset shot: 'vista', 'hero' or 'wide'. */
   /** A fixed style-test shot, or 'closeup': a face close-up of whichever god you control. */
-  snapCam(presetId: CameraPresetId | 'closeup' | 'overlook'): Promise<void>;
+  snapCam(presetId: CameraPresetId | 'closeup' | 'overlook' | 'mech'): Promise<void>;
   /** Starts a new game with this world seed. */
   setSeed(seed: number): Promise<void>;
   /** Forces the local god's face ('neutral' | 'determined' | 'happy' | 'hurt'); null for automatic. */
@@ -54,6 +54,8 @@ export interface TestApi {
   completeTutorialStep(stepId: string): Promise<void>;
   /** Tears down the grotto's barricade (as if it had been beaten down). */
   breakBarricade(): Promise<void>;
+  /** Wears the Mk. II's rear plating down to `fraction` of its durability (M7 tests; the last blows are real). */
+  weakenMech(fraction: number): Promise<void>;
   /** Moves the local god onto the ground at (x, z) via a `dev:teleport` intent, camera behind it. */
   teleport(x: number, z: number, rotationY?: number): Promise<void>;
 }

@@ -245,4 +245,49 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await behindSquad(page, 'squad-river');
     await expect(page).toHaveScreenshot('sentry-captain.png', SHOT);
   });
+
+  // Cerberus Mk. II (M7). The mech walks its watch loop, so shots are framed from where it is.
+  async function atTheGates(page: Page) {
+    await cinematicAt(page, 541 + 905);
+    await page.evaluate(async () => {
+      await window.wc!.breakBarricade();
+      window.wc!.step(150);
+    });
+  }
+
+  test('Cerberus Mk. II on watch, its sensor cone sweeping', async ({ page }) => {
+    await atTheGates(page);
+    await page.evaluate(async () => {
+      const m = Object.values(window.wc!.getState().world!.entities).find((e) => e.mech)!;
+      const f = { x: Math.sin(m.rotationY), z: Math.cos(m.rotationY) };
+      // 48 m in front and a little to the side, facing it.
+      await window.wc!.teleport(m.position.x + f.x * 48 + f.z * 8, m.position.z + f.z * 48 - f.x * 8, m.rotationY + Math.PI);
+      window.wc!.step(1);
+      await window.wc!.freeze(12);
+      await window.wc!.snapCam('mech');
+    });
+    await expect(page).toHaveScreenshot('mech-watch.png', SHOT);
+  });
+
+  test('Cerberus freed: the Three-Fold Howl', async ({ page }) => {
+    await atTheGates(page);
+    await page.evaluate(() => window.wc!.weakenMech(0.02));
+    // The last blows from behind (real punches), then 9 s into the scene (the howl).
+    for (let i = 0; i < 40; i += 1) {
+      const s = await page.evaluate(() => window.wc!.getState());
+      if (s.world!.cutscene) break;
+      const m = Object.values(s.world!.entities).find((e) => e.mech)!;
+      const plating = s.world!.entities[m.mech!.platingId!];
+      const back = { x: -Math.sin(m.rotationY), z: -Math.cos(m.rotationY) };
+      await page.evaluate(({ x, z, yaw }) => window.wc!.teleport(x, z, yaw), { x: plating.position.x + back.x * 3.2, z: plating.position.z + back.z * 3.2, yaw: Math.atan2(-back.x, -back.z) });
+      await page.keyboard.press('KeyA');
+      await page.evaluate(() => window.wc!.step(10));
+    }
+    await page.evaluate(async () => {
+      const w = window.wc!.getState().world!;
+      window.wc!.step(w.cutscene!.startTick + 270 - w.tick);
+      await window.wc!.freeze(12);
+    });
+    await expect(page).toHaveScreenshot('cerberus-freed.png', SHOT);
+  });
 });

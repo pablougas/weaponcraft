@@ -5,6 +5,9 @@ import type { AttackKind, Element, Entity, EntityId, StatusEffect, StatusKind, V
 import { isKnownWeapon, weaponData } from './weapons';
 import type { SimContext } from './world';
 
+/** Three-Fold Howl's lifesteal share (content/spirits/cerberus.ts HOWL.lifesteal). */
+const HOWL_LIFESTEAL = 0.3;
+
 /** Ticks a hurt reaction (face, flinch) lasts. */
 const HURT_TICKS = ticks(0.4);
 /** Ticks wildlife runs away after being hit. */
@@ -188,6 +191,10 @@ export function applyDamage(
     }
   }
 
+  // Three-Fold Howl: the god heals a share of everything it deals while the howl lasts.
+  if (attacker?.hero?.howl && attacker.health && dealt > 0 && kind !== 'status') {
+    attacker.health.current = Math.min(attacker.health.max, attacker.health.current + Math.round(dealt * HOWL_LIFESTEAL));
+  }
   ctx.emit('combat:hit', { attackerId, targetId, amount: dealt, kind, remaining: target.health.current, element, multiplier: multiplier * boost });
   if (target.health.current <= 0) {
     ctx.emit('entity:defeated', { entityId: targetId, defId: target.defId, by: attackerId });

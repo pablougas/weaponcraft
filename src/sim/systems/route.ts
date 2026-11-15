@@ -1,5 +1,6 @@
 import type { SimContext } from '../world';
 import { despawn } from '../world';
+import { ensureMech } from './mech';
 import { ensureGarrison } from './soldiers';
 
 /**
@@ -11,6 +12,8 @@ export function updateRoute(ctx: SimContext, defeated: ReadonlyArray<{ entityId:
   const { world } = ctx;
   // The humans' garrison holds the fields beyond the grotto.
   if (world.flags.descended && !world.flags.garrisonPlaced) ensureGarrison(ctx);
+  // Cerberus Mk. II keeps watch at the Gates (M7; older saves get it on load).
+  if (world.flags.descended && !world.flags.mechPlaced) ensureMech(ctx);
   if (world.flags.barricadeBroken) return;
   const barricade = Object.values(world.entities).find((e) => e.structure?.kind === 'barricade');
   if (!barricade?.health || barricade.health.current > 0) return;

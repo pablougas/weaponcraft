@@ -1,7 +1,11 @@
-import type { ContentDef } from '../types';
+import type { ContentDef, ModelLoader } from '../types';
+import { cerberusMk2 } from './cerberus-mk2';
 
-/** Filled in by M7 (Cerberus Mk. II). */
-export type MechDef = ContentDef;
+/** A human war machine (SPEC §10). Its behaviour lives in sim/systems/mech.ts. */
+export interface MechDef extends ContentDef {
+  name: string;
+  model: ModelLoader;
+}
 
-// Registry: add a file in this folder and one line here. Never edit the engine.
-export const mechs: readonly MechDef[] = [];
+// Registry: add a folder here and one line below. Never edit the engine.
+export const mechs: readonly MechDef[] = [cerberusMk2];

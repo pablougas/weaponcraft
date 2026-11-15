@@ -62,6 +62,38 @@ export interface Entity {
   npc?: { name: string };
   /** Which region this entity is in (default: the surface). */
   region?: RegionId;
+  /** Cerberus Mk. II (M7): the war machine at the Gates. */
+  mech?: MechState;
+  /** A hittable part of a mech (its rear plating): which mech it belongs to. */
+  mechPart?: { mechId: EntityId; part: 'rear-plating' };
+}
+
+/** What the mech is doing (M7). 'down' once its rear plating breaks. */
+export type MechMode = 'patrol' | 'alert' | 'attack' | 'search' | 'down';
+
+/** Cerberus Mk. II's state (M7): a watch loop, a sweeping sensor cone, telegraphed attacks. */
+export interface MechState {
+  mode: MechMode;
+  /** 0–100: how sure it is someone's there (attacks at 60). */
+  awareness: number;
+  targetId: EntityId | null;
+  lastSeen: Vec3 | null;
+  /** Ticks in the current mode, or since the target was last seen while attacking. */
+  timer: number;
+  /** Next point on the watch loop. */
+  patrolIndex: number;
+  /** Where the three heads look (the sensor cone), radians like rotationY. */
+  facing: number;
+  /** Sweep phase for the heads while on watch. */
+  scan: number;
+  /** An attack in progress: wind-up ticks left (the warning), then active ticks; where it aims. */
+  attack: { kind: 'stomp' | 'breath'; windup: number; active: number; point: Vec3; yaw: number } | null;
+  /** Ticks before the next attack. */
+  cooldown: number;
+  /** Is it walking this tick (for the view's stride)? */
+  walking: boolean;
+  /** The plating entity on its back. */
+  platingId: EntityId | null;
 }
 
 export type StatusKind = 'blind' | 'poison' | 'stun' | 'crush';
@@ -152,6 +184,8 @@ export interface HeroState {
   safeTimer?: number;
   /** Ticks the hero has been trying to move without moving (stuck detection). */
   stuckTicks?: number;
+  /** Three-Fold Howl (M7): ticks left of lifesteal on everything this god hits. */
+  howl?: number;
 }
 
 export type SoldierKind = 'spear' | 'shield' | 'archer' | 'sentry' | 'captain';
@@ -246,6 +280,10 @@ export interface WorldFlags {
   refugeBuilt?: boolean;
   /** M4: the Fusion Altar, the weapons to find and elemental dummies are placed. */
   armoryPlaced?: boolean;
+  /** M7: Cerberus Mk. II is standing watch at the Gates. */
+  mechPlaced?: boolean;
+  /** M7: the Mk. II is down and Cerberus is free (Three-Fold Howl unlocked for both gods). */
+  cerberusFreed?: boolean;
   [flag: string]: boolean | undefined;
 }
 

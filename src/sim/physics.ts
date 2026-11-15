@@ -2,7 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO } from './regions';
-import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_FOOTPRINT, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
+import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_SIZE, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
@@ -99,13 +99,11 @@ export class PhysicsWorld {
     for (const side of [-1, 1]) {
       this.world.createCollider(R.ColliderDesc.cuboid(0.6, 6, length).setTranslation(c.x + side * (TUNNEL.halfWidth + 0.6), c.y + 6, c.z + (TUNNEL.fromZ + TUNNEL.toZ) / 2 - 3));
     }
-    // Spires, the Gates' pillars, the Mk. II's footprint and Cerberus's chain post.
+    // Spires, the Gates' pillars and Cerberus's chain post (the Mk. II moves: see syncFrom).
     for (const spire of SPIRES) {
       this.world.createCollider(R.ColliderDesc.cylinder(spire.height / 2, spire.radius * 0.8).setTranslation(c.x + spire.x, c.y + spireBase(spire) + spire.height / 2, c.z + spire.z));
     }
     for (const pillar of GATE_PILLARS) this.world.createCollider(R.ColliderDesc.cylinder(15, 3.2).setTranslation(c.x + pillar.x, c.y + 14, c.z + pillar.z));
-    const mech = MECH_FOOTPRINT;
-    this.world.createCollider(R.ColliderDesc.cuboid(mech.halfX, 6, mech.halfZ).setTranslation(c.x + mech.x, c.y + 6, c.z + mech.z));
     this.world.createCollider(R.ColliderDesc.cylinder(3, 1).setTranslation(c.x + CERBERUS_POST.x, c.y + 3, c.z + CERBERUS_POST.z));
     // The forts' palisades and watchtowers.
     for (const fort of FORT_SPOTS) {
@@ -166,6 +164,20 @@ export class PhysicsWorld {
       }
     }
     for (const entity of Object.values(state.entities)) {
+      if (entity.mech) {
+        // Cerberus Mk. II: a big box that walks and turns (M7).
+        let record = this.bodies.get(entity.id);
+        if (!record) {
+          const body = this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased());
+          const collider = this.world.createCollider(this.R.ColliderDesc.cuboid(MECH_SIZE.halfX, MECH_SIZE.halfY, MECH_SIZE.halfZ), body);
+          record = { body, collider, centerOffset: MECH_SIZE.halfY };
+          this.bodies.set(entity.id, record);
+        }
+        const p = entity.position;
+        record.body.setTranslation({ x: p.x, y: p.y + record.centerOffset, z: p.z }, false);
+        record.body.setRotation({ x: 0, y: Math.sin(entity.rotationY / 2), z: 0, w: Math.cos(entity.rotationY / 2) }, false);
+        continue;
+      }
       if (!entity.body || !(entity.hero || entity.creature || entity.structure || entity.npc)) continue;
       let record = this.bodies.get(entity.id);
       if (!record) {

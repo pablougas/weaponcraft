@@ -6,6 +6,9 @@ import { applyHeroIntent, updateHeroes } from './systems/hero';
 import { switchCharacter, updateCompanions } from './systems/party';
 import { updateRoute } from './systems/route';
 import { updateSoldiers } from './systems/soldiers';
+import { findMech, updateMech } from './systems/mech';
+import { updateSpirits } from './systems/spirits';
+import { FREED_ID, skipFreed, updateFreed } from './cutscenes/freed';
 import { updateReveal } from './systems/reveal';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
@@ -53,6 +56,8 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   updateHeroes(ctx, input.physics);
   if (input.isAuthority) updateCreatures(ctx, input.physics);
   updateSoldiers(ctx, input.physics);
+  updateMech(ctx);
+  updateSpirits(ctx);
   updateReveal(ctx);
   updateRoute(ctx, events.filter((e): e is Extract<typeof e, { type: 'entity:defeated' }> => e.type === 'entity:defeated'));
 
@@ -62,6 +67,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     if (!world.flags.prologueDone && !world.cutscene && !world.flags.olympusShattered && tutorialComplete(world)) startRocket(ctx);
     else if (rocketTicks(world) !== null) updateRocket(ctx);
     else if (world.cutscene?.id === DESCENT_ID) updateDescent(ctx);
+    else if (world.cutscene?.id === FREED_ID) updateFreed(ctx);
   }
 
   return events;
@@ -117,8 +123,20 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       else reject('no barricade');
       return;
     }
+    case 'dev:weakenMech': {
+      if (!ctx.isAuthority) return;
+      const mech = findMech(world);
+      const plating = mech?.mech.platingId ? world.entities[mech.mech.platingId] : undefined;
+      if (!plating?.health || !Number.isFinite(intent.fraction)) {
+        reject('no mech');
+        return;
+      }
+      plating.health.current = Math.max(1, Math.round(plating.health.max * Math.min(1, Math.max(0, intent.fraction))));
+      return;
+    }
     case 'cutscene:skip': {
-      const reason = world.cutscene?.id === DESCENT_ID ? skipDescent(ctx) : skipRocket(ctx);
+      const id = world.cutscene?.id;
+      const reason = id === DESCENT_ID ? skipDescent(ctx) : id === FREED_ID ? skipFreed(ctx) : skipRocket(ctx);
       if (reason) reject(reason);
       return;
     }

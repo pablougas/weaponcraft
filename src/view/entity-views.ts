@@ -4,6 +4,7 @@ import { gods } from '../content/gods';
 import { regionOf, type RegionId } from '../sim/regions';
 import { restPose } from '../sim/systems/rest';
 import { structures } from '../content/structures';
+import { mechs } from '../content/mechs';
 import type { ModelLoader } from '../content/types';
 import type { Entity, EntityId, GameEvent, WorldState } from '../sim';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from './entity-model';
@@ -15,7 +16,7 @@ import { createDecoyModel } from './effects/shadow';
 /** Every approved def that has a model, by def ID. */
 function modelLoaders(): Map<string, ModelLoader> {
   const loaders = new Map<string, ModelLoader>();
-  for (const def of [...gods, ...enemies, ...structures]) {
+  for (const def of [...gods, ...enemies, ...structures, ...mechs]) {
     if (def.approved) loaders.set(def.id, def.model);
   }
   return loaders;

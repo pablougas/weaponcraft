@@ -1,4 +1,6 @@
 import { DEFAULT_BINDINGS, keyLabel, type InputAction, type InputMap } from '../engine/input-map';
+import type { SpiritDef } from '../content/spirits';
+import { activeSpirit } from '../sim/systems/spirits';
 import { enemyDef, godDef } from '../sim/defs';
 import type { Entity, WorldState } from '../sim/types';
 import { DODGE_STAMINA } from '../sim/systems/hero';
@@ -12,6 +14,8 @@ const GLYPHS: Record<string, string> = {
   punch: '<circle cx="12" cy="12" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h3M18 12h3M12 3v3M12 18v3" stroke="currentColor" stroke-width="2"/>',
   blink: '<path d="M3 15h6M2 11h5M4 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".7"/><path d="M16.5 2 10 11.5h4.2L12.5 22l8-12h-4.4z" fill="currentColor"/>',
   roll: '<path d="M18 8a7 7 0 1 0 1.2 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="m19.5 3.5-.8 5.3-5.2-1.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+  // Three-Fold Howl: three rings of sound.
+  howl: '<circle cx="6" cy="12" r="2.4" fill="currentColor"/><path d="M10 7.5a6 6 0 0 1 0 9M13.5 5a9.5 9.5 0 0 1 0 14M17 2.8a13 13 0 0 1 0 18.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 };
 
 interface AbilitySlot {
@@ -79,7 +83,7 @@ export function createHud(parent: HTMLElement): Hud {
   let builtFor = '';
   let codesFor: (action: InputAction) => readonly string[] = (action) => DEFAULT_BINDINGS[action];
 
-  const buildSlots = (godId: string) => {
+  const buildSlots = (godId: string, spirit: SpiritDef | undefined) => {
     const god = godDef(godId);
     const defs: AbilitySlot[] = [
       { hud: 'punch', action: 'punch', glyph: 'punch', name: 'Punch', staminaNeeded: () => 3 },
@@ -98,6 +102,11 @@ export function createHud(parent: HTMLElement): Hud {
       const ultimate = god.ultimate;
       defs.push({ hud: 'ultimate', action: 'ultimate', glyph: 'sky', name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction, element: ultimate.element });
     }
+    // A freed spirit's gift (M7: Cerberus's Three-Fold Howl), the same for both gods.
+    if (spirit) {
+      const gift = spirit.ability;
+      defs.push({ hud: 'spirit', action: 'spiritAbility', glyph: 'howl', name: gift.name, cooldownId: gift.id, cooldownTicks: gift.cooldownTicks, staminaNeeded: () => gift.staminaCost });
+    }
     abilitiesEl.replaceChildren();
     slots = defs.map((def) => {
       const el = document.createElement('div');
@@ -111,7 +120,7 @@ export function createHud(parent: HTMLElement): Hud {
       abilitiesEl.append(el);
       return { ...def, el, cooldown: el.querySelector<HTMLElement>('.wc-ability-cooldown')!, key: el.querySelector<HTMLElement>('kbd')! };
     });
-    builtFor = godId;
+    builtFor = godId + (spirit ? `+${spirit.id}` : '');
     refreshKeys();
   };
   const refreshKeys = () => {
@@ -156,7 +165,8 @@ export function createHud(parent: HTMLElement): Hud {
       setMeter(healthMeter, health, hero.health?.current ?? 0, hero.health?.max ?? 0);
       setMeter(staminaMeter, stamina, hero.stamina?.current ?? 0, hero.stamina?.max ?? 0);
 
-      if (builtFor !== hero.defId) buildSlots(hero.defId);
+      const spirit = activeSpirit(world);
+      if (builtFor !== hero.defId + (spirit ? `+${spirit.id}` : '')) buildSlots(hero.defId, spirit);
       const player = Object.values(world.players).find((p) => p.entityId === hero.id);
       const otherId = player?.party?.find((id) => id !== hero.id);
       const other = otherId ? world.entities[otherId] : undefined;

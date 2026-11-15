@@ -13,6 +13,8 @@ export type Intent =
   | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean; seenCutscenes?: string[] }
   /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
   | { type: 'dev:breakBarricade'; playerId: PlayerId }
+  /** Dev/test: wear the Mk. II's rear plating down to a fraction of its durability. */
+  | { type: 'dev:weakenMech'; playerId: PlayerId; fraction: number }
   | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }
@@ -45,7 +47,7 @@ export type Intent =
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 
-export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn' | 'interact' | 'blink' | 'switchCharacter';
+export type PlayerAction = 'jump' | 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack' | 'godAbility' | 'ultimate' | 'lockOn' | 'interact' | 'blink' | 'switchCharacter' | 'spiritAbility';
 
 export type IntentType = Intent['type'];
 

@@ -8,7 +8,7 @@ import { createLook, type Look } from './look';
 import { buildBirds } from './meadow/birds';
 import { buildFlowers, buildGrass } from './meadow/foliage';
 import { buildOlympus, type OlympusState, type OlympusView } from './meadow/olympus';
-import { buildFields } from './underworld/fields';
+import { buildFields, type FieldsView } from './underworld/fields';
 import { buildGrotto } from './underworld/grotto';
 import { GROTTO, type RegionId } from '../sim/regions';
 import { buildRocks, buildTrees } from './meadow/props';
@@ -30,6 +30,8 @@ export interface WorldView {
   setRegion(region: RegionId): void;
   /** The grotto's barricade: standing, or torn down (M6). */
   setBarricadeBroken(broken: boolean): void;
+  /** The Gates (M7): the Mk. II's beam, the freeing scene's time, and whether Cerberus is free. */
+  setGates: FieldsView['setGates'];
   /** Olympus intact or shattered, and the rocket cinematic's distant effects. */
   setOlympus(state: Omit<OlympusState, 'time'>): void;
   /** Extra bloom and exposure for the impact's slow swell (0 = none). */
@@ -250,6 +252,9 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
       } else {
         updateGodRays();
       }
+    },
+    setGates(state) {
+      fields.setGates(state);
     },
     setBarricadeBroken(broken) {
       grotto.setBarricadeBroken(broken);

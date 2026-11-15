@@ -13,6 +13,7 @@ const PRESS_ACTIONS: Partial<Record<InputAction, PlayerAction>> = {
   blink: 'blink',
   interact: 'interact',
   switchCharacter: 'switchCharacter',
+  spiritAbility: 'spiritAbility',
 };
 
 /**

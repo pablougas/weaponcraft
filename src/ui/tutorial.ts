@@ -6,6 +6,7 @@ import { escapeHtml } from './weapon-card';
 const OBJECTIVES: Record<string, string> = {
   'find-the-others': 'Find the others. Survive.',
   'find-and-free-cerberus': 'Find and free Cerberus.',
+  'cerberus-freed': 'Cerberus is free. His Three-Fold Howl is yours.',
 };
 
 const STEP_NAMES: Record<TutorialStepId, string> = {

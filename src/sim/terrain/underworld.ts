@@ -97,8 +97,25 @@ export function underworldClamp(x: number, z: number, margin = 0): { x: number; 
 
 /** Gate pillars, the Mk. II's footprint and Cerberus's chain post (the M7 set piece, inactive in M6). */
 export const GATE_PILLARS = [{ x: GATES.x - 17, z: GATES.z - 12 }, { x: GATES.x + 17, z: GATES.z - 12 }] as const;
-export const MECH_FOOTPRINT = { x: GATES.x, z: GATES.z - 4, halfX: 5.5, halfZ: 9 } as const;
 export const CERBERUS_POST = { x: GATES.x - 22, z: GATES.z + 4 } as const;
+/** Where the chained hound lies, beside his post. */
+export const CERBERUS_HOUND = { x: CERBERUS_POST.x + 5, z: CERBERUS_POST.z + 2, yaw: -0.9 } as const;
+/** Where the hound's drained fire is gathered and beamed to the Mk. II (M7). */
+export const POWER_PYLON = { x: GATES.x - 9, z: GATES.z - 3 } as const;
+/** The Gates' beacon (it marks the way from anywhere in the fields). */
+export const BEACON = { x: GATES.x, z: GATES.z - 4 } as const;
+
+/**
+ * Cerberus Mk. II (M7), enlarged for the encounter: its collision box (half
+ * extents, metres) and its watch loop in front of the Gates, an ellipse it
+ * walks while its heads sweep. Everything stays on the flat plaza.
+ */
+export const MECH_SIZE = { halfX: 6.5, halfY: 11, halfZ: 12.5 } as const;
+export const MECH_WATCH = { x: GATES.x, z: GATES.z + 37, rx: 24, rz: 10 } as const;
+export const MECH_PATROL: ReadonlyArray<{ x: number; z: number }> = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2;
+  return { x: MECH_WATCH.x + Math.cos(a) * MECH_WATCH.rx, z: MECH_WATCH.z + Math.sin(a) * MECH_WATCH.rz };
+});
 
 export interface Spire {
   x: number;

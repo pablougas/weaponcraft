@@ -20,6 +20,7 @@ export type InputAction =
   | 'lockOn'
   | 'blink'
   | 'switchCharacter'
+  | 'spiritAbility'
   | 'skipCutscene'
   | 'interact'
   | 'inventory'
@@ -55,6 +56,8 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   blink: ['KeyW'],
   // Switch between Zeus and Hades (M6).
   switchCharacter: ['KeyV'],
+  // The freed spirit's ability (M7: Cerberus's Three-Fold Howl).
+  spiritAbility: ['KeyE'],
   skipCutscene: ['Enter'],
   interact: ['KeyF'],
   inventory: ['KeyI'],

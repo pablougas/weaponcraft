@@ -1,4 +1,5 @@
 import type { AttackSpec } from '../../content/types';
+import { castSpirit } from './spirits';
 import { applyDamage, isHittable, targetsInArc, targetsNear } from '../combat';
 import { DT, GRAVITY, MEADOW_RADIUS, perTick, ticks } from '../constants';
 import { godDef } from '../defs';
@@ -266,6 +267,8 @@ export function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerActi
       ctx.emit('ability:telegraph', { casterId: entity.id, abilityId: ultimate.id, point, radius: ultimate.radius, ticks: ultimate.telegraphTicks });
       return null;
     }
+    case 'spiritAbility':
+      return castSpirit(ctx, entity);
     case 'lockOn':
       hero.lockTarget = hero.lockTarget ? null : findLockTarget(ctx, entity);
       return null;
