@@ -62,7 +62,8 @@ test.describe('smoke', { tag: '@smoke' }, () => {
   test('production hides the test API without #test', async ({ page }) => {
     test.skip(!process.env.WC_SHIP, 'Dev builds always expose window.wc.');
     await page.goto('/');
-    await expect(page.locator('#wc-title')).toBeVisible();
+    // Without #test there's no ready() to wait on; allow for a slow (busy) machine.
+    await expect(page.locator('#wc-title')).toBeVisible({ timeout: 45_000 });
     expect(await page.evaluate(() => 'wc' in window)).toBe(false);
   });
 
