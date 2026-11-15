@@ -82,6 +82,40 @@ export class ShadowEffects {
     });
   }
 
+  /** A shadow dagger thrown from Hades's circle at his focus: a fast straight streak, then a dark burst. */
+  dagger(from: Vec3, to: Vec3, reduceMotion: boolean): void {
+    const blade = buildDagger();
+    const mats = daggerMaterials(blade);
+    const a = new THREE.Vector3(from.x, from.y, from.z);
+    const b = new THREE.Vector3(to.x, to.y, to.z);
+    const trailMat = this.glow('#9b6bff', 0.45);
+    const trailGeo = new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 8, 0.035, 5, false);
+    const trail = new THREE.Mesh(trailGeo, trailMat);
+    trail.geometry.setDrawRange(0, 0);
+    const burstMat = this.glow('#5b2aa8', 0.6);
+    const burst = new THREE.Mesh(this.sphere, burstMat);
+    burst.position.copy(b);
+    burst.scale.setScalar(0.001);
+    const flight = 0.16;
+    const fadeTime = reduceMotion ? 0.25 : 0.4;
+    blade.position.copy(a);
+    blade.lookAt(b);
+    this.add({
+      objects: [blade, trail, burst], materials: [...mats, trailMat, burstMat], age: 0, life: flight + fadeTime,
+      update: (_t, age) => {
+        const p = Math.min(1, age / flight);
+        blade.position.lerpVectors(a, b, p);
+        blade.visible = p < 1;
+        const total = trail.geometry.index ? trail.geometry.index.count : 0;
+        trail.geometry.setDrawRange(0, Math.floor(total * p));
+        const fade = age < flight ? 1 : Math.max(0, 1 - (age - flight) / fadeTime);
+        trailMat.opacity = 0.45 * fade;
+        burstMat.opacity = age < flight ? 0 : 0.6 * fade;
+        burst.scale.setScalar(age < flight ? 0.001 : 0.25 + (1 - fade) * (reduceMotion ? 0.25 : 0.5));
+      },
+    });
+  }
+
   /** Spectral hands rise in a ring around Hades (Grasp of the Dead). */
   grasp(center: Vec3, radius: number, reduceMotion: boolean): void {
     const group = new THREE.Group();
@@ -221,6 +255,36 @@ export class ShadowEffects {
       for (const m of fx.materials) m.dispose();
     }
   }
+}
+
+/**
+ * One shadow dagger (Cerberus's gift to Hades): a violet-white blade with a
+ * dark hilt and a soft glow, its tip along +Z. Used for the daggers circling
+ * him and for the ones he throws.
+ */
+export function buildDagger(): THREE.Group {
+  const group = new THREE.Group();
+  const bladeGeo = new THREE.ConeGeometry(0.06, 0.7, 4);
+  bladeGeo.rotateX(Math.PI / 2);
+  bladeGeo.translate(0, 0, 0.35);
+  const blade = new THREE.Mesh(bladeGeo, new THREE.MeshBasicMaterial({ color: '#d6c6ff', transparent: true, toneMapped: false }));
+  blade.scale.set(1, 0.3, 1);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: '#2a1840', transparent: true }));
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.2, 6), guard.material);
+  grip.rotation.x = Math.PI / 2;
+  grip.position.z = -0.12;
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: '#7a3cff', transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  halo.scale.set(0.08, 0.05, 0.4);
+  halo.position.z = 0.25;
+  group.add(blade, guard, grip, halo);
+  return group;
+}
+
+/** The materials in a dagger, for fading and disposal. */
+export function daggerMaterials(dagger: THREE.Group): THREE.Material[] {
+  const mats = new Set<THREE.Material>();
+  dagger.traverse((o) => { if (o instanceof THREE.Mesh) mats.add(o.material as THREE.Material); });
+  return [...mats];
 }
 
 /** A Shadow Step decoy: a dark, see-through silhouette of Hades with violet eyes. */

@@ -2,6 +2,7 @@ import { addStatus, isHittable } from '../../sim/combat';
 import { ticks } from '../../sim/constants';
 import type { Entity } from '../../sim/types';
 import type { SpiritDef } from './index';
+import { shadowDaggers } from './shadow-daggers';
 
 /** Three-Fold Howl's numbers (SPEC §6 table: AoE fear + lifesteal for 6 s; plus lingering dread damage). */
 export const HOWL = {
@@ -20,18 +21,21 @@ export const HOWL = {
 
 /**
  * Cerberus, Hound of the Gate (M7): freed from the Mk. II, he bonds with both
- * gods and lends them his Three-Fold Howl.
+ * gods. Zeus gets his Three-Fold Howl; Hades, his old master, gets Shadow
+ * Daggers (team request, Nov 15).
  */
 export const cerberus: SpiritDef = {
   id: 'cerberus',
   name: 'Cerberus, Hound of the Gate',
   approved: true,
   freedFlag: 'cerberusFreed',
+  forGods: { hades: shadowDaggers },
   ability: {
     id: 'three-fold-howl',
     name: 'Three-Fold Howl',
     cooldownTicks: HOWL.cooldownTicks,
     staminaCost: HOWL.staminaCost,
+    icon: 'howl',
     cast(ctx, casterId) {
       const caster = ctx.world.entities[casterId];
       if (!caster?.hero) return false;

@@ -1,5 +1,5 @@
 import { DEFAULT_BINDINGS, keyLabel, type InputAction, type InputMap } from '../engine/input-map';
-import type { SpiritDef } from '../content/spirits';
+import { spiritAbilityFor, type SpiritDef } from '../content/spirits';
 import { activeSpirit } from '../sim/systems/spirits';
 import { enemyDef, godDef } from '../sim/defs';
 import type { Entity, WorldState } from '../sim/types';
@@ -20,6 +20,8 @@ const GLYPHS: Record<string, string> = {
   soul: '<path d="M12 2.5c1 3 6 5.5 6 10.5a6 6 0 0 1-12 0c0-2.4 1.2-3.8 2.3-4.8.1 1.8.9 3 2 3.3-.7-3.3.1-6.4 1.7-9z" fill="currentColor"/><circle cx="10" cy="14.5" r="1.25" fill="#141019"/><circle cx="14" cy="14.5" r="1.25" fill="#141019"/>',
   cage: '<path d="M4 3v18M9 3v3M15 3v3M20 3v18M3 3h18M3 21h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".75"/><path d="M12 7.5a5 5 0 0 0-5 5v2.2h2V17h6v-2.3h2v-2.2a5 5 0 0 0-5-5z" fill="currentColor"/><circle cx="10" cy="12.6" r="1.1" fill="#141019"/><circle cx="14" cy="12.6" r="1.1" fill="#141019"/>',
   // Three-Fold Howl: three rings of sound.
+  // Shadow Daggers (Hades's gift from Cerberus): three blades fanned around a dark core.
+  daggers: '<circle cx="12" cy="13" r="2.2" fill="currentColor" opacity=".55"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor" transform="rotate(120 12 13)"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor" transform="rotate(240 12 13)"/>',
   howl: '<circle cx="6" cy="12" r="2.4" fill="currentColor"/><path d="M10 7.5a6 6 0 0 1 0 9M13.5 5a9.5 9.5 0 0 1 0 14M17 2.8a13 13 0 0 1 0 18.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 };
 
@@ -110,10 +112,10 @@ export function createHud(parent: HTMLElement): Hud {
       const ultimate = god.ultimate;
       defs.push({ hud: 'ultimate', action: 'ultimate', glyph: glyphOr(ultimate.icon, 'sky'), name: ultimate.name, cooldownId: ultimate.id, cooldownTicks: ultimate.cooldownTicks, staminaNeeded: (max) => max * ultimate.minStaminaFraction, element: ultimate.element });
     }
-    // A freed spirit's gift (M7: Cerberus's Three-Fold Howl), the same for both gods.
+    // A freed spirit's gift (M7: Cerberus's Three-Fold Howl for Zeus, Shadow Daggers for Hades).
     if (spirit) {
-      const gift = spirit.ability;
-      defs.push({ hud: 'spirit', action: 'spiritAbility', glyph: 'howl', name: gift.name, cooldownId: gift.id, cooldownTicks: gift.cooldownTicks, staminaNeeded: () => gift.staminaCost });
+      const gift = spiritAbilityFor(spirit, godId);
+      defs.push({ hud: 'spirit', action: 'spiritAbility', glyph: glyphOr(gift.icon, 'howl'), name: gift.name, cooldownId: gift.id, cooldownTicks: gift.cooldownTicks, staminaNeeded: () => gift.staminaCost });
     }
     abilitiesEl.replaceChildren();
     slots = defs.map((def) => {

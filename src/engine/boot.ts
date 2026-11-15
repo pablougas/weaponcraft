@@ -389,9 +389,13 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'spirit:freed') {
       const key = keyLabel(inputMap.codesFor('spiritAbility')[0] ?? 'KeyE');
-      captions.show(`Three-Fold Howl unlocked for both gods: press ${key}.`, 6);
+      captions.show(`Cerberus's gifts unlocked: ${key} is the Three-Fold Howl for Zeus and Shadow Daggers for Hades.`, 6);
     }
     if (event.type === 'ability:cast' && event.abilityId === 'three-fold-howl' && localHero()?.id === event.casterId) captions.show('[Cerberus howls through you]', 2);
+    if (event.type === 'ability:cast' && event.abilityId === 'shadow-daggers' && localHero()?.id === event.casterId) {
+      const key = keyLabel(inputMap.codesFor('lockOn')[0] ?? 'Tab');
+      captions.show(`[Three shadow daggers circle Hades: ${key} to focus an enemy and they strike]`, 3);
+    }
     if (event.type === 'soldier:suspicious') captions.show('[Soldier] “Who’s there?”', 2);
     if (event.type === 'fort:cleared') captions.show('Fort cleared. Its chest is unguarded.', 3.5);
     if (event.type === 'chest:opened') captions.show(event.weaponId ? `Found a weapon in the chest (${weaponDef(event.weaponId).name}).` : 'The chest is empty.', 3.5);
@@ -430,7 +434,9 @@ export async function boot(): Promise<void> {
       const roller = activeSession.world.entities[event.entityId];
       if (roller) dust.spawn(roller.position, roller.rotationY, settings.get().reduceMotion);
     }
-    if (event.type === 'ability:cast' && event.abilityId === 'soul-bolts' && event.points.length > 1) {
+    if (event.type === 'ability:cast' && event.abilityId === 'shadow-dagger' && event.points.length > 1) {
+      shadow.dagger(event.points[0], event.points[1], rm);
+    } else if (event.type === 'ability:cast' && event.abilityId === 'soul-bolts' && event.points.length > 1) {
       const hand = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
       shadow.soulBolt(hand ? { x: hand.x, y: hand.y, z: hand.z } : event.points[0], event.points[1], rm);
     } else if (event.type === 'ability:cast' && event.points.length > 1) {

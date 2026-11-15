@@ -1,4 +1,4 @@
-import { spirits, type SpiritDef } from '../../content/spirits';
+import { spiritAbilityFor, spirits, type SpiritDef } from '../../content/spirits';
 import type { Entity, HeroState, WorldState } from '../types';
 import type { SimContext } from '../world';
 
@@ -7,11 +7,11 @@ export function activeSpirit(world: WorldState): SpiritDef | undefined {
   return spirits.find((s) => s.approved && world.flags[s.freedFlag]);
 }
 
-/** E: casts the freed spirit's ability for this god (both gods share it; each has its own cooldown). */
+/** E: casts the freed spirit's ability for this god (each god has his own gift and cooldown). */
 export function castSpirit(ctx: SimContext, entity: Entity & { hero: HeroState }): string | null {
   const spirit = activeSpirit(ctx.world);
   if (!spirit) return 'no spirit';
-  const ability = spirit.ability;
+  const ability = spiritAbilityFor(spirit, entity.defId);
   const hero = entity.hero;
   if ((hero.cooldowns[ability.id] ?? 0) > 0) return 'cooling down';
   if (!entity.stamina || entity.stamina.current < ability.staminaCost) return 'no stamina';
@@ -21,9 +21,12 @@ export function castSpirit(ctx: SimContext, entity: Entity & { hero: HeroState }
   return null;
 }
 
-/** Ticks down spirit effects on the gods (Three-Fold Howl's lifesteal). */
+/** Ticks down spirit effects on the gods (the howl's lifesteal, Hades's circling daggers). */
 export function updateSpirits(ctx: SimContext): void {
+  const spirit = activeSpirit(ctx.world);
   for (const entity of Object.values(ctx.world.entities)) {
-    if (entity.hero?.howl) entity.hero.howl = Math.max(0, entity.hero.howl - 1);
+    if (!entity.hero) continue;
+    if (entity.hero.howl) entity.hero.howl = Math.max(0, entity.hero.howl - 1);
+    if (spirit && ctx.isAuthority && !ctx.world.cutscene) spiritAbilityFor(spirit, entity.defId).tick?.(ctx, entity.id);
   }
 }

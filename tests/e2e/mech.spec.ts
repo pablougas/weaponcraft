@@ -18,7 +18,7 @@ async function inGrotto(page: Page) {
 }
 
 test.describe('Cerberus Mk. II, the Warden, and freeing Cerberus (M7)', () => {
-  test('sneak behind the Mk. II, break its plating, the Warden climbs out; beat him and Cerberus goes free (Hades reunited, Poseidon arrives); E howls for Zeus and for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
+  test('sneak behind the Mk. II, break its plating, the Warden climbs out; beat him and Cerberus goes free (Hades reunited, Poseidon arrives); E howls for Zeus, Shadow Daggers for Hades; it all survives a reload', async ({ page, consoleErrors }) => {
     test.setTimeout(300_000);
     await inGrotto(page);
     await page.evaluate(() => window.wc!.breakBarricade());
@@ -106,10 +106,12 @@ test.describe('Cerberus Mk. II, the Warden, and freeing Cerberus (M7)', () => {
     s = await state(page);
     const hades = s.world!.entities[s.world!.players.p1.entityId!];
     expect(hades.defId).toBe('hades');
+    // Hades gets Shadow Daggers instead: three blades circle him (and his HUD slot shows them).
+    await expect(page.locator('[data-hud="spirit"]')).toContainText('Shadow Daggers');
     await page.keyboard.press('KeyE');
     await page.evaluate(() => window.wc!.step(2));
     s = await state(page);
-    expect(s.world!.entities[hades.id].hero!.howl).toBeGreaterThan(0);
+    expect(s.world!.entities[hades.id].hero!.daggers).toMatchObject({ reform: [0, 0, 0] });
 
     // Saved: after a reload Cerberus is still free and the Mk. II still down.
     await page.reload();

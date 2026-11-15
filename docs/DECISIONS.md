@@ -148,3 +148,9 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - 2026-11-15 — **Skull Cage** (team tuning): cooldown 12 s → 8 s; it now slams down on everything inside (20 + 0.4 × stamina spent, shadow) and crushes for the whole 4 s it holds them (1.2 × stamina spent over 4 s). A new `caged` status holds even the Warden, for 2 s (he ignores ordinary stuns). Status labels: Crushed, Caged.
 - 2026-11-15 — **Three-Fold Howl lingers** (team tuning): everything in its 10 m reach, machines included, takes dread damage, 6 a second for 4 s (shown as "Dread"), on top of the fear and the lifesteal.
 - 2026-11-15 — Team approved the screenshots for the Warden, the reunion and Poseidon, the slower descent, and the shifted Underworld shots (faster gods, soldiers still during cutscenes); baselines recorded.
+
+## Shadow Daggers replace the howl for Hades (team request, Nov 15)
+- Cerberus's gift is now per god (`SpiritDef.forGods`). Zeus keeps the Three-Fold Howl; Hades's E summons three shadow daggers that circle him for 15 s (20 s cooldown, 30 stamina).
+- "Focuses on an enemy" means lock-on (Tab). While he's locked on to an enemy within 16 m, the daggers fly at it one every 0.4 s, for 22 shadow damage each (so his Shadow lifesteal applies). Each dagger re-forms in the circle 3 s after it's thrown. With no lock, they just circle.
+- The companion AI locks on in fights already, so an AI Hades uses them too. Companions now cast the spirit gift when a fight starts, if they have more than 50 stamina.
+- The orbit is shared by the sim and the view (`daggerOrbit`), so a throw leaves from the dagger you see.

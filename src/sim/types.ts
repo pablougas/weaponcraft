@@ -222,6 +222,11 @@ export interface HeroState {
   regenDelay?: number;
   /** Three-Fold Howl (M7): ticks left of lifesteal on everything this god hits. */
   howl?: number;
+  /**
+   * Shadow Daggers (Cerberus's gift to Hades): ticks left, each dagger's ticks
+   * until it re-forms (0 = circling, ready), and ticks until the next can fly.
+   */
+  daggers?: { ticksLeft: number; reform: number[]; nextShot: number } | null;
 }
 
 export type SoldierKind = 'spear' | 'shield' | 'archer' | 'sentry' | 'captain';

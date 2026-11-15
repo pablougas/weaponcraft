@@ -6,6 +6,7 @@ import type { Entity, EntityId, HeroState, PlayerId, PlayerState } from '../type
 import type { SimContext } from '../world';
 import { castAbility, doAction, newHeroState } from './hero';
 import { isResting } from './rest';
+import { activeSpirit, castSpirit } from './spirits';
 
 /**
  * Two gods, one player (SPEC §5, M6): V switches which god you control; the
@@ -149,6 +150,8 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
     }
     // His Q every couple of seconds while he has the stamina for it; otherwise melee.
     const q = godDef(self.defId).ability;
+    // Cerberus's gift (E) when a fight starts: Hades's daggers then strike what he's focused on.
+    if (ctx.world.tick % ticks(1) === 0 && (self.stamina?.current ?? 0) > 50 && activeSpirit(ctx.world) && !hero.daggers && castSpirit(ctx, self) === null) return;
     if (d <= 14 && ctx.world.tick % ticks(2) === 0 && (self.stamina?.current ?? 0) > 40) castAbility(ctx, self);
     else if (d <= MELEE_RANGE + 0.4 && ctx.world.tick % ticks(0.5) === 0) doAction(ctx, self, hero.weaponId ? 'lightAttack' : 'punch');
     void q;

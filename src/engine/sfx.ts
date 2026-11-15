@@ -83,6 +83,18 @@ export class Sfx {
           this.howl(ctx, 0.7);
           return;
         }
+        if (event.abilityId === 'shadow-daggers') {
+          // Three blades drawn from the dark: rising metallic rings a beat apart.
+          [0, 0.12, 0.24].forEach((delay, i) => this.tone(ctx, { from: 900 + i * 180, to: 1500 + i * 220, duration: 0.25, volume: 0.05, type: 'triangle', delay }));
+          this.noiseBurst(ctx, { duration: 0.5, volume: 0.08, type: 'bandpass', freq: 500, freqEnd: 1600 });
+          return;
+        }
+        if (event.abilityId === 'shadow-dagger') {
+          // A thrown blade: a quick high whistle into a thud.
+          this.noiseBurst(ctx, { duration: 0.14, volume: 0.14, type: 'highpass', freq: 3000 });
+          this.tone(ctx, { from: 1700, to: 600, duration: 0.14, volume: 0.05, type: 'sine' });
+          return;
+        }
         if (event.abilityId === 'soul-bolts') {
           // A ghostly wail: a falling, wavering tone over a breathy whoosh.
           this.noiseBurst(ctx, { duration: 0.3, volume: 0.18, type: 'bandpass', freq: 1400, freqEnd: 300 });

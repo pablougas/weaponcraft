@@ -84,6 +84,7 @@ function stopEverything(hero: HeroState): void {
   hero.charge = null;
   hero.weaponHeld = false;
   hero.ultimate = null;
+  hero.daggers = null;
   hero.vy = 0;
 }
 

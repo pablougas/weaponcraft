@@ -4,6 +4,8 @@ import { attackSpecFor, DODGE_TICKS } from '../../../sim/systems/hero';
 import type { Entity } from '../../../sim/types';
 import { isKnownWeapon, weaponData } from '../../../sim/weapons';
 import type { EntityModel, Expression, ModelFactory, ModelFrame } from '../../../view/entity-model';
+import { DAGGERS, daggerOrbit } from '../../spirits/shadow-daggers';
+import { buildDagger, daggerMaterials } from '../../../view/effects/shadow';
 import { createParticles } from '../../../view/particles';
 import { buildWeaponModel } from '../../../view/weapon-model';
 import { drawFace, SKIN } from './face';
@@ -279,6 +281,19 @@ export const createModel: ModelFactory = (look, entityId) => {
   };
   showFace('neutral');
 
+  // Shadow Daggers (Cerberus's gift): three blades circling him while the gift lasts.
+  // They live in world-aligned space (the ring undoes his heading) so they follow the sim's orbit.
+  const daggerRing = new THREE.Group();
+  root.add(daggerRing);
+  const daggers = Array.from({ length: DAGGERS.count }, () => {
+    const d = buildDagger();
+    daggerRing.add(d);
+    return { group: d, mats: daggerMaterials(d) };
+  });
+  daggerRing.visible = false;
+  let orbitT = 0;
+  const origin = { x: 0, y: 0, z: 0 };
+
   let walkPhase = 0;
   const model: EntityModel = {
     root,
@@ -311,6 +326,26 @@ export const createModel: ModelFactory = (look, entityId) => {
       cloakPivot.rotation.z = Math.sin(t * 0.7) * 0.03;
       const flicker = frame.reduceMotion ? 1 : 1 + Math.sin(t * 7) * 0.08 + Math.sin(t * 13) * 0.04;
       flameTongue.scale.set(1, flicker, 1);
+
+      // Shadow Daggers: circling at chest height, tips outward; a thrown one fades back in as it re-forms.
+      const ring = hero?.daggers;
+      daggerRing.visible = !!ring;
+      if (ring) {
+        const simT = frame.world.tick / 30;
+        orbitT = Math.abs(orbitT + frame.dt - simT) > 0.1 ? simT : orbitT + frame.dt;
+        daggerRing.rotation.y = -root.rotation.y;
+        const fadeOut = Math.min(1, ring.ticksLeft / 15);
+        daggers.forEach((d, i) => {
+          const p = daggerOrbit(origin, i, orbitT);
+          d.group.position.set(p.x, p.y, p.z);
+          // Tip outward and a little down, along the ring (ring-local, so no lookAt: that works in world space).
+          d.group.rotation.set(0.35, Math.atan2(p.x, p.z) + 0.5, 0, 'YXZ');
+          const back = ring.reform[i] > 0 ? Math.max(0, 1 - ring.reform[i] / 12) : 1;
+          d.group.visible = back > 0;
+          d.group.scale.setScalar(0.6 + 0.4 * back);
+          for (const m of d.mats) m.opacity = (m.blending === THREE.AdditiveBlending ? 0.25 : 1) * back * fadeOut;
+        });
+      }
 
       // Walk cycle.
       walkPhase += frame.dt * (moving ? (sprinting ? 12 : 8) : 0);
@@ -405,6 +440,7 @@ export const createModel: ModelFactory = (look, entityId) => {
       return (heldTip ?? tip).getWorldPosition(out);
     },
     dispose() {
+      for (const d of daggers) for (const m of d.mats) m.dispose();
       faceTex.dispose();
       glowTex.dispose();
     },

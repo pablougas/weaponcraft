@@ -334,6 +334,25 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await expect(page).toHaveScreenshot('poseidon-arrives.png', SHOT);
   });
 
+  test('Hades with Shadow Daggers circling him (Cerberus\'s gift)', async ({ page }) => {
+    test.setTimeout(240_000);
+    await atTheGates(page);
+    await freedSceneAt(page, 33 * 30 + 5); // past the end: Cerberus free, control back
+    await page.keyboard.press('KeyV');
+    // A few steps back from the hound (short enough that Zeus walks rather than flashing over), facing away.
+    await page.evaluate(async () => {
+      window.wc!.step(35);
+      const w = window.wc!.getState().world!;
+      const me = w.entities[w.players.p1.entityId!];
+      const away = me.rotationY + Math.PI;
+      await window.wc!.teleport(me.position.x + Math.sin(away) * 9, me.position.z + Math.cos(away) * 9, away);
+      window.wc!.step(30);
+    });
+    await page.keyboard.press('KeyE');
+    await page.evaluate(async () => { window.wc!.step(8); await window.wc!.freeze(12); });
+    await expect(page).toHaveScreenshot('hades-shadow-daggers.png', SHOT);
+  });
+
   test('The Warden climbs out of the broken Mk. II', async ({ page }) => {
     await atTheGates(page);
     await breakPlating(page);
