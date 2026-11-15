@@ -53,6 +53,12 @@ export interface EventMap {
   'objective:set': { objectiveId: string };
   /** A god rested at a bed: healed (and later, respawns there). */
   'hero:rested': { playerId: PlayerId };
+  /** Read the humans' dispatch in the grotto. */
+  'dispatch:read': { playerId: PlayerId };
+  /** Looked at the barricade over the tunnel deeper in (it opens in M6). */
+  'barricade:examined': { playerId: PlayerId };
+  /** Talked to a story character. */
+  'npc:talk': { playerId: PlayerId; npcId: EntityId; name: string };
   /** Someone used the Forge. */
   'forge:used': { playerId: PlayerId };
   /** The hero was put back on safe ground (stuck or fell out of the world). */

@@ -9,6 +9,10 @@ import { createAltarScreen } from '../ui/altar';
 import { createCaptions } from '../ui/captions';
 import { createTutorialPanel } from '../ui/tutorial';
 import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematics/rocket';
+import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
+import { ShadowPortal } from '../view/effects/portal';
+import { descentTicks } from '../sim/cutscenes/descent';
+import { GROTTO, groundAt, regionOf } from '../sim/regions';
 import { rocketTicks } from '../sim/cutscenes/rocket';
 import { DAY_MS } from '../sim/time';
 import { loadProgress, saveProgress } from './progress';
@@ -79,6 +83,7 @@ export async function boot(): Promise<void> {
   let cameraMode: 'preset' | 'follow' = 'preset';
   /** Camera pose when the rocket cinematic began (it eases from there), and the latest shake (tests). */
   let cinematicStart: CameraPose | null = null;
+  let cinematicId: string | null = null;
   let cameraShake = 0;
   const storage = browserStorage();
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -275,10 +280,19 @@ export async function boot(): Promise<void> {
     views.handleEvent(event, frame);
     sfx.handle(event);
     if (event.type === 'cutscene:beat' && ROCKET_CAPTIONS[event.beat]) captions.show(ROCKET_CAPTIONS[event.beat], event.beat === 'pan' ? 5 : 3.5);
+    if (event.type === 'cutscene:beat' && event.cutsceneId === 'descent' && DESCENT_CAPTIONS[event.beat]) {
+      captions.show(DESCENT_CAPTIONS[event.beat], event.beat === 'dispatch' ? 6 : 3.8);
+    }
     if (event.type === 'cutscene:end') {
-      progress.seenRocket = true;
+      // This browser remembers what it has seen, so later games may skip it.
+      if (event.cutsceneId === 'rocket') progress.seenRocket = true;
+      progress.seenCutscenes = [...new Set([...(progress.seenCutscenes ?? []), event.cutsceneId])];
       saveProgress(storage, progress);
     }
+    if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
+    if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
+    if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. We will break through.', 4);
+    if (event.type === 'npc:talk') captions.show('Hades: Cerberus first. Then we take back what is ours.', 4);
     if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
     if (event.type === 'hero:rested') captions.show('You rest. Health and stamina restored.');
     if (event.type === 'forge:used') captions.show('The Forge is cold. Bring materials from the wider world to craft here.');
@@ -380,6 +394,13 @@ export async function boot(): Promise<void> {
   if (devMenuEnabled()) {
     devMenu = createDevMenu(document.body, activeSession, settings, loop, newGame);
   }
+  // A calm black fade for the portal (no flash), and the two shadow portals.
+  const fadeOverlay = document.createElement('div');
+  fadeOverlay.id = 'wc-fade';
+  fadeOverlay.hidden = true;
+  document.body.append(fadeOverlay);
+  const portalA = new ShadowPortal(meadow.scene);
+  const portalB = new ShadowPortal(meadow.scene);
   const tutorialPanel = createTutorialPanel(document.body, (action) => keyLabel(inputMap.codesFor(action)[0] ?? ''));
   window.addEventListener('keydown', (event) => {
     if (event.repeat) return;
@@ -525,32 +546,59 @@ export async function boot(): Promise<void> {
         && Math.hypot(hero.position.x, hero.position.z) > MEADOW_RADIUS - 3) {
         captions.show('The rest of the world can wait. For now.');
       }
-      // The rocket cinematic drives the camera, HUD and Olympus from its timeline (SPEC §3.2).
-      const cinematicTicks = rocketTicks(world);
-      const cinematic = cinematicTicks !== null && cameraMode === 'follow' && hero;
+      // Show the region the local god is in (the meadow, or the Underworld's grotto).
+      const region = regionOf(hero);
+      meadow.setRegion(region);
+      const floorAt = (x: number, z: number) => groundAt(region, x, z);
+
+      // Cinematics drive the camera, HUD and effects from their sim timelines:
+      // the rocket (SPEC §3.2), then straight on, Hades's arrival and the descent (§3.3).
+      const rocketT = rocketTicks(world);
+      const descentT = descentTicks({ world });
+      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : null;
+      const cinematic = cutsceneId !== null && cameraMode === 'follow' && !!hero;
       const reduceMotion = settings.get().reduceMotion;
       let olympusTiming: { rocketFlight: number | null; sinceImpact: number | null; columns: number | null } = { rocketFlight: null, sinceImpact: null, columns: null };
+      let fade = 0;
+      let portalUp = 0;
+      let portalDown = 0;
       if (cinematic && hero) {
         interpolator.position(world, hero.id, alpha, heroPoint);
-        if (!cinematicStart) {
+        if (!cinematicStart || cinematicId !== cutsceneId) {
           const target = new THREE.Vector3();
           meadow.camera.getWorldDirection(target).multiplyScalar(10).add(meadow.camera.position);
           cinematicStart = { position: meadow.camera.position.clone(), target, fov: meadow.camera.fov };
+          cinematicId = cutsceneId;
         }
-        cameraRig.update(followCamera, heroPoint, 0, null);
+        cameraRig.update(followCamera, heroPoint, 0, null, floorAt);
         const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
-        const t = (cinematicTicks + (frozen ? 0 : alpha)) / 30;
-        const frame = rocketFrame(t, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
-        meadow.camera.position.copy(frame.pose.position);
-        meadow.camera.fov = frame.pose.fov;
+        const ticksIn = (rocketT ?? descentT ?? 0) + (frozen ? 0 : alpha);
+        let pose: CameraPose;
+        if (cutsceneId === 'rocket') {
+          const frame = rocketFrame(ticksIn / 30, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
+          pose = frame.pose;
+          meadow.setCinematicBoost(frame.bloom, frame.exposure);
+          cameraShake = frame.shake;
+          olympusTiming = frame;
+        } else {
+          const hades = Object.values(world.entities).find((e) => e.npc && e.defId === 'hades');
+          const hadesPoint = hades ? interpolator.position(world, hades.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
+          const frame = descentFrame(ticksIn / 30, heroPoint, hadesPoint, world.cutscene?.points ?? {}, cinematicStart, followPose);
+          pose = frame.pose;
+          fade = frame.fade;
+          portalUp = frame.portalUp;
+          portalDown = frame.portalDown;
+          meadow.setCinematicBoost(0, 0);
+          cameraShake = 0;
+        }
+        meadow.camera.position.copy(pose.position);
+        meadow.camera.fov = pose.fov;
         meadow.camera.updateProjectionMatrix();
-        meadow.camera.lookAt(frame.pose.target);
-        meadow.setCinematicBoost(frame.bloom, frame.exposure);
-        cameraShake = frame.shake;
-        olympusTiming = frame;
+        meadow.camera.lookAt(pose.target);
       } else {
         if (cinematicStart) {
           cinematicStart = null;
+          cinematicId = null;
           meadow.camera.fov = 50;
           meadow.camera.updateProjectionMatrix();
           meadow.setCinematicBoost(0, 0);
@@ -558,6 +606,11 @@ export async function boot(): Promise<void> {
         }
         cameraShake = 0;
       }
+      fadeOverlay.style.opacity = String(fade);
+      fadeOverlay.hidden = fade <= 0.001;
+      const points = world.cutscene?.points;
+      portalA.update(points?.portalUp, hero?.position, portalUp, viewSeconds);
+      portalB.update(points?.portalDown, hero?.position, portalDown, viewSeconds);
       meadow.setOlympus({
         shattered: world.flags.olympusShattered,
         ...olympusTiming,
@@ -578,7 +631,21 @@ export async function boot(): Promise<void> {
         }
         interpolator.position(world, hero.id, alpha, heroPoint);
         const lock = hero.hero?.lockTarget ? world.entities[hero.hero.lockTarget] : undefined;
-        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null);
+        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt);
+        if (region === 'underworld') {
+          // Keep the camera inside the grotto's walls (pull it in toward the god).
+          const c = GROTTO.center;
+          const dx = meadow.camera.position.x - c.x;
+          const dz = meadow.camera.position.z - c.z;
+          const r = Math.hypot(dx, dz);
+          const limit = GROTTO.radius + 1;
+          if (r > limit) {
+            meadow.camera.position.x = c.x + (dx * limit) / r;
+            meadow.camera.position.z = c.z + (dz * limit) / r;
+          }
+          meadow.camera.position.y = Math.min(meadow.camera.position.y, c.y + 12);
+          meadow.camera.lookAt(heroPoint.x, heroPoint.y + 1.55, heroPoint.z);
+        }
       }
       // The HUD fades out for the cinematic and comes back after.
       const showHud = shell.screen === 'playing' && !world.cutscene;
@@ -612,7 +679,7 @@ export async function boot(): Promise<void> {
         cameraMode = 'follow';
         hud.setVisible(true);
         // Tell the sim whether this browser has seen the rocket before (then it's skippable).
-        activeSession.sendIntent({ type: 'player:declare', seenRocket: progress.seenRocket });
+        activeSession.sendIntent({ type: 'player:declare', seenRocket: progress.seenRocket, seenCutscenes: progress.seenCutscenes ?? [] });
         requestLock();
         view.canvas.focus();
       },

@@ -26,7 +26,8 @@ export function nearestInteractable(world: WorldState, playerId: PlayerId, range
   if (!hero) return undefined;
   let best: { entity: Entity; distance: number } | undefined;
   for (const entity of Object.values(world.entities)) {
-    if (!entity.pickup && !entity.structure) continue;
+    if (!entity.pickup && !entity.structure && !entity.npc) continue;
+    if ((entity.region ?? 'surface') !== (hero.region ?? 'surface')) continue;
     const distance = flatDistance(hero, entity);
     const reach = entity.structure ? Math.max(range, ALTAR_RANGE - 0.5) : range;
     if (distance > reach || Math.abs(hero.position.y - entity.position.y) > 2.5) continue;
@@ -67,6 +68,18 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
   }
   if (target.structure?.kind === 'forge') {
     ctx.emit('forge:used', { playerId });
+    return null;
+  }
+  if (target.structure?.kind === 'dispatch') {
+    ctx.emit('dispatch:read', { playerId });
+    return null;
+  }
+  if (target.structure?.kind === 'barricade') {
+    ctx.emit('barricade:examined', { playerId });
+    return null;
+  }
+  if (target.npc) {
+    ctx.emit('npc:talk', { playerId, npcId: target.id, name: target.npc.name });
     return null;
   }
   return 'nothing to use';

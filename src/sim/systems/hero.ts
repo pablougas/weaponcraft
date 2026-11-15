@@ -7,7 +7,7 @@ import { interact } from './items';
 import type { Intent, PlayerAction } from '../intents';
 import type { PhysicsWorld } from '../physics';
 import { meadowHeightAt, WATER_LEVEL } from '../terrain/meadow';
-import { groundHeightAt } from '../terrain/meadow-rocks';
+import { fallOutHeight, groundAt, isSafeFooting, regionBounds, regionOf, type RegionId } from '../regions';
 import { COMBO_WINDOW_TICKS, PUNCH_COMBO } from '../unarmed';
 import type { Entity, EntityId, HeroState, Vec3, WorldState } from '../types';
 import type { SimContext } from '../world';
@@ -509,7 +509,7 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
   // Meadow edge: a soft wall. Never teleport the hero for it (that pushed the
   // feet under the hillside and wedged the capsule, M3.1 bug); instead remove
   // the outward part of the movement and nudge back inside.
-  ({ vx, vz } = applyEdge(entity.position, vx, vz));
+  ({ vx, vz } = applyEdge(entity.position, vx, vz, regionOf(entity)));
 
   const before = { ...entity.position };
   const delta = { x: vx * DT, y: hero.vy * DT, z: vz * DT };
@@ -520,7 +520,7 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
   } else {
     // No physics (unit tests): walk on the terrain height.
     const next = { x: entity.position.x + delta.x, y: entity.position.y + delta.y, z: entity.position.z + delta.z };
-    const ground = groundHeightAt(next.x, next.z);
+    const ground = groundAt(regionOf(entity), next.x, next.z);
     hero.grounded = next.y <= ground;
     if (hero.grounded) next.y = ground;
     entity.position = next;
@@ -534,22 +534,27 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
 }
 
 /**
- * Keeps movement inside the meadow: within EDGE_ZONE of the edge the outward
- * part of the velocity fades to zero, and past the edge it pushes back in.
+ * Keeps movement inside the region (the meadow, or the grotto): within
+ * EDGE_ZONE of the edge the outward part of the velocity fades to zero, and
+ * past the edge it pushes back in.
  */
-export function applyEdge(position: Vec3, vx: number, vz: number): { vx: number; vz: number } {
-  const r = Math.hypot(position.x, position.z);
-  if (r < MEADOW_RADIUS - EDGE_ZONE || r < 0.01) return { vx, vz };
-  const nx = position.x / r;
-  const nz = position.z / r;
+export function applyEdge(position: Vec3, vx: number, vz: number, region: RegionId = 'surface'): { vx: number; vz: number } {
+  const bounds = regionBounds(region);
+  const zone = region === 'surface' ? EDGE_ZONE : 1.5;
+  const dx = position.x - bounds.x;
+  const dz = position.z - bounds.z;
+  const r = Math.hypot(dx, dz);
+  if (r < bounds.radius - zone || r < 0.01) return { vx, vz };
+  const nx = dx / r;
+  const nz = dz / r;
   const outward = vx * nx + vz * nz;
   if (outward > 0) {
-    const keep = Math.max(0, (MEADOW_RADIUS - r) / EDGE_ZONE);
+    const keep = Math.max(0, (bounds.radius - r) / zone);
     vx -= nx * outward * (1 - keep);
     vz -= nz * outward * (1 - keep);
   }
-  if (r > MEADOW_RADIUS) {
-    const push = Math.min(4, (r - MEADOW_RADIUS) * 4 + 1);
+  if (r > bounds.radius) {
+    const push = Math.min(4, (r - bounds.radius) * 4 + 1);
     vx -= nx * push;
     vz -= nz * push;
   }
@@ -563,16 +568,18 @@ export function applyEdge(position: Vec3, vx: number, vz: number): { vx: number;
 function keepOutOfTheGround(ctx: SimContext, entity: HeroEntity, before: Vec3, tryingToMove: boolean): void {
   const hero = entity.hero;
   const p = entity.position;
-  const terrain = meadowHeightAt(p.x, p.z);
+  const region = regionOf(entity);
+  const terrain = region === 'surface' ? meadowHeightAt(p.x, p.z) : groundAt(region, p.x, p.z);
   if (p.y < terrain - SINK_TOLERANCE) {
     entity.position = { x: p.x, y: terrain, z: p.z };
     hero.vy = 0;
     hero.grounded = true;
   }
 
-  const r = Math.hypot(entity.position.x, entity.position.z);
+  const bounds = regionBounds(region);
+  const r = Math.hypot(entity.position.x - bounds.x, entity.position.z - bounds.z);
   hero.safeTimer = Math.max(0, hero.safeTimer! - 1);
-  if (hero.grounded && hero.safeTimer === 0 && r < MEADOW_RADIUS - SAFE_EDGE_MARGIN && entity.position.y > WATER_LEVEL + 0.5) {
+  if (hero.grounded && hero.safeTimer === 0 && r < bounds.radius - SAFE_EDGE_MARGIN && isSafeFooting(region, entity.position)) {
     hero.lastSafe = { ...entity.position };
     hero.safeTimer = SAFE_EVERY;
   }
@@ -582,9 +589,9 @@ function keepOutOfTheGround(ctx: SimContext, entity: HeroEntity, before: Vec3, t
     ? hero.stuckTicks! + 1
     : 0;
 
-  const fellOut = entity.position.y < WATER_LEVEL - 6;
+  const fellOut = entity.position.y < fallOutHeight(region);
   if (fellOut || hero.stuckTicks! >= STUCK_TICKS) {
-    const safe = hero.lastSafe ?? { x: 0, y: groundHeightAt(0, 0), z: 0 };
+    const safe = hero.lastSafe ?? { x: bounds.x, y: groundAt(region, bounds.x, bounds.z), z: bounds.z };
     entity.position = { ...safe };
     hero.vy = 0;
     hero.grounded = true;
@@ -606,13 +613,15 @@ function performBlink(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld
   hero.blink = null;
   if (!blink || !jump) return;
   const from = { ...entity.position };
+  const region = regionOf(entity);
+  const bounds = regionBounds(region);
   let tx = from.x + jump.dx;
   let tz = from.z + jump.dz;
-  const limit = MEADOW_RADIUS - 2;
-  const r = Math.hypot(tx, tz);
+  const limit = bounds.radius - 2;
+  const r = Math.hypot(tx - bounds.x, tz - bounds.z);
   if (r > limit) {
-    tx *= limit / r;
-    tz *= limit / r;
+    tx = bounds.x + ((tx - bounds.x) * limit) / r;
+    tz = bounds.z + ((tz - bounds.z) * limit) / r;
   }
   const dx = tx - from.x;
   const dz = tz - from.z;
@@ -625,10 +634,10 @@ function performBlink(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld
       if (moved) entity.position = moved.position;
     }
   } else {
-    entity.position = { x: tx, y: groundHeightAt(tx, tz), z: tz };
+    entity.position = { x: tx, y: groundAt(region, tx, tz), z: tz };
   }
   // Never end up under the terrain (the M3.1 safety rule).
-  const ground = groundHeightAt(entity.position.x, entity.position.z);
+  const ground = groundAt(region, entity.position.x, entity.position.z);
   if (entity.position.y < ground) entity.position.y = ground;
   const to = { ...entity.position };
   const targetIds = targetsNear(ctx.world, to, blink.burstRadius, new Set([entity.id]));

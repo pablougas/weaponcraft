@@ -1,5 +1,5 @@
 import { ticks } from '../constants';
-import { ensureRefuge } from '../populate';
+import { startDescent } from './descent';
 import type { HeroState, WorldState } from '../types';
 import type { SimContext } from '../world';
 
@@ -41,7 +41,7 @@ export function startRocket(ctx: SimContext): void {
   const { world } = ctx;
   if (world.cutscene || world.flags.olympusShattered) return;
   const players = Object.values(world.players);
-  const skippable = players.length > 0 && players.every((p) => p.seenRocket);
+  const skippable = players.length > 0 && players.every((p) => p.seenRocket || p.seenCutscenes?.includes(ROCKET_ID));
   world.cutscene = { id: ROCKET_ID, startTick: world.tick, skippable };
   for (const player of players) {
     const hero = player.entityId ? world.entities[player.entityId]?.hero : undefined;
@@ -95,14 +95,17 @@ function shatterOlympus(ctx: SimContext): void {
   world.olympusShatteredAtMs = world.nowMs;
 }
 
-/** The prologue ends: the world clock runs, the meadow becomes the Refuge, a new objective. */
+/**
+ * The rocket ends: control does not return. Hades's arrival and the descent
+ * to the Outer Grotto follow straight on (M5.1, SPEC §3.2 step 5).
+ */
 function finishRocket(ctx: SimContext, skipped: boolean): void {
   const { world } = ctx;
   world.cutscene = null;
-  world.flags.prologueDone = true;
-  for (const player of Object.values(world.players)) player.seenRocket = true;
+  for (const player of Object.values(world.players)) {
+    player.seenRocket = true;
+    player.seenCutscenes = [...new Set([...(player.seenCutscenes ?? []), ROCKET_ID])];
+  }
   ctx.emit('cutscene:end', { cutsceneId: ROCKET_ID, skipped });
-  ensureRefuge(ctx);
-  world.objective = 'find-the-others';
-  ctx.emit('objective:set', { objectiveId: 'find-the-others' });
+  startDescent(ctx);
 }

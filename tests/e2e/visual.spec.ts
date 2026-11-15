@@ -151,8 +151,21 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   }
 
   test('the shattered summit after the rocket', async ({ page }) => {
-    await cinematicAt(page, 560);
+    await cinematicAt(page, 541); // the rocket's last tick; the descent starts with the portal still closed
     await page.evaluate(async () => { await window.wc!.setTime(0.7); await window.wc!.snapCam('vista'); });
     await expect(page).toHaveScreenshot('vista-shattered.png', SHOT);
+  });
+
+  // M5.1: Hades's arrival, the portal down, and the grotto (ticks after the rocket starts; it lasts 540).
+  for (const [name, ticks] of [['hades-arrival', 541 + 140], ['hades-portal', 541 + 470], ['grotto-discovery', 541 + 735]] as const) {
+    test(`descent: ${name}`, async ({ page }) => {
+      await cinematicAt(page, ticks);
+      await expect(page).toHaveScreenshot(`${name}.png`, SHOT);
+    });
+  }
+
+  test('the Outer Grotto as the Refuge', async ({ page }) => {
+    await cinematicAt(page, 541 + 905);
+    await expect(page).toHaveScreenshot('grotto-refuge.png', SHOT);
   });
 });

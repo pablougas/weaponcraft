@@ -8,6 +8,8 @@ import { createLook, type Look } from './look';
 import { buildBirds } from './meadow/birds';
 import { buildFlowers, buildGrass } from './meadow/foliage';
 import { buildOlympus, type OlympusState, type OlympusView } from './meadow/olympus';
+import { buildGrotto } from './underworld/grotto';
+import { GROTTO, type RegionId } from '../sim/regions';
 import { buildRocks, buildTrees } from './meadow/props';
 import { buildTerrainMesh, buildWater } from './meadow/terrain-mesh';
 import { createMeadowParticles } from './particles';
@@ -23,6 +25,8 @@ export interface WorldView {
   readonly scene: THREE.Scene;
   readonly look: Look;
   readonly olympus: OlympusView;
+  /** Shows the surface (meadow, sky, Olympus) or the Underworld (the grotto), with its own lighting. */
+  setRegion(region: RegionId): void;
   /** Olympus intact or shattered, and the rocket cinematic's distant effects. */
   setOlympus(state: Omit<OlympusState, 'time'>): void;
   /** Extra bloom and exposure for the impact's slow swell (0 = none). */
@@ -66,27 +70,36 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const fog = new THREE.FogExp2(0xffffff, 0.001);
   scene.fog = fog;
 
+  // Everything on the surface lives under one group, so the Underworld can hide it.
+  const surface = new THREE.Group();
+  scene.add(surface);
   const sky = createSky(U);
-  scene.add(sky);
-  scene.add(buildTerrainMesh(look));
+  surface.add(sky);
+  surface.add(buildTerrainMesh(look));
   const water = buildWater();
-  scene.add(water);
+  surface.add(water);
   const olympus = buildOlympus(look);
-  scene.add(olympus.group);
+  surface.add(olympus.group);
   let olympusState: OlympusState = { shattered: false, sinceImpact: null, rocketFlight: null, columns: null, smoke: false, time: 0, reduceMotion: false };
   let bloomBoost = 0;
   let exposureBoost = 0;
   // Build order matters: each builder draws from the shared layout RNG.
-  scene.add(buildRocks(look));
-  scene.add(buildTrees(look, rand));
+  surface.add(buildRocks(look));
+  surface.add(buildTrees(look, rand));
   const grass = buildGrass(look, rand);
-  scene.add(grass);
+  surface.add(grass);
   const flowers = buildFlowers(look, rand);
-  scene.add(flowers.group);
+  surface.add(flowers.group);
   const particles = createMeadowParticles(U, rand);
-  scene.add(...particles.all);
+  surface.add(...particles.all);
   const birds = buildBirds(rand);
-  scene.add(birds.group);
+  surface.add(birds.group);
+  // The Outer Grotto (M5.1), hidden until the local god is in the Underworld.
+  const grotto = buildGrotto(look);
+  scene.add(grotto.group);
+  grotto.setActive(false);
+  let region: RegionId = 'surface';
+  let reduceMotionOn = false;
 
   const post = createPostStack(renderer, scene, camera);
   let raysBase = 0.9;
@@ -150,6 +163,40 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
     water.material.color.copy(waterDay).lerp(waterNight, night);
   };
 
+  /**
+   * The Underworld's fixed "eternal dusk" (SPEC §3.5): violet and teal,
+   * unaffected by the surface clock or the time-of-day setting.
+   */
+  const underworldBackground = new THREE.Color('#0b0814');
+  const underworldSun = new THREE.Vector3(-0.35, 0.85, 0.25).normalize();
+  const applyUnderworldLighting = () => {
+    U.sunDir.value.copy(underworldSun);
+    sun.target.position.set(GROTTO.center.x, GROTTO.center.y, GROTTO.center.z);
+    sun.position.copy(underworldSun).multiplyScalar(60).add(sun.target.position);
+    sun.color.set('#9a8ad8');
+    sun.intensity = 1.5;
+    U.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity * 0.42);
+    hemi.color.set('#5b4a8a');
+    hemi.groundColor.set('#140f1e');
+    hemi.intensity = 1.4;
+    U.ambColor.value.set('#3a3160');
+    fog.color.set('#1d1630');
+    U.fogColor.value.copy(fog.color);
+    fog.density = 0.018;
+    U.fogDensity.value = fog.density;
+    post.bloom.strength = 0.4;
+    post.bloom.threshold = 0.85;
+    raysBase = 0;
+    U.rimColor.value.set('#5ff0e0');
+    U.rimStrength.value = 0.55;
+    U.outlineColor.value.set('#07060c');
+    gradeU.shadowTint.value.set(0.05, 0.1, 0.35);
+    gradeU.highTint.value.set(0.2, 0.45, 0.5);
+    renderer.toneMappingExposure = 1.0;
+    U.night.value = 0.6;
+    for (const glow of look.glowMaterials) glow.mat.emissiveIntensity = glow.night;
+  };
+
   const sunScreen = new THREE.Vector3();
   const cameraDir = new THREE.Vector3();
   const updateGodRays = () => {
@@ -178,14 +225,27 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
     camera,
     update(timeSeconds, dayFraction) {
       U.time.value = timeSeconds;
-      applyLighting(dayFraction);
+      if (region === 'underworld') applyUnderworldLighting();
+      else applyLighting(dayFraction);
       post.bloom.strength += bloomBoost;
       renderer.toneMappingExposure += exposureBoost;
       olympusState.time = timeSeconds;
       olympus.update(olympusState);
       birds.update(timeSeconds);
       sky.position.copy(camera.position);
-      updateGodRays();
+      if (region === 'underworld') {
+        post.rays.enabled = false;
+        grotto.update(timeSeconds, reduceMotionOn);
+      } else {
+        updateGodRays();
+      }
+    },
+    setRegion(next) {
+      if (next === region) return;
+      region = next;
+      surface.visible = region === 'surface';
+      grotto.setActive(region === 'underworld');
+      scene.background = region === 'underworld' ? underworldBackground : null;
     },
     render() {
       post.composer.render();
@@ -212,6 +272,7 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
       }
     },
     setReduceMotion(reduce) {
+      reduceMotionOn = reduce;
       U.motion.value = reduce ? 0.35 : 1;
     },
     setQuality(params) {

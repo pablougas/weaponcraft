@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { enemies } from '../content/enemies';
 import { gods } from '../content/gods';
+import { hadesLook } from '../content/gods/hades';
 import { structures } from '../content/structures';
 import type { ModelLoader } from '../content/types';
 import type { EntityId, GameEvent, WorldState } from '../sim';
@@ -26,6 +27,8 @@ export async function preloadModels(): Promise<Map<string, ModelFactory>> {
   }));
   // Weapons lying in the world use one built-in model that shows whichever weapon it is.
   factories.set('weapon-pickup', createPickupModel);
+  // Hades's story cameo (M5.1): his look isn't in the gods registry until he's playable (M6).
+  if (hadesLook.approved) factories.set(hadesLook.id, (await hadesLook.model()).createModel);
   return factories;
 }
 

@@ -2,6 +2,7 @@ import {
   createWorld,
   DEFAULT_PLAYER_ID,
   ensureMeadowPopulated,
+  ensureStory,
   getWorldTime,
   tickWorld,
   type Intent,
@@ -73,7 +74,7 @@ export class Session {
 
   /** Spawns the meadow's god, dummies and wildlife if this world doesn't have them yet. */
   populate(): void {
-    const events = ensureMeadowPopulated(this.world, this.isAuthority);
+    const events = [...ensureMeadowPopulated(this.world, this.isAuthority), ...ensureStory(this.world, this.isAuthority)];
     if (events.length > 0) this.transport.publish({ kind: 'events', tick: this.world.tick, events });
   }
 

@@ -3,11 +3,12 @@ import { CUTSCENE_ALLOWED_INTENTS, type Intent } from './intents';
 import type { PhysicsWorld } from './physics';
 import { updateStatuses } from './combat';
 import { applyHeroIntent, updateHeroes } from './systems/hero';
+import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
 import { applyItemIntent } from './systems/items';
 import { completeStep, tutorialComplete, updateTutorial } from './tutorial';
 import { updateCreatures } from './systems/wildlife';
-import { groundHeightAt } from './terrain/meadow-rocks';
+import { groundAt, regionOf } from './regions';
 import type { WorldState } from './types';
 import { createSimContext, despawn, spawn, type SimContext } from './world';
 
@@ -49,8 +50,9 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   // Prologue: tutorial progress, then the rocket when every step is done (SPEC §3.1–3.2).
   if (input.isAuthority) {
     updateTutorial(ctx, events);
-    if (!world.flags.prologueDone && !world.cutscene && tutorialComplete(world)) startRocket(ctx);
+    if (!world.flags.prologueDone && !world.cutscene && !world.flags.olympusShattered && tutorialComplete(world)) startRocket(ctx);
     else if (rocketTicks(world) !== null) updateRocket(ctx);
+    else if (world.cutscene?.id === DESCENT_ID) updateDescent(ctx);
   }
 
   return events;
@@ -91,7 +93,7 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
         reject('no hero to move');
         return;
       }
-      const position = { x: intent.x, y: groundHeightAt(intent.x, intent.z), z: intent.z };
+      const position = { x: intent.x, y: groundAt(regionOf(hero), intent.x, intent.z), z: intent.z };
       hero.position = position;
       if (intent.rotationY !== undefined && Number.isFinite(intent.rotationY)) hero.rotationY = intent.rotationY;
       hero.hero.vy = 0;
@@ -101,13 +103,19 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       return;
     }
     case 'cutscene:skip': {
-      const reason = skipRocket(ctx);
+      const reason = world.cutscene?.id === DESCENT_ID ? skipDescent(ctx) : skipRocket(ctx);
       if (reason) reject(reason);
       return;
     }
-    case 'player:declare':
-      world.players[intent.playerId].seenRocket = world.players[intent.playerId].seenRocket || intent.seenRocket;
+    case 'player:declare': {
+      const player = world.players[intent.playerId];
+      player.seenRocket = player.seenRocket || intent.seenRocket;
+      player.seenCutscenes = [...new Set([...(player.seenCutscenes ?? []), ...(intent.seenCutscenes ?? []), ...(intent.seenRocket ? ['rocket'] : [])])];
+      // A cutscene already running becomes skippable once every player has declared seeing it.
+      const running = world.cutscene;
+      if (running && Object.values(world.players).every((p) => p.seenCutscenes?.includes(running.id))) running.skippable = true;
       return;
+    }
     case 'dev:tutorial':
       if (!completeStep(ctx, intent.stepId)) reject('unknown or already done');
       return;

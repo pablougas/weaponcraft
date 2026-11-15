@@ -8,15 +8,18 @@ export const PROGRESS_KEY = 'weaponcraft:progress:v1';
 
 export interface Progress {
   seenRocket: boolean;
+  /** Cutscene IDs this browser has seen (they become skippable). */
+  seenCutscenes?: string[];
 }
 
 export function loadProgress(storage: SaveStorage | undefined): Progress {
   try {
     const raw = storage?.getItem(PROGRESS_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<Progress>) : {};
-    return { seenRocket: parsed.seenRocket === true };
+    const seen = Array.isArray(parsed.seenCutscenes) ? parsed.seenCutscenes.filter((id): id is string => typeof id === 'string') : [];
+    return { seenRocket: parsed.seenRocket === true, seenCutscenes: seen };
   } catch {
-    return { seenRocket: false };
+    return { seenRocket: false, seenCutscenes: [] };
   }
 }
 

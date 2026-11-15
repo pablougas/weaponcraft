@@ -45,22 +45,13 @@ test.describe('prologue and the rocket (M5)', () => {
     await page.evaluate(() => window.wc!.step(1));
     expect((await state(page)).world!.cutscene).not.toBeNull();
 
-    // Play it out (18 s of sim time).
+    // Play it out (18 s of sim time). Control does not return: Hades's arrival follows straight on.
     await page.evaluate(() => window.wc!.step(560));
     s = await state(page);
-    expect(s.world!.cutscene).toBeNull();
-    expect(s.world!.flags).toMatchObject({ olympusShattered: true, prologueDone: true, refugeBuilt: true });
-    expect(s.world!.objective).toBe('find-the-others');
-    expect(s.time!.source).not.toBe('prologue');
-    await expect(page.locator('#wc-hud')).toBeVisible();
-    await expect(page.locator('#wc-tutorial')).toContainText('Find the others. Survive.');
-
-    // Control is back.
-    await page.keyboard.down('ArrowUp');
-    await page.evaluate(() => window.wc!.step(30));
-    await page.keyboard.up('ArrowUp');
-    const after = hero(await state(page)).position;
-    expect(Math.hypot(after.x - during.x, after.z - during.z)).toBeGreaterThan(1);
+    expect(s.world!.flags.olympusShattered).toBe(true);
+    expect(s.world!.cutscene).toMatchObject({ id: 'descent', skippable: false });
+    expect(s.world!.flags.prologueDone).toBe(false);
+    await expect(page.locator('#wc-hud')).toBeHidden();
     // This browser remembers it has seen the rocket.
     expect(await page.evaluate(() => localStorage.getItem('weaponcraft:progress:v1'))).toContain('"seenRocket":true');
     expect(consoleErrors).toEqual([]);
@@ -93,7 +84,7 @@ test.describe('prologue and the rocket (M5)', () => {
     await expect(page.locator('#wc-tutorial')).toBeHidden();
   });
 
-  test('after seeing it once, a new game can skip the rocket with Enter', async ({ page }) => {
+  test('after seeing it once, a new game can skip the rocket (into the descent) with Enter', async ({ page }) => {
     await page.goto('/#test');
     await page.evaluate(() => localStorage.setItem('weaponcraft:progress:v1', JSON.stringify({ seenRocket: true })));
     await page.reload();
@@ -108,7 +99,7 @@ test.describe('prologue and the rocket (M5)', () => {
     await page.keyboard.press('Enter');
     await page.evaluate(() => window.wc!.step(1));
     const s = await state(page);
-    expect(s.world!.cutscene).toBeNull();
+    expect(s.world!.cutscene).toMatchObject({ id: 'descent', skippable: false });
     expect(s.world!.flags.olympusShattered).toBe(true);
   });
 

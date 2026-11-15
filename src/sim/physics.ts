@@ -1,5 +1,7 @@
 import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
+import { GROTTO_SPOTS } from './cutscenes/descent';
+import { GROTTO } from './regions';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
 import type { EntityId, Vec3, WorldState } from './types';
@@ -39,6 +41,7 @@ export class PhysicsWorld {
     this.world = new R.World({ x: 0, y: 0, z: 0 });
     this.addTerrain();
     this.addRocks();
+    this.addGrotto();
     this.controller = this.world.createCharacterController(0.04);
     this.controller.setUp({ x: 0, y: 1, z: 0 });
     this.controller.setMaxSlopeClimbAngle((52 * Math.PI) / 180);
@@ -61,6 +64,34 @@ export class PhysicsWorld {
     }
     const desc = this.R.ColliderDesc.heightfield(n, n, heights, { x: TERRAIN_EXTENT, y: 1, z: TERRAIN_EXTENT });
     this.world.createCollider(desc);
+  }
+
+  /**
+   * The Outer Grotto (M5.1), deep below the meadow: a floor slab, a ring of
+   * rock walls with the tunnel north, the humans' conduit rig, and their
+   * barricade across the tunnel (it opens in M6).
+   */
+  private addGrotto(): void {
+    const c = GROTTO.center;
+    const R = this.R;
+    this.world.createCollider(R.ColliderDesc.cuboid(40, 0.5, 40).setTranslation(c.x, c.y - 0.5, c.z));
+    const wallRadius = GROTTO.radius + 1.6;
+    const segments = 28;
+    for (let i = 0; i < segments; i += 1) {
+      const a = (i / segments) * Math.PI * 2;
+      // Leave the tunnel mouth open to the north (−z); the barricade closes it.
+      if (Math.abs(Math.atan2(Math.sin(a - GROTTO.tunnelBearing), Math.cos(a - GROTTO.tunnelBearing))) < 0.16) continue;
+      const desc = R.ColliderDesc.cuboid(2.6, 6, 0.8)
+        .setTranslation(c.x + Math.sin(a) * wallRadius, c.y + 6, c.z + Math.cos(a) * wallRadius)
+        .setRotation({ x: 0, y: Math.sin(a / 2), z: 0, w: Math.cos(a / 2) });
+      this.world.createCollider(desc);
+    }
+    const rig = GROTTO_SPOTS.rig;
+    this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + rig.x, c.y + 1.4, c.z + rig.z));
+    const gate = GROTTO_SPOTS.barricade;
+    this.world.createCollider(R.ColliderDesc.cuboid(3.6, 2.5, 0.5).setTranslation(c.x + gate.x, c.y + 2.5, c.z + gate.z));
+    // The tunnel beyond the barricade, walled off for now.
+    this.world.createCollider(R.ColliderDesc.cuboid(3.6, 4, 0.5).setTranslation(c.x + gate.x, c.y + 4, c.z + gate.z - 6));
   }
 
   /** Static colliders: the hero rock, boulders and tree trunks. */
@@ -89,7 +120,7 @@ export class PhysicsWorld {
       }
     }
     for (const entity of Object.values(state.entities)) {
-      if (!entity.body || !(entity.hero || entity.creature || entity.structure)) continue;
+      if (!entity.body || !(entity.hero || entity.creature || entity.structure || entity.npc)) continue;
       let record = this.bodies.get(entity.id);
       if (!record) {
         const { radius, height } = entity.body;

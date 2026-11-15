@@ -58,7 +58,7 @@ export class CameraRig {
   }
 
   /** Positions `camera` behind `target`; while locked on, swings to keep the lock target in view. */
-  update(camera: THREE.PerspectiveCamera, target: Vec3, dt: number, lockTarget: Vec3 | null): void {
+  update(camera: THREE.PerspectiveCamera, target: Vec3, dt: number, lockTarget: Vec3 | null, floorAt: (x: number, z: number) => number = meadowHeightAt): void {
     if (lockTarget) {
       const desiredYaw = Math.atan2(lockTarget.x - target.x, lockTarget.z - target.z);
       const delta = Math.atan2(Math.sin(desiredYaw - this.yaw), Math.cos(desiredYaw - this.yaw));
@@ -72,7 +72,7 @@ export class CameraRig {
       this.pivot.z - Math.cos(this.yaw) * horizontal,
     );
     // Stay above the ground.
-    const floor = meadowHeightAt(this.desired.x, this.desired.z) + 0.4;
+    const floor = floorAt(this.desired.x, this.desired.z) + 0.4;
     if (this.desired.y < floor) this.desired.y = floor;
     if (!this.initialized || dt <= 0) {
       camera.position.copy(this.desired);

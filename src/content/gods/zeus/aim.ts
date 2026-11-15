@@ -1,5 +1,5 @@
 import { isHittable } from '../../../sim/combat';
-import { groundHeightAt } from '../../../sim/terrain/meadow-rocks';
+import { groundAt, regionOf } from '../../../sim/regions';
 import type { Entity, Vec3 } from '../../../sim/types';
 import type { SimContext } from '../../../sim/world';
 
@@ -13,7 +13,7 @@ export function aimPoint(entity: Entity, distance: number): Vec3 {
   const yaw = aimYaw(entity);
   const x = entity.position.x + Math.sin(yaw) * distance;
   const z = entity.position.z + Math.cos(yaw) * distance;
-  return { x, y: groundHeightAt(x, z), z };
+  return { x, y: groundAt(regionOf(entity), x, z), z };
 }
 
 /** The hero's lock-on target, if it's still hittable. */

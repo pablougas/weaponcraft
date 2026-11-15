@@ -1,3 +1,4 @@
+import type { RegionId } from './regions';
 // All game state is plain, JSON-serializable data (SPEC §13 rule 1).
 // No class instances, functions, Maps, Sets or references to meshes.
 
@@ -48,7 +49,11 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' };
+  /** A story character you can talk to (F). */
+  npc?: { name: string };
+  /** Which region this entity is in (default: the surface). */
+  region?: RegionId;
 }
 
 export type StatusKind = 'blind' | 'poison' | 'stun';
@@ -160,6 +165,8 @@ export interface PlayerState {
   inventory: string[];
   /** This player has watched the rocket cinematic before (on any save), so they may skip it. */
   seenRocket?: boolean;
+  /** Cutscene IDs this player has seen before on this browser (any save): those may be skipped. */
+  seenCutscenes?: string[];
 }
 
 /** Story and progress flags (SPEC §11). Unknown keys are allowed for content. */
@@ -168,6 +175,10 @@ export interface WorldFlags {
   olympusShattered: boolean;
   /** The meadow's god, dummies and wildlife have been spawned (false/missing in older saves). */
   meadowPopulated: boolean;
+  /** M5.1: Hades took Zeus down to the Outer Grotto. */
+  descended?: boolean;
+  /** M5.1: the grotto's altar, bed, dispatch and barricade are placed. */
+  grottoBuilt?: boolean;
   /** M5: the Forge and the bed were added when the meadow became the Refuge. */
   refugeBuilt?: boolean;
   /** M4: the Fusion Altar, the weapons to find and elemental dummies are placed. */
@@ -181,6 +192,8 @@ export interface CutsceneState {
   startTick: number;
   /** Can the players skip it? (Not the first time anyone here sees it, SPEC §3.2.) */
   skippable?: boolean;
+  /** Named points the cutscene uses (portal positions…), as plain data. */
+  points?: Record<string, Vec3>;
 }
 
 /** Prologue tutorial progress (SPEC §3.1), saved with the world. */

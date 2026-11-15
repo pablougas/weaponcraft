@@ -1,3 +1,4 @@
+import { startDescent } from './cutscenes/descent';
 import { godDef } from './defs';
 import type { GameEvent } from './events';
 import { worldRng } from './rng';
@@ -126,4 +127,15 @@ export function ensureRefuge(ctx: SimContext): void {
   spawnStructure(ctx, 'forge', FORGE_SPOT.x, FORGE_SPOT.z, -Math.PI / 2, { radius: 0.9, height: 1.6 });
   spawnStructure(ctx, 'bed', BED_SPOT.x, BED_SPOT.z, 0.4, { radius: 0.7, height: 0.7 });
   world.flags.refugeBuilt = true;
+}
+
+/**
+ * Story migration (M5.1): a save made after the M5 rocket ended in the meadow
+ * Refuge. Loading it continues the story with Hades's arrival.
+ */
+export function ensureStory(world: WorldState, isAuthority = true): GameEvent[] {
+  if (!isAuthority || !world.flags.olympusShattered || world.flags.descended || world.cutscene) return [];
+  const { ctx, events } = createSimContext(world, isAuthority);
+  startDescent(ctx);
+  return events;
 }

@@ -2,7 +2,7 @@ import type { UltimateModule } from '../../../sim/abilities';
 import { applyDamage, flatDistance, isHittable, knockBack } from '../../../sim/combat';
 import { ticks } from '../../../sim/constants';
 import type { EntityId } from '../../../sim/types';
-import { groundHeightAt } from '../../../sim/terrain/meadow-rocks';
+import { groundAt, regionOf } from '../../../sim/regions';
 import { aimPoint, lockedTarget } from './aim';
 
 const RADIUS = 5;
@@ -30,7 +30,7 @@ export const skyStrike: UltimateModule = {
     const caster = ctx.world.entities[casterId];
     if (!caster) return null;
     const lock = lockedTarget(ctx, caster);
-    if (lock) return { x: lock.position.x, y: groundHeightAt(lock.position.x, lock.position.z), z: lock.position.z };
+    if (lock) return { x: lock.position.x, y: groundAt(regionOf(lock), lock.position.x, lock.position.z), z: lock.position.z };
     return aimPoint(caster, AIM_DISTANCE);
   },
   land(ctx, casterId, point, spent) {

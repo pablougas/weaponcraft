@@ -10,7 +10,7 @@ export type Intent =
   /** Skip the running cutscene (only if it's skippable). */
   | { type: 'cutscene:skip'; playerId: PlayerId }
   /** The client tells the sim what this player has already seen on this browser (any save). */
-  | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean }
+  | { type: 'player:declare'; playerId: PlayerId; seenRocket: boolean; seenCutscenes?: string[] }
   /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
   | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */

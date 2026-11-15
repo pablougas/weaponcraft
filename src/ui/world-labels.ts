@@ -119,6 +119,11 @@ export class WorldLabels {
     let label = 'Use';
     if (target.pickup && isKnownWeapon(world, target.pickup.weaponId)) label = `Pick up ${weaponData(world, target.pickup.weaponId).name}`;
     if (target.structure?.kind === 'fusion-altar') label = 'Use Fusion Altar';
+    if (target.structure?.kind === 'bed') label = 'Rest';
+    if (target.structure?.kind === 'forge') label = 'Use the Forge';
+    if (target.structure?.kind === 'dispatch') label = 'Read the dispatch';
+    if (target.structure?.kind === 'barricade') label = 'Examine the barricade';
+    if (target.npc) label = `Talk to ${target.npc.name}`;
     this.prompt.hidden = false;
     this.prompt.innerHTML = '';
     const key = document.createElement('kbd');
