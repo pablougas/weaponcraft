@@ -170,3 +170,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - New **Voices** volume slider (default 90%); 0 silences them. Skipping a scene, resetting the level or starting a new game stops the speech at once. If lines pile up during play, the oldest waiting ones are dropped.
 - Not voiced: the Warden and soldiers (humans), dispatches, and stage directions in brackets.
 - The "Cerberus freed" scene is now 51 s, up from 33 s, so each spoken line finishes before the next. Zeus answers at 35.5 s, Poseidon's last line is at 40.5 s, and the captions stay up as long as the speech. Earlier beats and the approved frames are unchanged.
+- 2026-11-15 — Three-Fold Howl recharges faster (team request): cooldown 20 s → 10 s. Hades's Shadow Daggers keep their 20 s.
