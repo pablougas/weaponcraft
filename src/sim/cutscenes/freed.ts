@@ -37,9 +37,10 @@ export const FREED_BEATS = {
   /** …and Poseidon steps out. */
   poseidonOut: ticks(18.5),
   linePoseidon1: ticks(20.5),
-  lineZeus: ticks(26),
-  linePoseidon2: ticks(29),
-  end: ticks(33),
+  // Spaced so each spoken line ends before the next (the gods' voices, Nov 15).
+  lineZeus: ticks(35.5),
+  linePoseidon2: ticks(40.5),
+  end: ticks(51),
 } as const;
 
 export type FreedBeat = keyof typeof FREED_BEATS;

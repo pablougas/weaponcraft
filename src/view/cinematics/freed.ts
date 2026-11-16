@@ -22,7 +22,7 @@ export const FREED_CAPTIONS: Readonly<Record<string, string>> = {
 };
 
 /** How long each caption stays up (long lines stay longer). */
-export const FREED_CAPTION_SECONDS: Readonly<Record<string, number>> = { lineHades: 3.5, linePoseidon1: 5.5, lineZeus: 3, linePoseidon2: 4 };
+export const FREED_CAPTION_SECONDS: Readonly<Record<string, number>> = { lineHades: 6, linePoseidon1: 14, lineZeus: 3.2, linePoseidon2: 9.5 };
 
 const ease = (x: number) => {
   const t = Math.min(1, Math.max(0, x));

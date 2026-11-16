@@ -337,7 +337,7 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   test('Hades with Shadow Daggers circling him (Cerberus\'s gift)', async ({ page }) => {
     test.setTimeout(240_000);
     await atTheGates(page);
-    await freedSceneAt(page, 33 * 30 + 5); // past the end: Cerberus free, control back
+    await freedSceneAt(page, 51 * 30 + 5); // past the end: Cerberus free, control back
     await page.keyboard.press('KeyV');
     // A few steps back from the hound (short enough that Zeus walks rather than flashing over), facing away.
     await page.evaluate(async () => {

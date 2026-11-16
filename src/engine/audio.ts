@@ -1,12 +1,16 @@
 let context: AudioContext | undefined;
-let buses: { master: GainNode; music: GainNode; sfx: GainNode } | undefined;
-let volumes: AudioVolumes = { master: 0.8, music: 0.6, sfx: 0.8 };
+let buses: { master: GainNode; music: GainNode; sfx: GainNode; voice: GainNode } | undefined;
+let volumes: AudioVolumes = { master: 0.8, music: 0.6, sfx: 0.8, voice: 0.9 };
+/** Music ducking while a god speaks (1 = full). */
+let duck = 1;
 
 /** Volume levels, 0–1 (stored in settings). */
 export interface AudioVolumes {
   master: number;
   music: number;
   sfx: number;
+  /** The gods' voices (spoken lines and their divine layer). */
+  voice: number;
 }
 
 /**
@@ -28,8 +32,8 @@ export function getAudioContext(): AudioContext | undefined {
   return context;
 }
 
-/** The music or SFX mix bus (master volume on top). Undefined until audio is unlocked. */
-export function getBus(name: 'music' | 'sfx'): GainNode | undefined {
+/** The music, SFX or voice mix bus (master volume on top). Undefined until audio is unlocked. */
+export function getBus(name: 'music' | 'sfx' | 'voice'): GainNode | undefined {
   if (!context) return undefined;
   if (!buses) {
     const master = context.createGain();
@@ -38,13 +42,26 @@ export function getBus(name: 'music' | 'sfx'): GainNode | undefined {
     music.connect(master);
     const sfx = context.createGain();
     sfx.connect(master);
-    buses = { master, music, sfx };
+    const voice = context.createGain();
+    voice.connect(master);
+    buses = { master, music, sfx, voice };
     applyVolumes();
   }
   return buses[name];
 }
 
-/** Sets the three volume levels (from the settings menu). */
+/** The current volume levels (the spoken voice reads its loudness from here). */
+export function getVolumes(): AudioVolumes {
+  return volumes;
+}
+
+/** Lowers the music while a god speaks (1 = full volume), easing over a moment. */
+export function duckMusic(level: number): void {
+  duck = Math.min(1, Math.max(0, level));
+  applyVolumes();
+}
+
+/** Sets the volume levels (from the settings menu). */
 export function setVolumes(next: AudioVolumes): void {
   volumes = { ...next };
   applyVolumes();
@@ -55,6 +72,7 @@ function applyVolumes(): void {
   // Squared, so the slider feels even to the ear.
   const now = context.currentTime;
   buses.master.gain.setTargetAtTime(volumes.master ** 2, now, 0.03);
-  buses.music.gain.setTargetAtTime(volumes.music ** 2, now, 0.03);
+  buses.music.gain.setTargetAtTime(volumes.music ** 2 * duck, now, duck < 1 ? 0.15 : 0.6);
   buses.sfx.gain.setTargetAtTime(volumes.sfx ** 2, now, 0.03);
+  buses.voice.gain.setTargetAtTime(volumes.voice ** 2, now, 0.03);
 }

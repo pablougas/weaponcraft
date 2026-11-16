@@ -43,6 +43,7 @@ import { Interpolator } from '../view/interpolation';
 import { createWorldView, type WorldView } from '../view/world-view';
 import { setVolumes, unlockAudio } from './audio';
 import { Music } from './music';
+import { GodVoices } from './voices';
 import { InputController } from './input';
 import { InputMap, keyLabel } from './input-map';
 import { FixedStepLoop } from './loop';
@@ -315,7 +316,8 @@ export async function boot(): Promise<void> {
   });
 
   const hud = createHud(document.body);
-  const captions = createCaptions(document.body);
+  const voices = new GodVoices();
+  const captions = createCaptions(document.body, (text) => voices.say(text));
   const progress = loadProgress(storage);
   const dust = new DustEffects(meadow.scene);
   const sfx = new Sfx(
@@ -355,6 +357,8 @@ export async function boot(): Promise<void> {
       captions.show(DESCENT_CAPTIONS[event.beat], event.beat === 'dispatch' ? 8 : 5.5);
     }
     if (event.type === 'cutscene:end') {
+      // A skipped scene takes its lines with it.
+      if (event.skipped) voices.stop();
       // This browser remembers what it has seen, so later games may skip it.
       if (event.cutsceneId === 'rocket') progress.seenRocket = true;
       progress.seenCutscenes = [...new Set([...(progress.seenCutscenes ?? []), event.cutsceneId])];
@@ -379,6 +383,7 @@ export async function boot(): Promise<void> {
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
     if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], FREED_CAPTION_SECONDS[event.beat] ?? 2.6);
     if (event.type === 'level:reset' && event.entityId === localHero()?.id) {
+      voices.stop();
       cameraRig.rearm();
       captions.show(event.reason === 'fell' ? '[You wake at the Refuge. Your enemies have regrouped.]' : '[Back at the Refuge. The level starts over.]', 3.5);
     }
@@ -465,6 +470,7 @@ export async function boot(): Promise<void> {
     if (event.type === 'party:joined') captions.show(`Hades: I will walk with you, brother. (${keyLabel(inputMap.codesFor('switchCharacter')[0] ?? 'KeyV')} to switch)`, 5);
   });
   activeSession.onReset(() => {
+    voices.stop();
     interpolator.clear();
     loop.reset();
     views.clear();

@@ -157,3 +157,16 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
 - Revised (team request): the daggers hover in a tight pyramid above his crown, with their tips meeting at an apex, and the formation turns slowly. They fly one at a time, 0.8 s apart, and each one trails a violet tracer behind it.
 - Revised again (team request): the daggers lie flat and all point the way Hades faces. From behind they form a small pyramid above his crown, one on top and two below, and the formation turns with him. A front three-quarter test camera ('side') frames the review shot.
 - Approved by the team (Nov 15): `hades-shadow-daggers.png` recorded as the baseline.
+
+## The gods' voices (team request, Nov 15)
+- Every god line is already captioned as "Zeus: …", "Hades: …" or "Poseidon: …", so the voices hook into the captions. Each new god caption is spoken (`engine/voices.ts`), and the captions stay up.
+- **Words:** the browser's speech voices, **on-device ones only** (`localService`). A network voice would be a runtime request, which the itch.io rules forbid. Each god has his own voice: Hades has pitch 0.5 and rate 0.8 (deepest and slowest), Poseidon 0.66 and 0.86, Zeus 0.78 and 0.9. Each also has a preferred list of installed voices (Daniel, Alex, Aaron, Microsoft David/George/Mark), falling back to any local English voice.
+- **Divine layer:** under each line, synthesized and played through a generated 3.2 s hall reverb:
+  - Zeus: an open fifth with a high shimmer and rolling thunder.
+  - Hades: a sub drone, a slow-beating dark pair and a hollow wind.
+  - Poseidon: a warm chord with surf swelling like a wave.
+- The music ducks to 35% while a god speaks.
+- **No on-device voice** (some browsers, headless tests): a reverberant god-murmur instead, made of formant-shaped syllables at his pitch.
+- New **Voices** volume slider (default 90%); 0 silences them. Skipping a scene, resetting the level or starting a new game stops the speech at once. If lines pile up during play, the oldest waiting ones are dropped.
+- Not voiced: the Warden and soldiers (humans), dispatches, and stage directions in brackets.
+- The "Cerberus freed" scene is now 51 s, up from 33 s, so each spoken line finishes before the next. Zeus answers at 35.5 s, Poseidon's last line is at 40.5 s, and the captions stay up as long as the speech. Earlier beats and the approved frames are unchanged.

@@ -4,7 +4,7 @@ import { expect, openGame, test, STEPS, TO_GROTTO } from './fixtures';
 type State = Awaited<ReturnType<NonNullable<typeof window.wc>['getState']>>;
 const state = (page: Page): Promise<State> => page.evaluate(() => window.wc!.getState());
 /** "Cerberus Freed" length in ticks (sim/cutscenes/freed.ts FREED_BEATS.end = 33 s). */
-const FREED_TICKS = 990;
+const FREED_TICKS = 1530; // the freed scene (51 s)
 /** "The Warden" length in ticks (sim/cutscenes/warden.ts WARDEN_BEATS.end = 10 s). */
 const WARDEN_TICKS = 300;
 

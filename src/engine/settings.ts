@@ -30,8 +30,8 @@ export interface Settings {
   invertY: boolean;
   /** Camera swings back behind the god while moving, so the arrow keys steer without a mouse. */
   cameraAutoFollow: boolean;
-  /** Master, music and sound-effect volume, 0–1. */
-  volume: { master: number; music: number; sfx: number };
+  /** Master, music, sound-effect and voice volume, 0–1. */
+  volume: { master: number; music: number; sfx: number; voice: number };
 }
 
 export interface QualityParams {
@@ -60,7 +60,7 @@ export function defaultSettings(prefersReducedMotion = false): Settings {
     mouseSensitivity: 1,
     invertY: false,
     cameraAutoFollow: true,
-    volume: { master: 0.8, music: 0.6, sfx: 0.8 },
+    volume: { master: 0.8, music: 0.6, sfx: 0.8, voice: 0.9 },
   };
 }
 
@@ -85,7 +85,7 @@ export function parseSettings(text: string | null, defaults: Settings): Settings
   }
   if (typeof value.volume === 'object' && value.volume !== null) {
     const volume = value.volume as Record<string, unknown>;
-    for (const key of ['master', 'music', 'sfx'] as const) {
+    for (const key of ['master', 'music', 'sfx', 'voice'] as const) {
       const v = volume[key];
       if (typeof v === 'number' && Number.isFinite(v)) settings.volume[key] = Math.min(1, Math.max(0, v));
     }

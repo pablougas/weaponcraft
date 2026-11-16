@@ -33,9 +33,9 @@ export interface SettingsMenuOptions {
   onResetLevel(): void;
 }
 
-type VolumeKey = 'master' | 'music' | 'sfx';
-const VOLUME_KEYS: readonly VolumeKey[] = ['master', 'music', 'sfx'];
-const VOLUME_LABELS: Readonly<Record<VolumeKey, string>> = { master: 'Master volume', music: 'Music', sfx: 'Sound effects' };
+type VolumeKey = 'master' | 'music' | 'sfx' | 'voice';
+const VOLUME_KEYS: readonly VolumeKey[] = ['master', 'music', 'sfx', 'voice'];
+const VOLUME_LABELS: Readonly<Record<VolumeKey, string>> = { master: 'Master volume', music: 'Music', sfx: 'Sound effects', voice: 'Voices' };
 
 /** Esc settings menu: effects, audio volumes, reduce motion, quality, time of day, New game. */
 export function createSettingsMenu(parent: HTMLElement, options: SettingsMenuOptions): SettingsMenu {
