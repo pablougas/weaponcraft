@@ -1,7 +1,7 @@
 import { getAudioContext, getBus } from './audio';
 
 /** Which ambient piece is playing: one mood per region (SPEC §11). */
-export type MusicMood = 'meadow' | 'underworld';
+export type MusicMood = 'meadow' | 'underworld' | 'ocean';
 
 interface MoodSpec {
   /** Seconds per step of the sequencer. */
@@ -34,6 +34,16 @@ const MOODS: Readonly<Record<MusicMood, MoodSpec>> = {
       { drone: notes(47, 54), notes: notes(62, 66, 69, 71, 74, 78) },
       { drone: notes(43, 50), notes: notes(62, 64, 67, 71, 74, 79) },
       { drone: notes(45, 52), notes: notes(61, 64, 66, 69, 73, 76) },
+    ],
+  },
+  /** The Ocean: slow A Dorian bells over a swelling pad, like light on deep water. */
+  ocean: {
+    step: 0.55, density: 0.3, stepsPerChord: 20, voice: 'bell', droneType: 'triangle', droneCutoff: 520, level: 0.5,
+    chords: [
+      { drone: notes(45, 52), notes: notes(64, 66, 67, 69, 72, 74, 76) },
+      { drone: notes(43, 50), notes: notes(62, 66, 67, 71, 74, 78) },
+      { drone: notes(41, 48), notes: notes(60, 64, 67, 69, 72, 76) },
+      { drone: notes(43, 50), notes: notes(62, 64, 67, 71, 74, 79) },
     ],
   },
   underworld: {
@@ -186,7 +196,7 @@ export class Music {
     }
     this.duck.gain.setTargetAtTime(cinematic ? 0.25 : 1, ctx.currentTime, 0.8);
     for (const key of Object.keys(MOODS) as MusicMood[]) {
-      if (key === mood && !this.players[key]) this.players[key] = new MoodPlayer(ctx, MOODS[key], this.duck, key === 'meadow' ? 7 : 13);
+      if (key === mood && !this.players[key]) this.players[key] = new MoodPlayer(ctx, MOODS[key], this.duck, key === 'meadow' ? 7 : key === 'ocean' ? 23 : 13);
       this.players[key]?.update(key === mood);
     }
   }

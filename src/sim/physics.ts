@@ -1,7 +1,8 @@
 import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
-import { GROTTO } from './regions';
+import { GROTTO, OCEAN } from './regions';
+import { CASTLE_TOWERS, CASTLE_WALL, castleWallSegments, KEEP, KRAKEN_RIG, OCEAN_GRID, oceanLocalHeight, SHIPWRECK } from './terrain/ocean';
 import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_SIZE, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
@@ -45,6 +46,7 @@ export class PhysicsWorld {
     this.addTerrain();
     this.addRocks();
     this.addGrotto();
+    this.addOcean();
     this.controller = this.world.createCharacterController(0.04);
     this.controller.setUp({ x: 0, y: 1, z: 0 });
     this.controller.setMaxSlopeClimbAngle((52 * Math.PI) / 180);
@@ -132,6 +134,36 @@ export class PhysicsWorld {
     const extentZ = nz * FIELDS_CELL;
     this.world.createCollider(R.ColliderDesc.heightfield(nz, nx, heights, { x: extentX, y: 1, z: extentZ })
       .setTranslation(c.x + FIELDS.minX + extentX / 2, c.y, c.z + FIELDS.minZ + extentZ / 2));
+  }
+
+  /**
+   * The Ocean (team request, Nov 15): the sand (a heightfield), the castle's
+   * curtain wall, towers and keep, the humans' rig and the wrecked ship.
+   */
+  private addOcean(): void {
+    const c = OCEAN.center;
+    const R = this.R;
+    const g = OCEAN_GRID;
+    const nx = Math.round((g.maxX - g.minX) / g.cell);
+    const nz = Math.round((g.maxZ - g.minZ) / g.cell);
+    const heights = new Float32Array((nx + 1) * (nz + 1));
+    for (let ix = 0; ix <= nx; ix += 1) {
+      for (let iz = 0; iz <= nz; iz += 1) heights[iz + ix * (nz + 1)] = oceanLocalHeight(g.minX + ix * g.cell, g.minZ + iz * g.cell);
+    }
+    const extentX = nx * g.cell;
+    const extentZ = nz * g.cell;
+    this.world.createCollider(R.ColliderDesc.heightfield(nz, nx, heights, { x: extentX, y: 1, z: extentZ })
+      .setTranslation(c.x + g.minX + extentX / 2, c.y, c.z + g.minZ + extentZ / 2));
+    const yawQ = (yaw: number) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
+    for (const seg of castleWallSegments()) {
+      this.world.createCollider(R.ColliderDesc.cuboid(2.2, CASTLE_WALL.height / 2, 0.8)
+        .setTranslation(c.x + seg.x, c.y + CASTLE_WALL.height / 2, c.z + seg.z).setRotation(yawQ(seg.yaw)));
+    }
+    for (const tower of CASTLE_TOWERS) this.world.createCollider(R.ColliderDesc.cylinder(6, 2.4).setTranslation(c.x + tower.x, c.y + 6, c.z + tower.z));
+    this.world.createCollider(R.ColliderDesc.cylinder(7, KEEP.radius).setTranslation(c.x + KEEP.x, c.y + 7, c.z + KEEP.z));
+    this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + KRAKEN_RIG.x, c.y + 3, c.z + KRAKEN_RIG.z));
+    this.world.createCollider(R.ColliderDesc.cuboid(SHIPWRECK.halfBeam, 2.5, SHIPWRECK.halfLength)
+      .setTranslation(c.x + SHIPWRECK.x, c.y + 2, c.z + SHIPWRECK.z).setRotation(yawQ(SHIPWRECK.yaw)));
   }
 
   /** Static colliders: the hero rock, boulders and tree trunks. */

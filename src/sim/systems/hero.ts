@@ -576,8 +576,8 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
  * past the edge it pushes back in.
  */
 export function applyEdge(position: Vec3, vx: number, vz: number, region: RegionId = 'surface'): { vx: number; vz: number } {
-  if (region === 'underworld') {
-    // The grotto, tunnel and fields: rock walls and cliffs stop you; past the edge, push back in.
+  if (region !== 'surface') {
+    // The grotto, tunnel and fields (or the Ocean's shore): rock walls and cliffs stop you; past the edge, push back in.
     const clamp = regionClamp(region, position.x, position.z);
     if (clamp.inside) return { vx, vz };
     const dx = clamp.x - position.x;

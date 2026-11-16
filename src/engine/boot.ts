@@ -366,6 +366,15 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'objective:set' && event.objectiveId === 'find-and-free-cerberus') captions.show('Find and free Cerberus.', 5);
     if (event.type === 'dispatch:read') captions.show(DESCENT_CAPTIONS.dispatch, 6);
+    // Poseidon's sea-gate (team request, Nov 15).
+    if (event.type === 'sea-gate:opened') {
+      captions.show('Poseidon: The humans did not stop at Olympus, brothers. They hold Atlantis, and they have chained my kraken to drain him as they drained Cerberus. My spout stays open: step through, and we take back the sea.', 12);
+    }
+    if (event.type === 'sea-gate:travel' && event.playerId === activeSession.localPlayerId) {
+      captions.show(event.to === 'ocean'
+        ? '[Through the sea-gate: Poseidon\u2019s sea. A wrecked human ship on the sand; across the causeway, Atlantis, flying human banners. Beside it, the kraken strains at his chains.]'
+        : '[Back through the sea-gate, to the Gates of the Underworld.]', 6);
+    }
     if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. Break it down.', 4);
     if (event.type === 'soldier:alarm') {
       captions.show(event.kind === 'sentry' ? '[A sentry’s horn sounds. Soldiers are coming.]'
@@ -415,7 +424,9 @@ export async function boot(): Promise<void> {
     if (event.type === 'hero:down') captions.show('Zeus has fallen. He wakes at the Refuge.', 3.5);
     if (event.type === 'npc:talk') {
       captions.show(event.name === 'Poseidon'
-        ? 'Poseidon: The tides are turning, brothers. Rest a while; then we find the others.'
+        ? (activeSession.world.flags.seaGateOpen
+          ? 'Poseidon: My spout is a gate now. Step through it, and we take Atlantis back. My kraken will not wait forever.'
+          : 'Poseidon: The tides are turning, brothers. Rest a while; then we find the others.')
         : 'Hades: Cerberus first. Then we take back what is ours.', 4);
     }
     if (event.type === 'objective:set' && event.objectiveId === 'find-the-others') captions.show('Find the others. Survive.', 5);
@@ -693,7 +704,8 @@ export async function boot(): Promise<void> {
       const hero = localHero();
       sfx.updateCharge(shell.screen === 'playing' ? hero : undefined, hero ? godDef(hero.defId).chargedMove?.fullChargeTicks ?? 30 : 30);
       // Music follows the local god's region and dips under cinematics.
-      music.update(shell.screen === 'playing' && hero ? (regionOf(hero) === 'underworld' ? 'underworld' : 'meadow') : null, !!world.cutscene);
+      const mood = regionOf(hero);
+      music.update(shell.screen === 'playing' && hero ? (mood === 'surface' ? 'meadow' : mood) : null, !!world.cutscene);
       // A footstep every stride while the god walks on the ground.
       if (hero?.hero && shell.screen === 'playing' && !frozen) {
         const moved = lastStepPos ? Math.hypot(hero.position.x - lastStepPos.x, hero.position.z - lastStepPos.z) : 0;
@@ -703,7 +715,7 @@ export async function boot(): Promise<void> {
           if (strideLeft <= 0) {
             const sprinting = hero.hero.sprint;
             strideLeft = sprinting ? 2.2 : 1.5;
-            sfx.footstep(regionOf(hero) === 'underworld' ? 'stone' : 'grass', sprinting);
+            sfx.footstep(regionOf(hero) === 'surface' ? 'grass' : 'stone', sprinting);
           }
         }
       } else {

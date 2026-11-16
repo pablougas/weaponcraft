@@ -1,3 +1,4 @@
+import { ensureSeaGate } from '../systems/sea-gate';
 import { ticks } from '../constants';
 import { GROTTO, groundAt } from '../regions';
 import { CERBERUS_HOUND } from '../terrain/underworld';
@@ -184,6 +185,8 @@ function finishFreed(ctx: SimContext, skipped: boolean): void {
   ctx.emit('spirit:freed', { spiritId: 'cerberus' });
   world.objective = 'brothers-reunited';
   ctx.emit('objective:set', { objectiveId: 'brothers-reunited' });
+  // Poseidon's spout stays open: a gate to his sea (team request, Nov 15).
+  ensureSeaGate(ctx);
 }
 
 export function skipFreed(ctx: SimContext): string | null {

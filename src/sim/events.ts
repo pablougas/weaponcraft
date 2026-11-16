@@ -1,4 +1,5 @@
 import type { AttackKind, Element, EntityId, MechAttackKind, PlayerId, Vec3, WardenAttackKind } from './types';
+import type { RegionId } from './regions';
 
 /**
  * Events the sim emits each tick. Payloads are plain data and carry IDs, never
@@ -63,6 +64,10 @@ export interface EventMap {
   'hero:down': { entityId: EntityId };
   /** A fallen god woke at a bed (or their last safe spot). */
   'hero:revived': { entityId: EntityId; bedId: EntityId | null };
+  /** Poseidon's sea-gate opened at the Gates (team request, Nov 15). */
+  'sea-gate:opened': Record<string, never>;
+  /** A god stepped through a sea-gate. */
+  'sea-gate:travel': { playerId: PlayerId; entityId: EntityId; from: RegionId; to: RegionId };
   /** Read the humans' dispatch in the grotto. */
   'dispatch:read': { playerId: PlayerId };
   /** A shield-bearer blocked a hit from the front. */

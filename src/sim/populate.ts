@@ -1,3 +1,4 @@
+import { ensureSeaGate } from './systems/sea-gate';
 import { armBarricade, startDescent } from './cutscenes/descent';
 import { recruitHades } from './systems/party';
 import { godDef } from './defs';
@@ -142,5 +143,6 @@ export function ensureStory(world: WorldState, isAuthority = true): GameEvent[] 
   // M6: a save from M5.1 has Hades as a story character; he joins the party.
   else if (world.flags.descended && !world.cutscene) recruitHades(ctx);
   armBarricade(world);
+  ensureSeaGate(ctx);
   return events;
 }

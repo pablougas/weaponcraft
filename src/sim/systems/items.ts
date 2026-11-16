@@ -1,3 +1,4 @@
+import { travelThroughSeaGate } from './sea-gate';
 import { startRest } from './rest';
 import { startFreed } from '../cutscenes/freed';
 
@@ -90,6 +91,7 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
     ctx.emit('dispatch:read', { playerId });
     return null;
   }
+  if (target.structure?.kind === 'sea-gate') return travelThroughSeaGate(ctx, playerId, target);
   if (target.structure?.kind === 'barricade') {
     ctx.emit('barricade:examined', { playerId });
     return null;

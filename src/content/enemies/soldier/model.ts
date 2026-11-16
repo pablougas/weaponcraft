@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { groundAt } from '../../../sim/regions';
+import { groundAt, regionOf } from '../../../sim/regions';
 import { SOLDIER_SPECS } from '../../../sim/systems/soldiers';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 
@@ -189,7 +189,7 @@ export const createModel: ModelFactory = (look) => {
             const lz = Math.cos(a + yaw - entity.rotationY) * r;
             const wx = entity.position.x + Math.sin(a + yaw) * r;
             const wz = entity.position.z + Math.cos(a + yaw) * r;
-            pos.setXYZ(v++, lx, groundAt('underworld', wx, wz) - entity.position.y + lift, lz);
+            pos.setXYZ(v++, lx, groundAt(regionOf(entity), wx, wz) - entity.position.y + lift, lz);
           }
         }
         pos.needsUpdate = true;

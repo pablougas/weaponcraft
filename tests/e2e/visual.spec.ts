@@ -358,6 +358,75 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
     await expect(page).toHaveScreenshot('hades-shadow-daggers.png', SHOT);
   });
 
+  /** Cerberus is free and control is back: the sea-gate stands where Poseidon rose. */
+  async function seaGateOpen(page: Page) {
+    test.setTimeout(240_000);
+    await atTheGates(page);
+    await freedSceneAt(page, 51 * 30 + 5);
+    await page.evaluate(() => window.wc!.step(10));
+  }
+
+  /**
+   * Steps through the sea-gate (real F), then walks the party to local (x, z)
+   * of the Ocean facing `yaw`, in short hops so Hades keeps up on foot (a long
+   * jump would make him catch up with a teleport, whose flash would freeze in frame).
+   */
+  async function inTheOcean(page: Page, x: number, z: number, yaw: number, settle = 30) {
+    await seaGateOpen(page);
+    await page.evaluate(async () => {
+      const w = window.wc!.getState().world!;
+      const gate = Object.values(w.entities).find((e) => e.structure?.kind === 'sea-gate' && e.region === 'underworld')!;
+      const f = { x: Math.sin(gate.rotationY), z: Math.cos(gate.rotationY) };
+      await window.wc!.teleport(gate.position.x + f.x * 2.8, gate.position.z + f.z * 2.8, gate.rotationY + Math.PI);
+      window.wc!.step(2);
+    });
+    await page.keyboard.press('KeyF');
+    await page.evaluate(async ({ x, z, yaw, settle }) => {
+      window.wc!.step(2);
+      const w = window.wc!.getState().world!;
+      const me = w.entities[w.players.p1.entityId!];
+      const hops = Math.ceil(Math.hypot(x - me.position.x, z - me.position.z) / 8);
+      for (let i = 1; i <= hops; i += 1) {
+        await window.wc!.teleport(me.position.x + ((x - me.position.x) * i) / hops, me.position.z + ((z - me.position.z) * i) / hops, yaw);
+        window.wc!.step(i === hops ? settle : 40);
+      }
+      await window.wc!.freeze(12);
+    }, { x, z, yaw, settle });
+  }
+
+  test('Poseidon\'s sea-gate at the Gates', async ({ page }) => {
+    await seaGateOpen(page);
+    await page.evaluate(async () => {
+      const w = window.wc!.getState().world!;
+      const gate = Object.values(w.entities).find((e) => e.structure?.kind === 'sea-gate' && e.region === 'underworld')!;
+      const f = { x: Math.sin(gate.rotationY), z: Math.cos(gate.rotationY) };
+      await window.wc!.teleport(gate.position.x + f.x * 7, gate.position.z + f.z * 7, gate.rotationY + Math.PI);
+      window.wc!.step(30);
+      await window.wc!.freeze(12);
+    });
+    await expect(page).toHaveScreenshot('sea-gate.png', SHOT);
+  });
+
+  test('the Ocean: the beach, the causeway and Atlantis held by the humans', async ({ page }) => {
+    await inTheOcean(page, 7, 23, Math.PI);
+    await expect(page).toHaveScreenshot('ocean-arrival.png', SHOT);
+  });
+
+  test('the Ocean: the human ship wrecked on the beach', async ({ page }) => {
+    await inTheOcean(page, -3, 20, Math.atan2(-18, 7));
+    await expect(page).toHaveScreenshot('ocean-shipwreck.png', SHOT);
+  });
+
+  test('the Ocean: inside Atlantis, the humans\' garrison before the keep', async ({ page }) => {
+    await inTheOcean(page, -4, -47, Math.PI + 0.25, 4);
+    await expect(page).toHaveScreenshot('ocean-courtyard.png', SHOT);
+  });
+
+  test('the Ocean: Poseidon\'s kraken in chains beside the castle', async ({ page }) => {
+    await inTheOcean(page, 10, -36, Math.atan2(28, -30), 4);
+    await expect(page).toHaveScreenshot('ocean-kraken.png', SHOT);
+  });
+
   test('The Warden climbs out of the broken Mk. II', async ({ page }) => {
     await atTheGates(page);
     await breakPlating(page);

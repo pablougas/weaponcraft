@@ -122,6 +122,7 @@ export class WorldLabels {
     if (target.structure?.kind === 'bed') label = 'Rest';
     if (target.structure?.kind === 'forge') label = 'Use the Forge';
     if (target.structure?.kind === 'dispatch') label = 'Read the dispatch';
+    if (target.structure?.kind === 'sea-gate') label = target.structure.to === 'ocean' ? 'Step through to the sea' : 'Step back through to the Gates';
     if (target.structure?.kind === 'barricade') label = 'Examine the barricade';
     if (target.structure?.kind === 'chest') label = 'Open the chest';
     if (target.structure?.kind === 'chains') label = world.flags.wardenDefeated && !world.flags.cerberusFreed ? 'Break Cerberus\u2019s chains' : 'Examine the chains';

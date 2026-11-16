@@ -10,7 +10,8 @@ import { buildFlowers, buildGrass } from './meadow/foliage';
 import { buildOlympus, type OlympusState, type OlympusView } from './meadow/olympus';
 import { buildFields, type FieldsView } from './underworld/fields';
 import { buildGrotto } from './underworld/grotto';
-import { GROTTO, type RegionId } from '../sim/regions';
+import { GROTTO, OCEAN, type RegionId } from '../sim/regions';
+import { buildOcean } from './ocean/ocean';
 import { buildRocks, buildTrees } from './meadow/props';
 import { buildTerrainMesh, buildWater } from './meadow/terrain-mesh';
 import { createMeadowParticles } from './particles';
@@ -79,7 +80,8 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const surface = new THREE.Group();
   scene.add(surface);
   const sky = createSky(U);
-  surface.add(sky);
+  // The sky is shared by the surface and the Ocean (both under the same sun and clock).
+  scene.add(sky);
   surface.add(buildTerrainMesh(look));
   const water = buildWater();
   surface.add(water);
@@ -107,6 +109,10 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
   const fields = buildFields(look);
   scene.add(fields.group);
   fields.setActive(false);
+  // The Ocean (team request, Nov 15): Poseidon's sea and Atlantis, under the surface's sky and clock.
+  const ocean = buildOcean(look);
+  scene.add(ocean.group);
+  ocean.setActive(false);
   let region: RegionId = 'surface';
   let reduceMotionOn = false;
 
@@ -239,6 +245,12 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
       U.time.value = timeSeconds;
       if (region === 'underworld') applyUnderworldLighting();
       else applyLighting(dayFraction);
+      if (region === 'ocean') {
+        // Same sun and sky; the shadow box follows the camera over the sea.
+        sun.target.position.set(camera.position.x, OCEAN.center.y, camera.position.z);
+        sun.position.copy(U.sunDir.value).multiplyScalar(220).add(sun.target.position);
+        ocean.update(timeSeconds, reduceMotionOn);
+      }
       post.bloom.strength += bloomBoost;
       renderer.toneMappingExposure += exposureBoost;
       olympusState.time = timeSeconds;
@@ -263,6 +275,8 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
       if (next === region) return;
       region = next;
       surface.visible = region === 'surface';
+      sky.visible = region !== 'underworld';
+      ocean.setActive(region === 'ocean');
       grotto.setActive(region === 'underworld');
       fields.setActive(region === 'underworld');
       scene.background = region === 'underworld' ? underworldBackground : null;

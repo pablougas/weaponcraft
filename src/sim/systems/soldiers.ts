@@ -1,8 +1,9 @@
 import { applyDamage, isHittable } from '../combat';
 import { DT, ticks } from '../constants';
 import type { PhysicsWorld } from '../physics';
-import { GROTTO, groundAt } from '../regions';
-import { FORT_RADIUS, FORT_SPOTS, pathX, SPIRES, underworldClamp } from '../terrain/underworld';
+import { GROTTO, groundAt, oceanPoint, regionClamp, regionOf, sameRegion, type RegionId } from '../regions';
+import { CASTLE, CASTLE_WALL, KRAKEN_RIG } from '../terrain/ocean';
+import { FORT_RADIUS, FORT_SPOTS, pathX, SPIRES } from '../terrain/underworld';
 import type { Entity, EntityId, SoldierKind, SoldierState, Vec3 } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
 import { isResting } from './rest';
@@ -161,6 +162,32 @@ export function restartGarrison(ctx: SimContext): void {
     if (world.forts[fort.id]) world.forts[fort.id].cleared = false;
   });
   placeSquads(ctx);
+  // The humans holding Atlantis come back too (once the sea-gate is open).
+  if (world.flags.atlantisGarrisoned) placeAtlantisGarrison(ctx);
+}
+
+/**
+ * The humans who took Atlantis (team request, Nov 15): a patrol round the
+ * courtyard, guards at the gate and the keep, archers on the wall walk's
+ * foot, a captain over the kraken's rig, and two sentries on the causeway.
+ */
+const ATLANTIS_GARRISON: ReadonlyArray<{ kind: SoldierKind; x: number; z: number; facing: number; patrol?: ReadonlyArray<{ x: number; z: number }> }> = [
+  { kind: 'shield', x: -3.5, z: CASTLE.z + CASTLE_WALL.radius - 3, facing: 0 },
+  { kind: 'spear', x: 3.5, z: CASTLE.z + CASTLE_WALL.radius - 3, facing: 0 },
+  { kind: 'archer', x: -9, z: CASTLE.z + 9, facing: 0.4 },
+  { kind: 'archer', x: 9, z: CASTLE.z + 9, facing: -0.4 },
+  { kind: 'spear', x: -11, z: CASTLE.z, facing: Math.PI / 2, patrol: [{ x: -11, z: CASTLE.z + 6 }, { x: -11, z: CASTLE.z - 8 }, { x: -4, z: CASTLE.z - 14 }, { x: -11, z: CASTLE.z - 8 }] },
+  { kind: 'captain', x: KRAKEN_RIG.x - 3, z: KRAKEN_RIG.z + 1, facing: Math.PI / 2 },
+  { kind: 'sentry', x: -2, z: -24, facing: 0, patrol: [{ x: -2, z: -30 }, { x: -2, z: -6 }] },
+  { kind: 'sentry', x: 2, z: -12, facing: Math.PI, patrol: [{ x: 2, z: -6 }, { x: 2, z: -30 }] },
+];
+
+export function placeAtlantisGarrison(ctx: SimContext): void {
+  for (const g of ATLANTIS_GARRISON) {
+    const patrol = (g.patrol ?? []).map((p) => oceanPoint(p.x, p.z));
+    spawnSoldier(ctx, g.kind, oceanPoint(g.x, g.z), g.facing, null, patrol, 'ocean');
+  }
+  ctx.world.flags.atlantisGarrisoned = true;
 }
 
 function placeSquads(ctx: SimContext): void {
@@ -215,12 +242,12 @@ function rout(ctx: SimContext, captain: Entity & { soldier: SoldierState }): voi
   ctx.emit('soldier:rout', { squadId, captainId: captain.id });
 }
 
-function spawnSoldier(ctx: SimContext, kind: SoldierKind, home: Vec3, facing: number, fortId: string | null, patrol: Vec3[]): EntityId {
+export function spawnSoldier(ctx: SimContext, kind: SoldierKind, home: Vec3, facing: number, fortId: string | null, patrol: Vec3[], region: RegionId = 'underworld'): EntityId {
   const spec = SOLDIER_SPECS[kind];
   const defId = kind === 'sentry' ? 'sentry' : kind === 'captain' ? 'sentry-captain' : `soldier-${kind}`;
   const id = spawn(ctx, defId, { position: { ...home }, rotationY: facing });
   const e = ctx.world.entities[id];
-  e.region = 'underworld';
+  e.region = region;
   e.body = { ...spec.body };
   e.health = { current: spec.maxHealth, max: spec.maxHealth };
   e.creature = { wanders: false, hostile: true, home: { ...home }, target: null, wait: 0, flee: 0, sinceHit: ticks(60) };
@@ -246,7 +273,7 @@ function blockedBySpire(a: Vec3, b: Vec3): boolean {
 
 /** Can this soldier see `target` right now? */
 export function canSee(soldier: Entity & { soldier: SoldierState }, target: Entity): boolean {
-  if ((target.region ?? 'surface') !== 'underworld') return false;
+  if (!sameRegion(target, soldier)) return false;
   const spec = SOLDIER_SPECS[soldier.soldier.kind];
   const dx = target.position.x - soldier.position.x;
   const dz = target.position.z - soldier.position.z;
@@ -259,7 +286,7 @@ export function canSee(soldier: Entity & { soldier: SoldierState }, target: Enti
     const angle = Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - facing), Math.cos(Math.atan2(dx, dz) - facing)));
     if (angle > spec.cone) return false;
   }
-  return !blockedBySpire(soldier.position, target.position);
+  return regionOf(soldier) !== 'underworld' || !blockedBySpire(soldier.position, target.position);
 }
 
 /** Things soldiers notice and chase: gods (not resting or fallen) and Shadow Step decoys. */
@@ -285,12 +312,12 @@ function move(entity: Entity, dx: number, dz: number, physics?: PhysicsWorld): v
   if (moved) {
     entity.position = moved.position;
     // Never below the ground (a body that ends up under the one-sided heightfield would sink forever).
-    const ground = groundAt('underworld', moved.position.x, moved.position.z);
+    const ground = groundAt(regionOf(entity), moved.position.x, moved.position.z);
     if (entity.position.y < ground - 0.3) entity.position = { ...entity.position, y: ground };
   } else {
     const x = entity.position.x + dx;
     const z = entity.position.z + dz;
-    entity.position = { x, y: groundAt('underworld', x, z), z };
+    entity.position = { x, y: groundAt(regionOf(entity), x, z), z };
   }
 }
 
@@ -500,7 +527,7 @@ function tryAttack(ctx: SimContext, e: Entity & { soldier: SoldierState }, targe
     if (s.kind === 'captain') {
       // Halberd slam: everything in front of him, not just the target.
       for (const other of Object.values(ctx.world.entities)) {
-        if (!other.hero || !isHittable(other) || (other.region ?? 'surface') !== 'underworld') continue;
+        if (!other.hero || !isHittable(other) || !sameRegion(other, e)) continue;
         const ox = other.position.x - e.position.x;
         const oz = other.position.z - e.position.z;
         const off = Math.abs(Math.atan2(Math.sin(Math.atan2(ox, oz) - s.facing), Math.cos(Math.atan2(ox, oz) - s.facing)));
@@ -527,7 +554,7 @@ function fireArrow(ctx: SimContext, e: Entity & { soldier: SoldierState }, targe
   const d = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) || 1;
   const id = spawn(ctx, 'arrow', { position: from, rotationY: Math.atan2(to.x - from.x, to.z - from.z) });
   const arrow = ctx.world.entities[id];
-  arrow.region = 'underworld';
+  arrow.region = regionOf(e);
   arrow.projectile = {
     vx: ((to.x - from.x) / d) * ARROW_SPEED, vy: ((to.y - from.y) / d) * ARROW_SPEED, vz: ((to.z - from.z) / d) * ARROW_SPEED,
     ticksLeft: ARROW_TICKS, damage: SOLDIER_SPECS.archer.damage, ownerId: e.id,
@@ -540,7 +567,7 @@ function updateArrow(ctx: SimContext, arrow: Entity): void {
   for (let i = 0; i < steps; i += 1) {
     arrow.position = { x: arrow.position.x + (p.vx * DT) / steps, y: arrow.position.y + (p.vy * DT) / steps, z: arrow.position.z + (p.vz * DT) / steps };
     for (const e of Object.values(ctx.world.entities)) {
-      if (!(e.hero || e.decoy) || (e.region ?? 'surface') !== 'underworld') continue;
+      if (!(e.hero || e.decoy) || !sameRegion(e, arrow)) continue;
       const dy = arrow.position.y - (e.position.y + 1);
       if (Math.hypot(e.position.x - arrow.position.x, e.position.z - arrow.position.z) < 0.6 && Math.abs(dy) < 1.1) {
         if (e.hero) applyDamage(ctx, e.id, p.damage, p.ownerId, 'light');
@@ -550,7 +577,7 @@ function updateArrow(ctx: SimContext, arrow: Entity): void {
     }
   }
   p.ticksLeft -= 1;
-  if (p.ticksLeft <= 0 || arrow.position.y < groundAt('underworld', arrow.position.x, arrow.position.z) - 0.2) despawn(ctx, arrow.id);
+  if (p.ticksLeft <= 0 || arrow.position.y < groundAt(regionOf(arrow), arrow.position.x, arrow.position.z) - 0.2) despawn(ctx, arrow.id);
 }
 
 /** A squad's sentries hit harder while their captain is alive. */
@@ -589,14 +616,14 @@ function followLeader(ctx: SimContext, e: Entity & { soldier: SoldierState }, ph
   creature.blocked = d > 4 && moved < speed * DT * 0.3 ? (creature.blocked ?? 0) + 1 : 0;
   // Still stuck after a few seconds and no god nearby to see it: rejoin the formation.
   if ((creature.blocked ?? 0) > ticks(3) && !nearAGod(ctx, e, 30)) {
-    e.position = { x: goal.x, y: groundAt('underworld', goal.x, goal.z), z: goal.z };
+    e.position = { x: goal.x, y: groundAt(regionOf(e), goal.x, goal.z), z: goal.z };
     creature.blocked = 0;
   }
   return d;
 }
 
 function nearAGod(ctx: SimContext, e: Entity, range: number): boolean {
-  return Object.values(ctx.world.entities).some((g) => g.hero && (g.region ?? 'surface') === 'underworld'
+  return Object.values(ctx.world.entities).some((g) => g.hero && sameRegion(g, e)
     && Math.hypot(g.position.x - e.position.x, g.position.z - e.position.z) < range);
 }
 
@@ -612,8 +639,9 @@ function updateFlee(ctx: SimContext, e: Entity & { soldier: SoldierState }, targ
   const dx = e.position.x - from.x;
   const dz = e.position.z - from.z;
   const len = Math.hypot(dx, dz) || 1;
-  const away = underworldClamp(e.position.x - GROTTO.center.x + (dx / len) * 8, e.position.z - GROTTO.center.z + (dz / len) * 8, 2);
-  walkToward(e, local(away.x, away.z), SOLDIER_SPECS[s.kind].run * 1.1, 0, physics);
+  const region = regionOf(e);
+  const away = regionClamp(region, e.position.x + (dx / len) * 8, e.position.z + (dz / len) * 8, 2);
+  walkToward(e, { x: away.x, y: groundAt(region, away.x, away.z), z: away.z }, SOLDIER_SPECS[s.kind].run * 1.1, 0, physics);
   if (s.timer >= ROUT_TICKS) {
     s.state = 'return';
     s.awareness = 0;

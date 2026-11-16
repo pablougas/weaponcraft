@@ -1,6 +1,7 @@
 import { MEADOW_RADIUS } from './constants';
 import { WATER_LEVEL } from './terrain/meadow';
 import { groundHeightAt } from './terrain/meadow-rocks';
+import { oceanClamp, oceanInside, oceanLocalHeight } from './terrain/ocean';
 import { underworldClamp, underworldGroundHeight, underworldInside } from './terrain/underworld';
 import type { Entity, Vec3 } from './types';
 
@@ -11,7 +12,7 @@ import type { Entity, Vec3 } from './types';
  * Each region has its own ground, edge and lighting (the view switches with
  * the local god).
  */
-export type RegionId = 'surface' | 'underworld';
+export type RegionId = 'surface' | 'underworld' | 'ocean';
 
 /** The Outer Grotto (M5.1): the first safe Underworld chamber and the new Refuge. */
 export const GROTTO = {
@@ -20,6 +21,11 @@ export const GROTTO = {
   radius: 20,
   /** The tunnel deeper into the Underworld opens to the north (−z); humans have barricaded it. */
   tunnelBearing: Math.PI,
+} as const;
+
+/** The Ocean (team request, Nov 15): Poseidon's sea and Atlantis, high above everything else. */
+export const OCEAN = {
+  center: { x: 0, y: 2000, z: 0 },
 } as const;
 
 export function regionOf(entity: Entity | undefined): RegionId {
@@ -34,6 +40,7 @@ export function sameRegion(a: Entity | undefined, b: Entity | undefined): boolea
 /** Ground height at (x, z) in a region. */
 export function groundAt(region: RegionId, x: number, z: number): number {
   if (region === 'underworld') return GROTTO.center.y + underworldGroundHeight(x - GROTTO.center.x, z - GROTTO.center.z);
+  if (region === 'ocean') return OCEAN.center.y + oceanLocalHeight(x - OCEAN.center.x, z - OCEAN.center.z);
   return groundHeightAt(x, z);
 }
 
@@ -49,6 +56,12 @@ export function regionClamp(region: RegionId, x: number, z: number, margin = 0):
     const p = underworldClamp(x - c.x, z - c.z, margin);
     return { x: p.x + c.x, z: p.z + c.z, inside };
   }
+  if (region === 'ocean') {
+    const c = OCEAN.center;
+    const inside = oceanInside(x - c.x, z - c.z, margin);
+    const p = oceanClamp(x - c.x, z - c.z, margin);
+    return { x: p.x + c.x, z: p.z + c.z, inside };
+  }
   const r = Math.hypot(x, z);
   const limit = MEADOW_RADIUS - margin;
   if (r <= limit) return { x, z, inside: true };
@@ -58,20 +71,28 @@ export function regionClamp(region: RegionId, x: number, z: number, margin = 0):
 /** The region's walkable area: centre and radius (a soft wall pushes back beyond it). */
 export function regionBounds(region: RegionId): { x: number; z: number; radius: number } {
   if (region === 'underworld') return { x: GROTTO.center.x, z: GROTTO.center.z, radius: GROTTO.radius };
+  if (region === 'ocean') return { x: OCEAN.center.x, z: OCEAN.center.z + 24, radius: 30 };
   return { x: 0, z: 0, radius: MEADOW_RADIUS };
 }
 
 /** Falling below this means the god went through the world: put them back on safe ground. */
 export function fallOutHeight(region: RegionId): number {
+  if (region === 'ocean') return OCEAN.center.y - 8;
   return region === 'underworld' ? GROTTO.center.y - 6 : WATER_LEVEL - 6;
 }
 
 /** True for a spot where lastSafe may be recorded (above water on the surface). */
 export function isSafeFooting(region: RegionId, position: Vec3): boolean {
+  if (region === 'ocean') return position.y > OCEAN.center.y + 0.4;
   return region === 'underworld' || position.y > WATER_LEVEL + 0.5;
 }
 
 /** A point in grotto-local coordinates (relative to its centre, on its floor). */
 export function grottoPoint(x: number, z: number): Vec3 {
   return { x: GROTTO.center.x + x, y: GROTTO.center.y, z: GROTTO.center.z + z };
+}
+
+/** A point in the Ocean's local coordinates (relative to its centre), on the ground. */
+export function oceanPoint(x: number, z: number): Vec3 {
+  return { x: OCEAN.center.x + x, y: groundAt('ocean', OCEAN.center.x + x, OCEAN.center.z + z), z: OCEAN.center.z + z };
 }

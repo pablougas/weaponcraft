@@ -49,7 +49,7 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' | 'chains' };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' | 'chains' | 'sea-gate'; to?: RegionId };
   /** A soldier or sentry (M6). */
   soldier?: SoldierState;
   /** An arrow in flight: velocity in m/s, life, damage and who shot it. */
@@ -317,6 +317,10 @@ export interface WorldFlags {
   barricadeBroken?: boolean;
   /** M5.1: the grotto's altar, bed, dispatch and barricade are placed. */
   grottoBuilt?: boolean;
+  /** Poseidon's sea-gate stands at the Gates, its twin on the Ocean's beach (team request, Nov 15). */
+  seaGateOpen?: boolean;
+  /** The humans holding Atlantis are placed. */
+  atlantisGarrisoned?: boolean;
   /** M5: the Forge and the bed were added when the meadow became the Refuge. */
   refugeBuilt?: boolean;
   /** M4: the Fusion Altar, the weapons to find and elemental dummies are placed. */
