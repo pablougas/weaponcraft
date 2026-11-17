@@ -63,6 +63,12 @@ const SHOUT_RANGE = 26;
 const HORN_RANGE = 55;
 const LOSE_TARGET_TICKS = ticks(3);
 const SEARCH_TICKS = ticks(5);
+/**
+ * After an alarm, the soldiers around it re-join the fight quietly for this
+ * long: catching sight of you again doesn't blow the horn or shout again
+ * (team request, Nov 16: it kept sounding every few seconds in a running fight).
+ */
+export const ALARM_QUIET_TICKS = ticks(20);
 const ARROW_SPEED = 26;
 const ARROW_TICKS = ticks(1.2);
 
@@ -306,16 +312,22 @@ function targetsFor(ctx: SimContext): Entity[] {
 }
 
 function raiseAlarm(ctx: SimContext, from: Entity & { soldier: SoldierState }, at: Vec3, range: number): void {
-  for (const other of Object.values(ctx.world.entities)) {
-    if (!other.soldier || other.id === from.id || other.soldier.state === 'flee') continue;
-    if (Math.hypot(other.position.x - from.position.x, other.position.z - from.position.z) > range) continue;
-    if (other.soldier.state === 'attack') continue;
+  const now = ctx.world.tick;
+  const recently = (o: SoldierState) => o.alarmedAt != null && now - o.alarmedAt < ALARM_QUIET_TICKS;
+  const near = Object.values(ctx.world.entities).filter((other): other is Entity & { soldier: SoldierState } =>
+    !!other.soldier && sameRegion(other, from)
+    && Math.hypot(other.position.x - from.position.x, other.position.z - from.position.z) <= range);
+  // Heard only if nobody around has sounded (or answered) an alarm lately.
+  const loud = !near.some((o) => recently(o.soldier));
+  for (const other of near) {
+    other.soldier.alarmedAt = now;
+    if (other.id === from.id || other.soldier.state === 'flee' || other.soldier.state === 'attack') continue;
     other.soldier.state = 'attack';
     other.soldier.awareness = 100;
     other.soldier.lastSeen = { ...at };
     other.soldier.timer = 0;
   }
-  ctx.emit('soldier:alarm', { entityId: from.id, kind: from.soldier.kind, at: { ...at } });
+  if (loud) ctx.emit('soldier:alarm', { entityId: from.id, kind: from.soldier.kind, at: { ...at } });
 }
 
 function move(entity: Entity, dx: number, dz: number, physics?: PhysicsWorld): void {

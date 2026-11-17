@@ -3,7 +3,7 @@ import type { Intent } from './intents';
 import { ensureMeadowPopulated } from './populate';
 import { GROTTO } from './regions';
 import { deserialize, serialize } from './serialize';
-import { ALERT_AT, ensureGarrison, SENTRY_SQUADS } from './systems/soldiers';
+import { ALARM_QUIET_TICKS, ALERT_AT, ensureGarrison, SENTRY_SQUADS } from './systems/soldiers';
 import { FORT_SPOTS, SPIRES, underworldInside, underworldLocalHeight } from './terrain/underworld';
 import { tickWorld } from './tick';
 import { TUTORIAL_STEPS } from './tutorial';
@@ -86,6 +86,34 @@ describe('forts and sentries (M6)', () => {
     expect(fight).toContainEqual(expect.objectContaining({ type: 'soldier:windup' }));
     expect(zeus().health!.current).toBeLessThan(before);
     void world;
+  });
+
+  it('losing you and spotting you again doesn\'t sound the alarm over and over (team request, Nov 16)', () => {
+    const { world, run, soldiers, at, parkHades } = underworld();
+    parkHades();
+    const fort = FORT_SPOTS[0];
+    const guard = soldiers(fort.id).find((s) => s.soldier!.kind === 'spear')!;
+    const gx = guard.position.x - GROTTO.center.x;
+    const gz = guard.position.z - GROTTO.center.z;
+    guard.soldier!.patrol = [];
+    guard.creature!.home = { ...guard.position };
+    face(guard, gx, gz - 10);
+    at(gx, gz - 6);
+    const alarms = (events: ReturnType<typeof run>) => events.filter((e) => e.type === 'soldier:alarm');
+    expect(alarms(run([], 60)).length).toBeGreaterThanOrEqual(1);
+    // It loses track of Zeus, then sees him again: back into the fight, quietly, again and again.
+    for (let k = 0; k < 4; k += 1) {
+      guard.soldier!.state = 'search';
+      face(guard, gx, gz - 10);
+      expect(alarms([...at(gx, gz - 6), ...run([], 20)])).toHaveLength(0);
+      expect(guard.soldier!.state).toBe('attack');
+    }
+    // Long after the last alarm, a fresh sighting is heard again.
+    for (const s of Object.values(world.entities)) if (s.soldier?.alarmedAt != null) s.soldier.alarmedAt -= ALARM_QUIET_TICKS + 1;
+    guard.soldier!.state = 'search';
+    face(guard, gx, gz - 10);
+    const back = [...at(gx, gz - 6), ...run([], 20)];
+    expect(alarms(back).length).toBeGreaterThanOrEqual(1);
   });
 
   it('a squad leader who sees you sounds the horn, and the whole squad comes at you', () => {

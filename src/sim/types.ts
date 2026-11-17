@@ -261,6 +261,8 @@ export interface SoldierState {
   cooldown: number;
   /** Sentry sweep counter. */
   scan: number;
+  /** World tick of the last alarm it raised or answered (alarms nearby stay quiet for a while after). Optional for older saves. */
+  alarmedAt?: number;
 }
 
 export interface CreatureState {

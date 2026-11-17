@@ -51,7 +51,7 @@ import { loadPhysics } from './physics';
 import { requestPointerLockSafely } from './pointer-lock';
 import { createFullWindowRenderer, type FullWindowRenderer } from './renderer';
 import { browserStorage } from './save';
-import { Sfx } from './sfx';
+import { Sfx, SOLDIER_HORN_HEARD, SOLDIER_SHOUT_HEARD } from './sfx';
 import { openSession, randomSeed, type Session } from './session';
 import { defaultSettings, pickAutoQuality, QUALITY_PRESETS, SettingsStore, type QualityPreset } from './settings';
 import { devMenuEnabled, installTestApi, isTestRun, type ShellState, type TestState } from './test-api';
@@ -320,10 +320,18 @@ export async function boot(): Promise<void> {
   const captions = createCaptions(document.body, (text) => voices.say(text));
   const progress = loadProgress(storage);
   const dust = new DustEffects(meadow.scene);
+  /** Metres from the local god to an entity; Infinity when it's in another region or gone (so it isn't heard). */
+  const distanceToLocal = (entityId: string): number => {
+    const me = localHero();
+    const it = activeSession.world.entities[entityId];
+    if (!me || !it || regionOf(me) !== regionOf(it)) return Infinity;
+    return Math.hypot(it.position.x - me.position.x, it.position.z - me.position.z);
+  };
   const sfx = new Sfx(
     (entityId) => !!entityId && entityId === localHero()?.id,
     (text) => captions.show(text),
     (playerId) => playerId === activeSession.localPlayerId,
+    (entityId) => distanceToLocal(entityId),
   );
   const music = new Music();
   /** Footsteps: metres walked since the last step, and where the god was last frame. */
@@ -376,7 +384,8 @@ export async function boot(): Promise<void> {
         : '[Back through the sea-gate, to the Gates of the Underworld.]', 6);
     }
     if (event.type === 'barricade:examined') captions.show('The humans barred the tunnel deeper into the Underworld. Break it down.', 4);
-    if (event.type === 'soldier:alarm') {
+    // Soldiers' cues are captioned only when the local god can hear them (same reach as the sounds).
+    if (event.type === 'soldier:alarm' && distanceToLocal(event.entityId) < (event.kind === 'sentry' || event.kind === 'captain' ? SOLDIER_HORN_HEARD : SOLDIER_SHOUT_HEARD)) {
       captions.show(event.kind === 'sentry' ? '[A sentry’s horn sounds. Soldiers are coming.]'
         : event.kind === 'captain' ? '[Sentry Captain, bellowing] “To arms! Take the god!”'
           : '[Soldier, shouting] “Over there!”', 3);
@@ -416,7 +425,7 @@ export async function boot(): Promise<void> {
       const key = keyLabel(inputMap.codesFor('lockOn')[0] ?? 'Tab');
       captions.show(`[Three shadow daggers circle Hades: ${key} to focus an enemy and they strike]`, 3);
     }
-    if (event.type === 'soldier:suspicious') captions.show('[Soldier] “Who’s there?”', 2);
+    if (event.type === 'soldier:suspicious' && distanceToLocal(event.entityId) < SOLDIER_SHOUT_HEARD) captions.show('[Soldier] “Who’s there?”', 2);
     if (event.type === 'fort:cleared') captions.show('Fort cleared. Its chest is unguarded.', 3.5);
     if (event.type === 'chest:opened') captions.show(event.weaponId ? `Found a weapon in the chest (${weaponDef(event.weaponId).name}).` : 'The chest is empty.', 3.5);
     if (event.type === 'intent:rejected' && event.reason === 'guarded' && event.playerId === activeSession.localPlayerId) captions.show('Soldiers guard this chest. Clear the fort first.', 3);

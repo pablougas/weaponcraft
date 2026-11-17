@@ -1,6 +1,11 @@
 import type { Entity, GameEvent } from '../sim';
 import { getAudioContext, getBus } from './audio';
 
+/** How far (m) a soldier's horn, shout and blows carry to the local god. */
+export const SOLDIER_HORN_HEARD = 70;
+export const SOLDIER_SHOUT_HEARD = 40;
+export const SOLDIER_STRIKE_HEARD = 30;
+
 /**
  * Synthesized sound effects (Web Audio, no files). Every sound is built from
  * oscillators and filtered noise when it plays. Silent until the title-screen
@@ -18,7 +23,16 @@ export class Sfx {
     private readonly onCaption: (text: string) => void,
     /** Is this the local player (for player-level events: pickups, fusion, chests)? */
     private readonly isLocalPlayer: (playerId: string) => boolean = () => true,
+    /** Metres from the local god to an entity (Infinity in another region or gone): far-off soldiers are quieter, then silent. */
+    private readonly distanceTo: (entityId: string) => number = () => 0,
   ) {}
+
+  /** How loud a soldier's sound is where the local god stands: full within 12 m, fading to silent at `range`. */
+  private loudness(entityId: string, range: number): number {
+    const d = this.distanceTo(entityId);
+    if (!Number.isFinite(d) || d >= range) return 0;
+    return Math.min(1, Math.max(0, (range - d) / (range - 12)));
+  }
 
   private ready(): AudioContext | undefined {
     const ctx = getAudioContext();
@@ -197,20 +211,25 @@ export class Sfx {
         this.noiseBurst(ctx, { duration: 1.2, volume: 0.5, type: 'lowpass', freq: 1200, freqEnd: 120 });
         for (let i = 0; i < 4; i += 1) this.tone(ctx, { from: 140 - i * 15, to: 60, duration: 0.2, volume: 0.25, type: 'sine', delay: i * 0.13 });
         return;
-      case 'soldier:alarm':
-        if (!ctx) return;
-        if (event.kind === 'sentry' || event.kind === 'captain') {
+      case 'soldier:alarm': {
+        const horn = event.kind === 'sentry' || event.kind === 'captain';
+        const loud = this.loudness(event.entityId, horn ? SOLDIER_HORN_HEARD : SOLDIER_SHOUT_HEARD);
+        if (!ctx || loud <= 0) return;
+        if (horn) {
           // A war horn: two reedy notes through a low-pass filter.
-          this.horn(ctx, 196, 0.7, 0);
-          this.horn(ctx, 233, 1.1, 0.65);
+          this.horn(ctx, 196, 0.7, 0, loud);
+          this.horn(ctx, 233, 1.1, 0.65, loud);
         } else {
-          this.tone(ctx, { from: 300, to: 220, duration: 0.25, volume: 0.08, type: 'sawtooth' });
+          this.tone(ctx, { from: 300, to: 220, duration: 0.25, volume: 0.08 * loud, type: 'sawtooth' });
         }
         return;
-      case 'soldier:strike':
-        if (!ctx) return;
-        this.noiseBurst(ctx, { duration: event.kind === 'captain' ? 0.35 : 0.16, volume: event.kind === 'captain' ? 0.18 : 0.08, type: 'bandpass', freq: 700, freqEnd: 300 });
+      }
+      case 'soldier:strike': {
+        const loud = this.loudness(event.entityId, SOLDIER_STRIKE_HEARD);
+        if (!ctx || loud <= 0) return;
+        this.noiseBurst(ctx, { duration: event.kind === 'captain' ? 0.35 : 0.16, volume: (event.kind === 'captain' ? 0.18 : 0.08) * loud, type: 'bandpass', freq: 700, freqEnd: 300 });
         return;
+      }
       case 'hero:down':
         if (!this.isLocal(event.entityId) || !ctx) return;
         this.tone(ctx, { from: 330, to: 110, duration: 1.4, volume: 0.12, type: 'triangle' });
@@ -357,7 +376,7 @@ export class Sfx {
   }
 
   /** A reedy horn note (sentries' alarm). */
-  private horn(ctx: AudioContext, freq: number, duration: number, delay: number): void {
+  private horn(ctx: AudioContext, freq: number, duration: number, delay: number, loud = 1): void {
     const start = ctx.currentTime + delay;
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
@@ -368,8 +387,8 @@ export class Sfx {
     filter.frequency.value = 900;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.12, start + 0.08);
-    gain.gain.setValueAtTime(0.12, start + duration - 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.12 * loud, start + 0.08);
+    gain.gain.setValueAtTime(0.12 * loud, start + duration - 0.15);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     osc.connect(filter).connect(gain).connect(this.master!);
     osc.start(start);
