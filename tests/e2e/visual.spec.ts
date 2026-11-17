@@ -418,12 +418,17 @@ test.describe('the look (M2)', { tag: '@visual' }, () => {
   });
 
   test('the Ocean: inside Atlantis, the humans\' garrison before the keep', async ({ page }) => {
-    await inTheOcean(page, -4, -47, Math.PI + 0.25, 4);
+    await inTheOcean(page, -4, -70, Math.PI + 0.12, 4);
     await expect(page).toHaveScreenshot('ocean-courtyard.png', SHOT);
   });
 
-  test('the Ocean: Poseidon\'s kraken in chains beside the castle', async ({ page }) => {
-    await inTheOcean(page, 10, -36, Math.atan2(28, -30), 4);
+  test('the Ocean: through Atlantis\'s gate, up the avenue to the keep', async ({ page }) => {
+    await inTheOcean(page, -1, -53, Math.PI, 4);
+    await expect(page).toHaveScreenshot('ocean-gate.png', SHOT);
+  });
+
+  test('the Ocean: a diver on the island\'s rim, and Poseidon\'s kraken in chains', async ({ page }) => {
+    await inTheOcean(page, 4, -36, Math.atan2(94, -60), 4);
     await expect(page).toHaveScreenshot('ocean-kraken.png', SHOT);
   });
 

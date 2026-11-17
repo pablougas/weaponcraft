@@ -2,7 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO, OCEAN } from './regions';
-import { CASTLE_TOWERS, CASTLE_WALL, castleWallSegments, KEEP, KRAKEN_RIG, OCEAN_GRID, oceanLocalHeight, SHIPWRECK } from './terrain/ocean';
+import { CASTLE_TOWERS, CASTLE_WALL, castleWallSegments, KEEP, KRAKEN_RIG, OCEAN_GRID, oceanLocalHeight, SHIPWRECK, STATUE, TEMPLES, TOWER, wallSegmentLength } from './terrain/ocean';
 import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_SIZE, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
@@ -156,11 +156,13 @@ export class PhysicsWorld {
       .setTranslation(c.x + g.minX + extentX / 2, c.y, c.z + g.minZ + extentZ / 2));
     const yawQ = (yaw: number) => ({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) });
     for (const seg of castleWallSegments()) {
-      this.world.createCollider(R.ColliderDesc.cuboid(2.2, CASTLE_WALL.height / 2, 0.8)
+      this.world.createCollider(R.ColliderDesc.cuboid(wallSegmentLength() / 2, CASTLE_WALL.height / 2, 1.1)
         .setTranslation(c.x + seg.x, c.y + CASTLE_WALL.height / 2, c.z + seg.z).setRotation(yawQ(seg.yaw)));
     }
-    for (const tower of CASTLE_TOWERS) this.world.createCollider(R.ColliderDesc.cylinder(6, 2.4).setTranslation(c.x + tower.x, c.y + 6, c.z + tower.z));
-    this.world.createCollider(R.ColliderDesc.cylinder(7, KEEP.radius).setTranslation(c.x + KEEP.x, c.y + 7, c.z + KEEP.z));
+    for (const tower of CASTLE_TOWERS) this.world.createCollider(R.ColliderDesc.cylinder(TOWER.height / 2, TOWER.radius).setTranslation(c.x + tower.x, c.y + TOWER.height / 2, c.z + tower.z));
+    this.world.createCollider(R.ColliderDesc.cylinder(14, KEEP.radius + 1.2).setTranslation(c.x + KEEP.x, c.y + 14, c.z + KEEP.z));
+    for (const t of TEMPLES) this.world.createCollider(R.ColliderDesc.cylinder(6, t.radius + 0.6).setTranslation(c.x + t.x, c.y + 6, c.z + t.z));
+    this.world.createCollider(R.ColliderDesc.cylinder(4, STATUE.radius).setTranslation(c.x + STATUE.x, c.y + 3, c.z + STATUE.z));
     this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + KRAKEN_RIG.x, c.y + 3, c.z + KRAKEN_RIG.z));
     this.world.createCollider(R.ColliderDesc.cuboid(SHIPWRECK.halfBeam, 2.5, SHIPWRECK.halfLength)
       .setTranslation(c.x + SHIPWRECK.x, c.y + 2, c.z + SHIPWRECK.z).setRotation(yawQ(SHIPWRECK.yaw)));

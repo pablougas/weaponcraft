@@ -15,6 +15,7 @@ const CONE_SEGMENTS = 20;
  * cloak, and swing a halberd. A squad's leader shows the squad's sight cone on
  * the ground (yellow while calm, orange when suspicious, red once they've seen
  * you). A "?" or "!" floats above anyone who is suspicious or has raised the alarm.
+ * In the Ocean they all wear diving armour instead (see `scuba`).
  */
 export const createModel: ModelFactory = (look) => {
   const { M, toon } = look;
@@ -30,10 +31,13 @@ export const createModel: ModelFactory = (look) => {
 
   body.add(M(new THREE.CylinderGeometry(0.3, 0.36, 0.75, 10), mail, [0, 1.15, 0], { outline: 0.02 }));
   body.add(M(new THREE.BoxGeometry(0.5, 0.7, 0.08), red, [0, 1.05, 0.31], { outline: 0.012 }));
-  body.add(M(new THREE.SphereGeometry(0.19, 14, 10), skin, [0, 1.72, 0.02], { outline: 0.012 }));
-  body.add(M(new THREE.SphereGeometry(0.22, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.8), bronze, [0, 1.76, 0], { outline: 0.015 }));
-  body.add(M(new THREE.BoxGeometry(0.05, 0.16, 0.4), red, [0, 2.0, -0.02], { outline: 0.008 }));
-  body.add(M(new THREE.BoxGeometry(0.32, 0.06, 0.04), dark, [0, 1.72, 0.2], { outline: false }));
+  // The head and its bronze crested helmet (swapped for a diving helmet in the Ocean).
+  const head = new THREE.Group();
+  body.add(head);
+  head.add(M(new THREE.SphereGeometry(0.19, 14, 10), skin, [0, 1.72, 0.02], { outline: 0.012 }));
+  head.add(M(new THREE.SphereGeometry(0.22, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.8), bronze, [0, 1.76, 0], { outline: 0.015 }));
+  head.add(M(new THREE.BoxGeometry(0.05, 0.16, 0.4), red, [0, 2.0, -0.02], { outline: 0.008 }));
+  head.add(M(new THREE.BoxGeometry(0.32, 0.06, 0.04), dark, [0, 1.72, 0.2], { outline: false }));
   const legs: THREE.Group[] = [];
   for (const x of [-0.13, 0.13]) {
     const leg = new THREE.Group();
@@ -82,8 +86,44 @@ export const createModel: ModelFactory = (look) => {
   let coneHalf = 0;
   let built = false;
   let captain = false;
-  const build = (kind: string) => {
+  /**
+   * Diving armour for the humans holding Atlantis (team request, Nov 16): a
+   * brass diving helmet with a round glass faceplate and side portholes, a
+   * still-red crest so they read as the same army, a dark rubber suit under
+   * the red tabard, twin air tanks with a hose to the helmet, and flippers.
+   */
+  const scuba = () => {
+    head.visible = false;
+    mail.color.set('#22404a');
+    dark.color.set('#1a2a30');
+    const brass = toon({ color: '#c79a3a', emissive: '#4a3208', emissiveIntensity: 0.15 });
+    const glass = toon({ color: '#7fd6e0', emissive: '#2a8c98', emissiveIntensity: 0.45, rim: false });
+    const tank = toon({ color: '#e2b23a' });
+    const rubber = toon({ color: '#141c22' });
+    body.add(M(new THREE.SphereGeometry(0.29, 18, 14), brass, [0, 1.76, 0], { outline: 0.016 }));
+    body.add(M(new THREE.CylinderGeometry(0.33, 0.36, 0.12, 18), brass, [0, 1.5, 0], { outline: 0.012 }));
+    body.add(M(new THREE.CylinderGeometry(0.17, 0.17, 0.06, 18), glass, [0, 1.76, 0.26], { rot: [Math.PI / 2, 0, 0], outline: false }));
+    body.add(M(new THREE.TorusGeometry(0.17, 0.03, 6, 18), brass, [0, 1.76, 0.28], { outline: 0.006 }));
+    for (const x of [-0.25, 0.25]) {
+      body.add(M(new THREE.CylinderGeometry(0.08, 0.08, 0.05, 12), glass, [x, 1.78, 0.06], { rot: [0, 0, Math.PI / 2], outline: false }));
+      body.add(M(new THREE.TorusGeometry(0.08, 0.02, 5, 12), brass, [x * 1.08, 1.78, 0.06], { rot: [0, Math.PI / 2, 0], outline: false }));
+    }
+    body.add(M(new THREE.BoxGeometry(0.05, 0.18, 0.46), red, [0, 2.08, -0.02], { outline: 0.008 }));
+    for (const x of [-0.12, 0.12]) {
+      body.add(M(new THREE.CylinderGeometry(0.11, 0.11, 0.62, 12), tank, [x, 1.2, -0.38], { outline: 0.012 }));
+      body.add(M(new THREE.SphereGeometry(0.11, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), tank, [x, 1.51, -0.38], { outline: false }));
+    }
+    body.add(M(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6), rubber, [0, 1.6, -0.38], { outline: false }));
+    const hose = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 1.62, -0.38), new THREE.Vector3(0.32, 1.95, -0.3), new THREE.Vector3(0.24, 1.82, -0.05)), 10, 0.035, 5);
+    body.add(M(hose, rubber, [0, 0, 0], { outline: false }));
+    for (const leg of legs) {
+      leg.add(M(new THREE.BoxGeometry(0.22, 0.04, 0.55), rubber, [0, -0.79, 0.2], { outline: 0.008 }));
+      leg.add(M(new THREE.BoxGeometry(0.26, 0.02, 0.18), toon({ color: '#2f8f96' }), [0, -0.79, 0.44], { outline: false }));
+    }
+  };
+  const build = (kind: string, region: string) => {
     built = true;
+    if (region === 'ocean') scuba();
     if (kind === 'captain') {
       captain = true;
       body.scale.setScalar(1.22);
@@ -154,7 +194,7 @@ export const createModel: ModelFactory = (look) => {
     update(entity, frame) {
       const s = entity.soldier;
       if (!s) return;
-      if (!built) build(s.kind);
+      if (!built) build(s.kind, regionOf(entity));
       const t = frame.time;
       // Walking bob and leg swing when moving (from the patrol/attack state), a raised arm while winding up.
       const moving = s.state !== 'patrol' || s.patrol.length > 0;

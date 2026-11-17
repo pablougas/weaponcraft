@@ -2,7 +2,7 @@ import { applyDamage, isHittable } from '../combat';
 import { DT, ticks } from '../constants';
 import type { PhysicsWorld } from '../physics';
 import { GROTTO, groundAt, oceanPoint, regionClamp, regionOf, sameRegion, type RegionId } from '../regions';
-import { CASTLE, CASTLE_WALL, KRAKEN_RIG } from '../terrain/ocean';
+import { CASTLE, CASTLE_WALL, KEEP, KRAKEN_RIG } from '../terrain/ocean';
 import { FORT_RADIUS, FORT_SPOTS, pathX, SPIRES } from '../terrain/underworld';
 import type { Entity, EntityId, SoldierKind, SoldierState, Vec3 } from '../types';
 import { despawn, spawn, type SimContext } from '../world';
@@ -167,19 +167,30 @@ export function restartGarrison(ctx: SimContext): void {
 }
 
 /**
- * The humans who took Atlantis (team request, Nov 15): a patrol round the
- * courtyard, guards at the gate and the keep, archers on the wall walk's
- * foot, a captain over the kraken's rig, and two sentries on the causeway.
+ * The humans who took Atlantis (team request, Nov 15; doubled for the bigger
+ * castle on Nov 16), all in diving armour: guards at the gate and the keep's
+ * door, archers in the courtyard, a patrol round each side, a captain and his
+ * guard over the kraken's rig, and two sentries on the causeway.
  */
-const ATLANTIS_GARRISON: ReadonlyArray<{ kind: SoldierKind; x: number; z: number; facing: number; patrol?: ReadonlyArray<{ x: number; z: number }> }> = [
-  { kind: 'shield', x: -3.5, z: CASTLE.z + CASTLE_WALL.radius - 3, facing: 0 },
-  { kind: 'spear', x: 3.5, z: CASTLE.z + CASTLE_WALL.radius - 3, facing: 0 },
-  { kind: 'archer', x: -9, z: CASTLE.z + 9, facing: 0.4 },
-  { kind: 'archer', x: 9, z: CASTLE.z + 9, facing: -0.4 },
-  { kind: 'spear', x: -11, z: CASTLE.z, facing: Math.PI / 2, patrol: [{ x: -11, z: CASTLE.z + 6 }, { x: -11, z: CASTLE.z - 8 }, { x: -4, z: CASTLE.z - 14 }, { x: -11, z: CASTLE.z - 8 }] },
-  { kind: 'captain', x: KRAKEN_RIG.x - 3, z: KRAKEN_RIG.z + 1, facing: Math.PI / 2 },
-  { kind: 'sentry', x: -2, z: -24, facing: 0, patrol: [{ x: -2, z: -30 }, { x: -2, z: -6 }] },
-  { kind: 'sentry', x: 2, z: -12, facing: Math.PI, patrol: [{ x: 2, z: -6 }, { x: 2, z: -30 }] },
+const GATE_Z = CASTLE.z + CASTLE_WALL.radius;
+const KEEP_DOOR_Z = KEEP.z + KEEP.radius + 4;
+export const ATLANTIS_GARRISON: ReadonlyArray<{ kind: SoldierKind; x: number; z: number; facing: number; patrol?: ReadonlyArray<{ x: number; z: number }> }> = [
+  { kind: 'shield', x: -4, z: GATE_Z - 4, facing: 0 },
+  { kind: 'spear', x: 4, z: GATE_Z - 4, facing: 0 },
+  { kind: 'archer', x: -12, z: CASTLE.z + 32, facing: 0.3 },
+  { kind: 'archer', x: 12, z: CASTLE.z + 32, facing: -0.3 },
+  { kind: 'archer', x: -18, z: CASTLE.z - 4, facing: 0.5 },
+  { kind: 'archer', x: 18, z: CASTLE.z - 4, facing: -0.5 },
+  { kind: 'shield', x: -5, z: KEEP_DOOR_Z, facing: 0 },
+  { kind: 'spear', x: 5, z: KEEP_DOOR_Z, facing: 0 },
+  ...([-1, 1] as const).map((side) => ({
+    kind: 'spear' as const, x: side * 20, z: CASTLE.z + 30, facing: side * -Math.PI / 2,
+    patrol: [{ x: side * 20, z: CASTLE.z + 30 }, { x: side * 40, z: CASTLE.z + 12 }, { x: side * 40, z: CASTLE.z - 20 }, { x: side * 16, z: CASTLE.z - 38 }, { x: side * 40, z: CASTLE.z - 20 }, { x: side * 40, z: CASTLE.z + 12 }],
+  })),
+  { kind: 'captain', x: KRAKEN_RIG.x - 4, z: KRAKEN_RIG.z + 1, facing: Math.PI / 2 },
+  { kind: 'spear', x: KRAKEN_RIG.x - 3, z: KRAKEN_RIG.z - 6, facing: Math.PI / 2 },
+  { kind: 'sentry', x: -3, z: -30, facing: 0, patrol: [{ x: -3, z: -40 }, { x: -3, z: -6 }] },
+  { kind: 'sentry', x: 3, z: -18, facing: Math.PI, patrol: [{ x: 3, z: -6 }, { x: 3, z: -40 }] },
 ];
 
 export function placeAtlantisGarrison(ctx: SimContext): void {

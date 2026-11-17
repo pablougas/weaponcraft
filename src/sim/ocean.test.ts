@@ -7,7 +7,8 @@ import { groundAt, OCEAN, regionClamp } from './regions';
 import { deserialize, serialize } from './serialize';
 import { nearestInteractable } from './systems/items';
 import { ensureSeaGate, gatesEnd } from './systems/sea-gate';
-import { CASTLE, CASTLE_WALL, KEEP, KRAKEN, OCEAN_ARRIVAL, oceanClamp, oceanInside, SEA_GATE, SHIPWRECK } from './terrain/ocean';
+import { CASTLE, CASTLE_GATE_HALF, CASTLE_WALL, KEEP, KRAKEN, OCEAN_ARRIVAL, oceanClamp, oceanInside, SEA_GATE, SHIPWRECK } from './terrain/ocean';
+import { ATLANTIS_GARRISON } from './systems/soldiers';
 import { tickWorld } from './tick';
 import { TUTORIAL_STEPS } from './tutorial';
 import type { WorldState } from './types';
@@ -49,11 +50,17 @@ const gates = (world: WorldState) => Object.values(world.entities).filter((e) =>
 const oceanSoldiers = (world: WorldState) => Object.values(world.entities).filter((e) => e.soldier && e.region === 'ocean');
 
 describe('the Ocean: its shape', () => {
+  it('Atlantis is a city: over 100 m across inside its walls, with a wide gate', () => {
+    expect(CASTLE_WALL.radius * 2).toBeGreaterThan(100);
+    expect(CASTLE_GATE_HALF).toBeGreaterThan(4);
+    expect(CASTLE_GATE_HALF).toBeLessThan(12);
+  });
+
   it('the beach, causeway and castle courtyard are land; the kraken, the sea and the far water are not', () => {
-    for (const p of [OCEAN_ARRIVAL, SEA_GATE, { x: 0, z: 0 }, { x: 0, z: -30 }, { x: CASTLE.x, z: CASTLE.z + 10 }, { x: KEEP.x + 10, z: KEEP.z }]) {
+    for (const p of [OCEAN_ARRIVAL, SEA_GATE, { x: 0, z: 0 }, { x: 0, z: -30 }, { x: CASTLE.x, z: CASTLE.z + 10 }, { x: KEEP.x + KEEP.radius + 8, z: KEEP.z }, { x: CASTLE.x - 45, z: CASTLE.z }]) {
       expect(oceanInside(p.x, p.z), `${p.x},${p.z}`).toBe(true);
     }
-    for (const p of [KRAKEN, { x: 30, z: 0 }, { x: 0, z: 60 }, { x: -40, z: -20 }]) expect(oceanInside(p.x, p.z), `${p.x},${p.z}`).toBe(false);
+    for (const p of [KRAKEN, { x: CASTLE.x + CASTLE.radius + 6, z: CASTLE.z }, { x: 30, z: 0 }, { x: 0, z: 60 }, { x: -40, z: -20 }]) expect(oceanInside(p.x, p.z), `${p.x},${p.z}`).toBe(false);
     // Land stands above the sea; the sea floor is well under it.
     expect(groundAt('ocean', OCEAN.center.x + OCEAN_ARRIVAL.x, OCEAN.center.z + OCEAN_ARRIVAL.z)).toBeGreaterThan(OCEAN.center.y + 0.4);
     expect(groundAt('ocean', OCEAN.center.x + KRAKEN.x, OCEAN.center.z + KRAKEN.z)).toBeLessThan(OCEAN.center.y - 2);
@@ -77,17 +84,18 @@ describe('the sea-gate and Atlantis (team request, Nov 15)', () => {
     expect(here.structure).toEqual({ kind: 'sea-gate', to: 'ocean' });
     expect(there.structure).toEqual({ kind: 'sea-gate', to: 'underworld' });
     const soldiers = oceanSoldiers(world);
-    expect(soldiers.length).toBe(8);
+    expect(soldiers.length).toBe(ATLANTIS_GARRISON.length);
+    expect(soldiers.length).toBeGreaterThanOrEqual(14);
     expect(soldiers.some((s) => s.soldier!.kind === 'captain')).toBe(true);
     for (const s of soldiers) expect(Math.abs(s.position.y - groundAt('ocean', s.position.x, s.position.z))).toBeLessThan(0.01);
     // Most of them are inside the castle walls.
     const inCastle = soldiers.filter((s) => Math.hypot(s.position.x - OCEAN.center.x - CASTLE.x, s.position.z - OCEAN.center.z - CASTLE.z) < CASTLE_WALL.radius);
-    expect(inCastle.length).toBeGreaterThanOrEqual(6);
+    expect(inCastle.length).toBeGreaterThanOrEqual(10);
     // Only once.
     const { ctx } = createSimContext(world, true);
     ensureSeaGate(ctx);
     expect(gates(world)).toHaveLength(2);
-    expect(oceanSoldiers(world)).toHaveLength(8);
+    expect(oceanSoldiers(world)).toHaveLength(ATLANTIS_GARRISON.length);
   });
 
   it('F steps through to the beach and back; Hades follows; the soldiers there only see gods in their sea', () => {
@@ -130,7 +138,7 @@ describe('the sea-gate and Atlantis (team request, Nov 15)', () => {
     expect(regionClamp('ocean', zeus().position.x, zeus().position.z, -0.6).inside).toBe(true);
     // Into the curtain wall beside the gate: it stops you (you slide along its outside). Through the gate: into the courtyard.
     const fromCastle = () => Math.hypot(zeus().position.x - OCEAN.center.x - CASTLE.x, zeus().position.z - OCEAN.center.z - CASTLE.z);
-    at(OCEAN.center.x + 10, OCEAN.center.z + CASTLE.z + CASTLE_WALL.radius + 5);
+    at(OCEAN.center.x + CASTLE_GATE_HALF + 4, OCEAN.center.z + CASTLE.z + CASTLE_WALL.radius + 5);
     run([{ type: 'player:move', playerId: 'p1', x: 0, z: -1 } as Intent], 150);
     expect(fromCastle()).toBeGreaterThan(CASTLE_WALL.radius);
     at(OCEAN.center.x, OCEAN.center.z + CASTLE.z + CASTLE_WALL.radius + 5);
@@ -151,6 +159,6 @@ describe('the sea-gate and Atlantis (team request, Nov 15)', () => {
     ensureStory(old);
     ensureStory(old);
     expect(gates(old)).toHaveLength(2);
-    expect(oceanSoldiers(old)).toHaveLength(8);
+    expect(oceanSoldiers(old)).toHaveLength(ATLANTIS_GARRISON.length);
   });
 });
