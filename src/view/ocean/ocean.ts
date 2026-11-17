@@ -240,13 +240,25 @@ export function buildOcean(look: Look): OceanView {
   group.add(M(mergeGeometries(avenue), marbleShade, [0, 0, 0], { outline: 0.012 }));
   // Poseidon's statue on his fountain: a shell basin, a robed figure, a gold trident.
   const sy = oceanLocalHeight(STATUE.x, STATUE.z);
-  group.add(M(new THREE.CylinderGeometry(STATUE.radius, STATUE.radius + 0.4, 1.2, 28), marbleShade, [STATUE.x, sy + 0.5, STATUE.z], { outline: 0.016 }));
-  group.add(M(new THREE.CylinderGeometry(STATUE.radius - 0.4, STATUE.radius - 0.4, 0.1, 28), toon({ color: '#5fc7d4', emissive: '#1d6f7c', emissiveIntensity: 0.3, rim: false }), [STATUE.x, sy + 1.05, STATUE.z], { outline: false, cast: false }));
+  // The basin is one lathed shape (floor, inner wall, rim, sloped outer wall), and the water sits well below
+  // the rim and well above the floor, so no two surfaces share a plane (they flickered when they did).
+  const ri = STATUE.radius - 0.45;
+  const basin = new THREE.LatheGeometry([
+    new THREE.Vector2(0, 0.3),
+    new THREE.Vector2(ri, 0.3),
+    new THREE.Vector2(ri, 1.2),
+    new THREE.Vector2(STATUE.radius, 1.2),
+    new THREE.Vector2(STATUE.radius + 0.4, -0.1),
+  ], 40);
+  group.add(M(basin, toon({ color: '#c3d4d3', side: THREE.DoubleSide }), [STATUE.x, sy, STATUE.z], { outline: 0.016 }));
+  const fountainWater = new THREE.CircleGeometry(ri + 0.02, 40);
+  fountainWater.rotateX(-Math.PI / 2);
+  group.add(M(fountainWater, toon({ color: '#5fc7d4', emissive: '#1d6f7c', emissiveIntensity: 0.3, rim: false }), [STATUE.x, sy + 0.85, STATUE.z], { outline: false, cast: false }));
   for (let k = 0; k < 10; k += 1) {
     const a = (k / 10) * Math.PI * 2;
     shells.add(scallop, scallopMats[k % 3], [STATUE.x + Math.sin(a) * (STATUE.radius + 0.42), sy + 0.6, STATUE.z + Math.cos(a) * (STATUE.radius + 0.42)], [0, a, 0], 0.9, 0.008);
   }
-  group.add(M(new THREE.CylinderGeometry(1.4, 1.7, 3, 12), marble, [STATUE.x, sy + 2.5, STATUE.z], { outline: 0.014 }));
+  group.add(M(new THREE.CylinderGeometry(1.4, 1.7, 3.6, 12), marble, [STATUE.x, sy + 2.2, STATUE.z], { outline: 0.014 }));
   group.add(M(new THREE.CylinderGeometry(0.9, 1.5, 5, 14), marble, [STATUE.x, sy + 6.5, STATUE.z], { outline: 0.016 }));
   group.add(M(new THREE.SphereGeometry(0.75, 14, 10), marble, [STATUE.x, sy + 9.6, STATUE.z], { outline: 0.012 }));
   group.add(M(new THREE.ConeGeometry(0.6, 1.3, 10), marbleShade, [STATUE.x, sy + 8.9, STATUE.z + 0.45], { rot: [Math.PI + 0.3, 0, 0], outline: 0.01 }));
