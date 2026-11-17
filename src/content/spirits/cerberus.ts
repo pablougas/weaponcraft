@@ -12,8 +12,8 @@ export const HOWL = {
   /** The god heals this share of all damage dealt while it lasts. */
   lifesteal: 0.3,
   lifestealTicks: ticks(6),
-  /** Halved from 20 s so it comes back faster (team request, Nov 15). */
-  cooldownTicks: ticks(10),
+  /** 20 s → 10 s (team request, Nov 15) → 7 s (team request, Nov 16). */
+  cooldownTicks: ticks(7),
   staminaCost: 30,
   /** Dread: every enemy in range keeps taking this much a second for a while after (team request, Nov 15). */
   dreadPerSecond: 6,

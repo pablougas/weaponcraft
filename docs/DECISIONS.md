@@ -184,3 +184,4 @@ Choices made where the spec was silent. Newest at the bottom. Format: date — d
     - coral along every shore, and kelp in the shallows.
   - The courtyard is paved with a wave mosaic (aqua, teal and coral rings) on cream stone, and the sand is flecked with crushed shell.
   - Review shots: `ocean-arrival`, `ocean-shipwreck`, `ocean-courtyard`, `ocean-gate` (new) and `ocean-kraken` (now with a diver close-up), plus `sea-gate`. They await the team's approval, and no baselines are recorded yet.
+- 2026-11-16 — Three-Fold Howl recharges a bit faster again (team request): cooldown 10 s → 7 s.
