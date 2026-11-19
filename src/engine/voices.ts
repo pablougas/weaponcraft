@@ -5,7 +5,12 @@ import { duckMusic, getAudioContext, getBus, getVolumes } from './audio';
  * as "Zeus: …", "Hades: …" or "Poseidon: …"; when such a caption appears, the
  * god speaks it.
  *
- * - The words come from the browser's own speech voices, **on-device ones only**
+ * - Every line in the game is recorded (team request, Nov 18: "make the voices
+ *   more real"): natural-sounding speech made offline with Kokoro, an open
+ *   neural voice model, by `scripts/make-god-voices.py`, shipped as small mp3s
+ *   in `public/voices/` and played through the same hall reverb as the divine
+ *   layer. A line with no recording falls back to the browser's speech below.
+ * - Fallback: the browser's own speech voices, **on-device ones only**
  *   (`localService`), so nothing goes over the network (itch.io rule). Each god
  *   has his own pitch and pace: Hades the deepest and slowest, Zeus commanding,
  *   Poseidon rolling.
@@ -32,9 +37,10 @@ export interface GodVoice {
 }
 
 export const GOD_VOICES: Readonly<Record<string, GodVoice>> = {
-  Zeus: { id: 'zeus', pitch: 0.78, rate: 0.9, root: 98, prefer: ['Daniel', 'Arthur', 'Microsoft George', 'Alex', 'Microsoft David', 'Aaron'] },
-  Hades: { id: 'hades', pitch: 0.5, rate: 0.8, root: 65.4, prefer: ['Alex', 'Microsoft David', 'Daniel', 'Arthur', 'Microsoft Mark'] },
-  Poseidon: { id: 'poseidon', pitch: 0.66, rate: 0.86, root: 82.4, prefer: ['Aaron', 'Microsoft Mark', 'Alex', 'Daniel', 'Microsoft David'] },
+  // Pitched only a little below normal: pushing browser voices far down is what made them sound robotic.
+  Zeus: { id: 'zeus', pitch: 0.92, rate: 0.95, root: 98, prefer: ['Daniel', 'Arthur', 'Microsoft George', 'Evan', 'Tom', 'Microsoft David', 'Aaron'] },
+  Hades: { id: 'hades', pitch: 0.78, rate: 0.88, root: 65.4, prefer: ['Nathan', 'Evan', 'Tom', 'Microsoft David', 'Daniel', 'Arthur', 'Microsoft Mark'] },
+  Poseidon: { id: 'poseidon', pitch: 0.85, rate: 0.92, root: 82.4, prefer: ['Arthur', 'Aaron', 'Reed', 'Microsoft Mark', 'Daniel', 'Microsoft David'] },
 };
 
 /**
@@ -65,6 +71,11 @@ interface Pending {
   words: string;
 }
 
+/** public/voices/manifest.json: each recorded line's words, its file and length. */
+export type VoiceManifest = Record<string, { file: string; seconds: number }>;
+
+const VOICE_DIR = `${import.meta.env.BASE_URL}voices/`;
+
 export class GodVoices {
   private queue: Pending[] = [];
   private speaking = false;
@@ -75,10 +86,43 @@ export class GodVoices {
   private timer: number | null = null;
   /** Bumped by stop(), so callbacks from a cancelled line are ignored. */
   private generation = 0;
+  private manifest: VoiceManifest = {};
+  /** Each recording's bytes, fetched ahead (the whole set is well under 1 MB), then decoded once. */
+  private readonly bytes = new Map<string, Promise<ArrayBuffer | null>>();
+  private readonly decoded = new Map<string, Promise<AudioBuffer | null>>();
+  private recording: AudioBufferSourceNode | null = null;
 
   constructor() {
     // Chrome loads its voice list lazily: ask once now so it's ready by the first line.
     try { window.speechSynthesis?.getVoices(); } catch { /* not available */ }
+    if (typeof fetch === 'function') {
+      fetch(`${VOICE_DIR}manifest.json`)
+        .then((r) => (r.ok ? r.json() : {}))
+        .then((m: VoiceManifest) => {
+          this.manifest = m;
+          for (const { file } of Object.values(m)) this.fetchBytes(file);
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  private fetchBytes(file: string): Promise<ArrayBuffer | null> {
+    let p = this.bytes.get(file);
+    if (!p) {
+      p = fetch(VOICE_DIR + file).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+      this.bytes.set(file, p);
+    }
+    return p;
+  }
+
+  private buffer(ctx: AudioContext, file: string): Promise<AudioBuffer | null> {
+    let p = this.decoded.get(file);
+    if (!p) {
+      // decodeAudioData takes the bytes over, so decode a copy.
+      p = this.fetchBytes(file).then((b) => (b ? ctx.decodeAudioData(b.slice(0)) : null)).catch(() => null);
+      this.decoded.set(file, p);
+    }
+    return p;
   }
 
   /** Speaks a caption if a god says it. Returns true if it will be voiced. */
@@ -100,6 +144,8 @@ export class GodVoices {
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
     try { window.speechSynthesis?.cancel(); } catch { /* not available */ }
+    try { this.recording?.stop(); } catch { /* already stopped */ }
+    this.recording = null;
     this.release?.();
     this.release = null;
     duckMusic(1);
@@ -127,12 +173,51 @@ export class GodVoices {
       // A breath between lines.
       this.timer = window.setTimeout(() => { this.timer = null; if (generation === this.generation) this.next(); }, 250);
     };
-    const seconds = lineSeconds(item.words, item.voice.rate);
     this.release = this.aura(item.voice);
+    const recorded = this.manifest[item.words];
+    const ctx = getAudioContext();
+    if (recorded && ctx) {
+      // The recording; if it can't be played after all, the browser's voice instead.
+      this.timer = window.setTimeout(done, (recorded.seconds + 3) * 1000);
+      void this.buffer(ctx, recorded.file).then((buffer) => {
+        if (finished || generation !== this.generation) return;
+        if (!buffer || !this.play(ctx, buffer, done)) this.fallback(item, done);
+      });
+      return;
+    }
+    this.fallback(item, done);
+  }
+
+  /** The browser's speech, or the murmur. */
+  private fallback(item: Pending, done: () => void): void {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    const seconds = lineSeconds(item.words, item.voice.rate);
     const spoken = this.speak(item, done);
     if (!spoken) this.murmur(item, seconds);
     // Safety net: never wait on a voice forever (speech engines can drop their end event).
     this.timer = window.setTimeout(done, (spoken ? seconds * 1.8 + 2 : seconds + 0.2) * 1000);
+  }
+
+  /** Plays a recorded line: mostly dry, with some of the hall behind it. */
+  private play(ctx: AudioContext, buffer: AudioBuffer, done: () => void): boolean {
+    const bus = getBus('voice');
+    const hall = this.hall(ctx);
+    if (!bus || !hall) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const dry = ctx.createGain();
+    dry.gain.value = 1;
+    const send = ctx.createGain();
+    send.gain.value = 0.28;
+    src.connect(dry).connect(bus);
+    src.connect(send).connect(hall.reverb);
+    src.onended = () => {
+      if (this.recording === src) this.recording = null;
+      done();
+    };
+    this.recording = src;
+    src.start();
+    return true;
   }
 
   /** Speaks the words with an on-device voice. False if there is none. */

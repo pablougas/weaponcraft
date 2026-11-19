@@ -139,6 +139,11 @@ export function applyDamage(
     ctx.emit('combat:evaded', { attackerId, targetId });
     return 0;
   }
+  // The Kraken mech's back armour can only be hurt while it's slumped after a slam (team request, Nov 16).
+  if (target.mechPart?.part === 'back-plating' && world.entities[target.mechPart.mechId]?.kraken?.mode !== 'slumped') {
+    ctx.emit('combat:blocked', { attackerId, targetId });
+    return 0;
+  }
   const attacker = attackerId ? world.entities[attackerId] : undefined;
 
   // Base → element wheel → ability boost.

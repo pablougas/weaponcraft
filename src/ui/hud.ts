@@ -1,4 +1,5 @@
 import { DEFAULT_BINDINGS, keyLabel, type InputAction, type InputMap } from '../engine/input-map';
+import { taskProgress, VILLAGE_TASKS, villagers, type VillagerId } from '../sim/systems/village';
 import { spiritAbilityFor, type SpiritDef } from '../content/spirits';
 import { activeSpirit } from '../sim/systems/spirits';
 import { enemyDef, godDef } from '../sim/defs';
@@ -22,6 +23,11 @@ const GLYPHS: Record<string, string> = {
   // Three-Fold Howl: three rings of sound.
   // Shadow Daggers (Hades's gift from Cerberus): three blades fanned around a dark core.
   daggers: '<circle cx="12" cy="13" r="2.2" fill="currentColor" opacity=".55"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor" transform="rotate(120 12 13)"/><path d="M12 1.5l1.5 5.5L12 9.5 10.5 7z" fill="currentColor" transform="rotate(240 12 13)"/>',
+  // Poseidon (Nov 16): a bolt of water, a rushing wave, a whirlpool, and a towering wave.
+  tide: '<path d="M14.5 3.5c2.5 3 5 6 5 9.2a5 5 0 0 1-10 0c0-3.2 2.6-6.2 5-9.2z" fill="currentColor"/><path d="M2.5 9.5h6M2 13.5h5.5M3.5 17.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>',
+  riptide: '<path d="M2 16c3-1 5-6 9-6s4 4 7 4c1.8 0 3-.8 4-2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M2 20.5c3 0 4-1.5 6.5-1.5s3.5 1.5 6.5 1.5 4-1.5 7-1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>',
+  whirlpool: '<path d="M12 12.2a1.2 1.2 0 1 1 1.2-1.2c0 2.8-4.6 3.4-5.6.6-1.3-3.6 3-6.4 6.4-5.2 4.4 1.6 4.4 8.2.2 10-4.8 2.1-10.2-1.4-10-6.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
+  tsunami: '<path d="M2 21h20M3 21c0-7 4-14 11-15 4-.5 7 1.5 7.5 4.5-2-1.5-5-1.2-6 1.2 3.5-.6 5.2 2.2 4.4 4.3-1.2-1.6-3.5-1.8-4.4-.2C14 18 13 21 12 21" fill="currentColor"/>',
   howl: '<circle cx="6" cy="12" r="2.4" fill="currentColor"/><path d="M10 7.5a6 6 0 0 1 0 9M13.5 5a9.5 9.5 0 0 1 0 14M17 2.8a13 13 0 0 1 0 18.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
 };
 
@@ -139,15 +145,26 @@ export function createHud(parent: HTMLElement): Hud {
       slot.key.textContent = code ? keyLabel(code) : '';
     }
   };
-  // The other god in the party (M6): a small portrait chip with his health and the switch key.
-  const ally = document.createElement('div');
-  ally.className = 'wc-ally';
-  ally.hidden = true;
-  ally.innerHTML = '<span class="wc-ally-name"></span><span class="wc-ally-bar"><span></span></span><kbd></kbd>';
-  (element.querySelector('.wc-hud-vitals') ?? element).append(ally);
-  const allyName = ally.querySelector<HTMLElement>('.wc-ally-name')!;
-  const allyFill = ally.querySelector<HTMLElement>('.wc-ally-bar > span')!;
-  const allyKey = ally.querySelector<HTMLElement>('kbd')!;
+  // The other gods in the party (M6; Poseidon makes three, Nov 16): a small chip each with his health and the switch key.
+  // The village's tasks (Nov 17): one line each while you're on it, with how far you've got.
+  const tasks = document.createElement('ul');
+  tasks.className = 'wc-tasks';
+  tasks.hidden = true;
+  tasks.setAttribute('aria-label', 'Tasks');
+  element.append(tasks);
+  let tasksKey = '';
+  const allyChips: Array<{ root: HTMLElement; name: HTMLElement; fill: HTMLElement; key: HTMLElement }> = [];
+  const allyChip = (i: number) => {
+    while (allyChips.length <= i) {
+      const root = document.createElement('div');
+      root.className = 'wc-ally';
+      root.hidden = true;
+      root.innerHTML = '<span class="wc-ally-name"></span><span class="wc-ally-bar"><span></span></span><kbd></kbd>';
+      (element.querySelector('.wc-hud-vitals') ?? element).append(root);
+      allyChips.push({ root, name: root.querySelector<HTMLElement>('.wc-ally-name')!, fill: root.querySelector<HTMLElement>('.wc-ally-bar > span')!, key: root.querySelector<HTMLElement>('kbd')! });
+    }
+    return allyChips[i];
+  };
   const target = get('target');
   const targetName = get('target-name');
   const targetHealth = get('target-health');
@@ -178,14 +195,30 @@ export function createHud(parent: HTMLElement): Hud {
       const spirit = activeSpirit(world);
       if (builtFor !== hero.defId + (spirit ? `+${spirit.id}` : '')) buildSlots(hero.defId, spirit);
       const player = Object.values(world.players).find((p) => p.entityId === hero.id);
-      const otherId = player?.party?.find((id) => id !== hero.id);
-      const other = otherId ? world.entities[otherId] : undefined;
-      ally.hidden = !other?.hero;
-      if (other?.hero) {
-        allyName.textContent = godDef(other.defId).name + (other.hero.down != null ? ' (down)' : '');
-        allyFill.style.transform = `scaleX(${other.health ? Math.max(0, other.health.current / other.health.max) : 0})`;
-        allyKey.textContent = keyLabel(codesFor('switchCharacter')[0] ?? 'KeyV');
+      const active = villagers(world).filter((v) => v.data.task === 'given').map((v) => {
+        const id = String(v.data.villager) as VillagerId;
+        const [done, goal] = taskProgress(world, id);
+        const count = goal > 1 ? ` (${done}/${goal})` : done >= Math.max(1, goal) ? ' \u2014 return to ' + String(v.data.name) : '';
+        return VILLAGE_TASKS[id].task + count;
+      });
+      const key = active.join('|');
+      if (key !== tasksKey) {
+        tasksKey = key;
+        tasks.hidden = active.length === 0;
+        tasks.replaceChildren(...active.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
       }
+      const others = (player?.party ?? []).filter((id) => id !== hero.id).map((id) => world.entities[id]).filter((e) => !!e?.hero);
+      const switchKey = keyLabel(codesFor('switchCharacter')[0] ?? 'KeyV');
+      others.forEach((other, i) => {
+        const chip = allyChip(i);
+        chip.root.hidden = false;
+        chip.name.textContent = godDef(other.defId).name + (other.hero!.down != null ? ' (down)' : '');
+        chip.fill.style.transform = `scaleX(${other.health ? Math.max(0, other.health.current / other.health.max) : 0})`;
+        // With two gods, tap V; with more, hold it to choose.
+        chip.key.textContent = others.length > 1 ? (i === 0 ? `hold ${switchKey}` : '') : switchKey;
+        chip.key.hidden = others.length > 1 && i > 0;
+      });
+      for (let i = others.length; i < allyChips.length; i += 1) allyChips[i].root.hidden = true;
       const weapon = isKnownWeapon(world, hero.hero.weaponId) ? weaponData(world, hero.hero.weaponId) : undefined;
       if (weapon && weapon.id !== shownWeapon) {
         shownWeapon = weapon.id;
@@ -208,7 +241,10 @@ export function createHud(parent: HTMLElement): Hud {
       }
 
       // The Warden's fight (M7) takes over the bar as a boss bar; otherwise it follows your lock-on.
-      const boss = Object.values(world.entities).find((e) => e.warden?.mode === 'fight' && (e.health?.current ?? 0) > 0 && e.region === hero.region);
+      const boss = Object.values(world.entities).find((e) => e.warden?.mode === 'fight' && (e.health?.current ?? 0) > 0 && e.region === hero.region)
+        // The Kraken mech's fight (Nov 16): its back armour is the boss bar.
+        ?? Object.values(world.entities).find((e) => e.mechPart?.part === 'back-plating' && (e.health?.current ?? 0) > 0 && e.region === hero.region
+          && ['fight', 'slumped'].includes(world.entities[e.mechPart.mechId]?.kraken?.mode ?? ''));
       const locked = boss ?? (hero.hero.lockTarget ? world.entities[hero.hero.lockTarget] : undefined);
       target.hidden = !locked;
       target.classList.toggle('wc-boss', !!boss);
@@ -222,7 +258,7 @@ export function createHud(parent: HTMLElement): Hud {
 }
 
 /** Names for hittable things that aren't in the enemy registry. */
-const PART_NAMES: Readonly<Record<string, string>> = { 'mech-plating': 'Mk. II rear plating', barricade: 'Barricade' };
+const PART_NAMES: Readonly<Record<string, string>> = { 'mech-plating': 'Mk. II rear plating', 'kraken-plating': 'Kraken mech \u2014 back armour', barricade: 'Barricade' };
 
 function enemyName(defId: string): string {
   if (PART_NAMES[defId]) return PART_NAMES[defId];

@@ -55,7 +55,7 @@ export interface TestApi {
   /** Tears down the grotto's barricade (as if it had been beaten down). */
   breakBarricade(): Promise<void>;
   /** Wears the Mk. II's rear plating down to `fraction` of its durability (M7 tests; the last blows are real). */
-  weakenMech(fraction: number, target?: 'plating' | 'warden'): Promise<void>;
+  weakenMech(fraction: number, target?: 'plating' | 'warden' | 'kraken' | 'tide'): Promise<void>;
   /** Moves the local god onto the ground at (x, z) via a `dev:teleport` intent, camera behind it. */
   teleport(x: number, z: number, rotationY?: number): Promise<void>;
 }

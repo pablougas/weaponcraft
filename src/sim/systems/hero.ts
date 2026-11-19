@@ -266,9 +266,9 @@ export function doAction(ctx: SimContext, entity: HeroEntity, action: PlayerActi
       hero.staminaDelay = EXHAUSTED_DELAY;
       hero.cooldowns[ultimate.id] = ultimate.cooldownTicks;
       // +1: the hero update later this same tick counts the first tick down.
-      hero.ultimate = { ticksLeft: ultimate.telegraphTicks + 1, point, spent };
       faceTowards(entity, point.x, point.z);
-      ctx.emit('ability:telegraph', { casterId: entity.id, abilityId: ultimate.id, point, radius: ultimate.radius, ticks: ultimate.telegraphTicks });
+      hero.ultimate = { ticksLeft: ultimate.telegraphTicks + 1, point, spent, yaw: entity.rotationY };
+      ctx.emit('ability:telegraph', { casterId: entity.id, abilityId: ultimate.id, point, radius: ultimate.radius, ticks: ultimate.telegraphTicks, yaw: entity.rotationY });
       return null;
     }
     case 'spiritAbility':
@@ -433,11 +433,11 @@ function updateHero(ctx: SimContext, entity: HeroEntity, physics: PhysicsWorld |
     hero.ultimate.ticksLeft -= 1;
     if (hero.ultimate.ticksLeft <= 0) {
       const ultimate = god.ultimate;
-      const { point, spent } = hero.ultimate;
+      const { point, spent, yaw } = hero.ultimate;
       hero.ultimate = null;
       if (ultimate && ctx.isAuthority) {
-        const targetIds = ultimate.land(ctx, entity.id, point, spent);
-        ctx.emit('ability:strike', { casterId: entity.id, abilityId: ultimate.id, point, radius: ultimate.radius, targetIds });
+        const targetIds = ultimate.land(ctx, entity.id, point, spent, yaw ?? entity.rotationY);
+        ctx.emit('ability:strike', { casterId: entity.id, abilityId: ultimate.id, point, radius: ultimate.radius, targetIds, yaw: yaw ?? entity.rotationY });
       }
     }
   }

@@ -10,18 +10,20 @@ const RADIUS = 4;
 const SLAM_DAMAGE = 20;
 const SLAM_PER_STAMINA = 0.4;
 const DAMAGE_PER_STAMINA = 1.2;
-const TRAP_TICKS = ticks(4);
-const CRUSH_SECONDS = 4;
-/** Bosses (the Warden) are only held this long. */
-const BOSS_TRAP_TICKS = ticks(2);
+/** How long the cage holds and crushes (team request, Nov 18: last longer; was 4 s). The view's bone cage stands this long too. */
+export const CAGE_SECONDS = 8;
+const TRAP_TICKS = ticks(CAGE_SECONDS);
+const CRUSH_SECONDS = CAGE_SECONDS;
+/** Bosses (the Warden, the Tide Engineer) are only held this long (was 2 s). */
+const BOSS_TRAP_TICKS = ticks(4);
 const AIM_DISTANCE = 10;
 
 /**
  * Hades's R: needs at least half stamina and spends all of it. A red warning
  * ring marks the spot for 1.5 s (the lock-on target, or 10 m ahead), then a
  * cage of bone drops (4 m): it slams down on everything inside (20 + 0.4 ×
- * stamina spent), holds them for 4 s (a boss for 2 s) and crushes them for
- * 1.2 × stamina spent over those 4 s. 8 s cooldown. Same fairness rules as Sky
+ * stamina spent), holds them for 8 s (a boss for 4 s) and crushes them for
+ * 1.2 × stamina spent over those 8 s. 8 s cooldown. Same fairness rules as Sky
  * Strike: the marker always comes first and nothing flashes.
  */
 export const skullCage: UltimateModule = {

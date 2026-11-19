@@ -1,4 +1,7 @@
 import { travelThroughSeaGate } from './sea-gate';
+import { openKeepDoor } from './keep-door';
+import { recruitGod } from './party';
+import { pickUpPearl, talkToVillager } from './village';
 import { startRest } from './rest';
 import { startFreed } from '../cutscenes/freed';
 
@@ -33,6 +36,10 @@ export function nearestInteractable(world: WorldState, playerId: PlayerId, range
   let best: { entity: Entity; distance: number } | undefined;
   for (const entity of Object.values(world.entities)) {
     if (!entity.pickup && !entity.structure && !entity.npc) continue;
+    // An open door has nothing more to do.
+    if (entity.structure?.kind === 'keep-door' && world.flags.keepDoorOpen) continue;
+    // The village's bridge, house doors and the raiders' ram aren't used with F (the ram is smashed).
+    if (entity.structure?.kind === 'village-bridge' || entity.structure?.kind === 'house-door' || entity.structure?.kind === 'siege-ram') continue;
     if ((entity.region ?? 'surface') !== (hero.region ?? 'surface')) continue;
     const distance = flatDistance(hero, entity);
     const reach = entity.structure ? Math.max(range, ALTAR_RANGE - 0.5) : range;
@@ -92,6 +99,7 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
     return null;
   }
   if (target.structure?.kind === 'sea-gate') return travelThroughSeaGate(ctx, playerId, target);
+  if (target.structure?.kind === 'keep-door') return openKeepDoor(ctx, playerId, target);
   if (target.structure?.kind === 'barricade') {
     ctx.emit('barricade:examined', { playerId });
     return null;
@@ -115,8 +123,13 @@ export function interact(ctx: SimContext, playerId: PlayerId): string | null {
     startFreed(ctx, mech?.id ?? target.id);
     return null;
   }
+  if (target.structure?.kind === 'glow-pearl') return pickUpPearl(ctx, playerId, target);
+  // The village's people have their own lines, tasks and rewards (Nov 17).
+  if (target.npc && target.defId === 'villager' && talkToVillager(ctx, playerId, target)) return null;
   if (target.npc) {
     ctx.emit('npc:talk', { playerId, npcId: target.id, name: target.npc.name });
+    // Poseidon joins the party once Cerberus is free (team request, Nov 16).
+    if (target.defId === 'poseidon' && ctx.world.flags.cerberusFreed && !ctx.world.cutscene) recruitGod(ctx, 'poseidon');
     return null;
   }
   return 'nothing to use';

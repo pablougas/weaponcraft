@@ -32,11 +32,16 @@ export function companionOf(ctx: SimContext, entity: Entity): PlayerState | unde
 
 /** Hades steps out of the story and into the party (M6). */
 export function recruitHades(ctx: SimContext): EntityId | null {
+  return recruitGod(ctx, 'hades');
+}
+
+/** A story god (Hades, then Poseidon) steps out of the story and into the party. */
+export function recruitGod(ctx: SimContext, defId: string): EntityId | null {
   const { world } = ctx;
-  const npc = Object.values(world.entities).find((e) => e.defId === 'hades' && e.npc);
+  const npc = Object.values(world.entities).find((e) => e.defId === defId && e.npc);
   const player = Object.values(world.players)[0];
   if (!npc || !player?.entityId) return null;
-  const def = godDef('hades');
+  const def = godDef(defId);
   delete npc.npc;
   npc.ownerId = player.id;
   npc.body = { ...def.body };
@@ -45,20 +50,29 @@ export function recruitHades(ctx: SimContext): EntityId | null {
   npc.hero = newHeroState(def.starterWeaponId);
   if (def.passive) npc.hero.passiveDamage = def.passive.damageMultiplier;
   npc.hero.lastSafe = { ...npc.position };
-  player.party = [player.entityId, npc.id];
+  npc.region = npc.region ?? 'surface';
+  player.party = [...new Set([...(player.party ?? [player.entityId]), npc.id])];
   player.switchReadyTick = 0;
-  ctx.emit('party:joined', { playerId: player.id, entityId: npc.id, defId: 'hades' });
+  ctx.emit('party:joined', { playerId: player.id, entityId: npc.id, defId });
   return npc.id;
 }
 
-/** V: control the other god. */
-export function switchCharacter(ctx: SimContext, playerId: PlayerId): string | null {
+/**
+ * V tapped: control the next god in the party, in turn. With `toId` (the god
+ * wheel, V held): control that god.
+ */
+export function switchCharacter(ctx: SimContext, playerId: PlayerId, toId?: EntityId): string | null {
   const { world } = ctx;
   const player = world.players[playerId];
   if (!player?.party || player.party.length < 2) return 'nobody to switch to';
-  if (world.tick < (player.switchReadyTick ?? 0)) return 'cooling down';
+  if (toId === player.entityId) return 'already that god';
+  if (toId && !player.party.includes(toId)) return 'not in your party';
+  // The wheel pauses the game while you choose, so a chosen switch skips the cooldown.
+  if (!toId && world.tick < (player.switchReadyTick ?? 0)) return 'cooling down';
   const current = player.entityId ? world.entities[player.entityId] : undefined;
-  const nextId = player.party.find((id) => id !== player.entityId && world.entities[id]?.hero);
+  const at = player.entityId ? player.party.indexOf(player.entityId) : -1;
+  const inTurn = [...player.party.slice(at + 1), ...player.party.slice(0, Math.max(0, at))];
+  const nextId = toId ?? inTurn.find((id) => world.entities[id]?.hero && world.entities[id].hero!.down == null) ?? inTurn.find((id) => world.entities[id]?.hero);
   const next = nextId ? world.entities[nextId] : undefined;
   if (!next?.hero) return 'nobody to switch to';
   if (next.hero.down != null) return 'down';
@@ -97,16 +111,20 @@ export function updateCompanions(ctx: SimContext): void {
     if (!player.party || !player.entityId) continue;
     const leader = world.entities[player.entityId];
     if (!leader?.hero) continue;
+    // With three gods (Nov 16) the companions take a side each.
+    let slot = 0;
     for (const id of player.party) {
       if (id === player.entityId) continue;
       const companion = world.entities[id] as HeroEntity | undefined;
+      const side = slot % 2 === 0 ? 1 : -1;
+      slot += 1;
       if (!companion?.hero || isResting(companion.hero)) continue;
-      driveCompanion(ctx, companion, leader as HeroEntity);
+      driveCompanion(ctx, companion, leader as HeroEntity, side);
     }
   }
 }
 
-function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): void {
+function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity, side: 1 | -1 = 1): void {
   const hero = self.hero;
   hero.move = { x: 0, z: 0 };
   hero.sprint = false;
@@ -121,8 +139,8 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   if (!sameRegion(self, leader) || distance > CATCH_UP_DISTANCE || stuck) {
     // Beside and a little behind, out of the follow camera's line of sight.
     const back = leader.rotationY + Math.PI;
-    const x = leader.position.x + Math.sin(back) * 1.2 - Math.cos(back) * 2.6;
-    const z = leader.position.z + Math.cos(back) * 1.2 + Math.sin(back) * 2.6;
+    const x = leader.position.x + Math.sin(back) * 1.2 - Math.cos(back) * 2.6 * side;
+    const z = leader.position.z + Math.cos(back) * 1.2 + Math.sin(back) * 2.6 * side;
     const from = { ...self.position };
     self.region = leader.region;
     self.position = { x, y: Math.max(groundAt(regionOf(leader), x, z), leader.position.y), z };
@@ -161,8 +179,8 @@ function driveCompanion(ctx: SimContext, self: HeroEntity, leader: HeroEntity): 
   hero.lockTarget = null;
 
   // Follow 3–6 m behind, off to the leader's side (so he isn't between you and the camera).
-  const sideX = -Math.cos(leader.rotationY) * 2.4 - Math.sin(leader.rotationY) * 1.5;
-  const sideZ = Math.sin(leader.rotationY) * 2.4 - Math.cos(leader.rotationY) * 1.5;
+  const sideX = -Math.cos(leader.rotationY) * 2.4 * side - Math.sin(leader.rotationY) * 1.5;
+  const sideZ = Math.sin(leader.rotationY) * 2.4 * side - Math.cos(leader.rotationY) * 1.5;
   const gx = leader.position.x + sideX - self.position.x;
   const gz = leader.position.z + sideZ - self.position.z;
   const toSpot = Math.hypot(gx, gz);

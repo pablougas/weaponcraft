@@ -1,8 +1,9 @@
 import type { GodDef } from '../types';
 import { hades } from './hades';
+import { poseidon } from './poseidon';
 import { zeus } from './zeus';
 
 export type { GodDef } from '../types';
 
 // Registry: add a folder here and one line below. Never edit the engine.
-export const gods: readonly GodDef[] = [zeus, hades];
+export const gods: readonly GodDef[] = [zeus, hades, poseidon];

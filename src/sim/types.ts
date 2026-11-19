@@ -49,7 +49,7 @@ export interface Entity {
   /** A weapon lying in the world; F picks it up. */
   pickup?: { weaponId: string };
   /** An interactive structure (F to use). */
-  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' | 'chains' | 'sea-gate'; to?: RegionId };
+  structure?: { kind: 'fusion-altar' | 'forge' | 'bed' | 'dispatch' | 'barricade' | 'chest' | 'chains' | 'sea-gate' | 'keep-door' | 'village-bridge' | 'house-door' | 'glow-pearl' | 'siege-ram'; to?: RegionId };
   /** A soldier or sentry (M6). */
   soldier?: SoldierState;
   /** An arrow in flight: velocity in m/s, life, damage and who shot it. */
@@ -67,7 +67,9 @@ export interface Entity {
   /** The Warden (M7): the Mk. II's pilot, the boss who climbs out when it breaks down. */
   warden?: WardenState;
   /** A hittable part of a mech (its rear plating): which mech it belongs to. */
-  mechPart?: { mechId: EntityId; part: 'rear-plating' };
+  mechPart?: { mechId: EntityId; part: 'rear-plating' | 'back-plating' };
+  /** The Kraken mech in Atlantis's harbour (team request, Nov 16). */
+  kraken?: KrakenMechState;
 }
 
 /** The Warden's attacks: a two-hit maul combo, a leap slam, and a shoulder dash. */
@@ -86,6 +88,8 @@ export interface WardenState {
   dashReady: number;
   /** Swings thrown in the current combo. */
   combo: number;
+  /** The Tide Engineer climbing out of the Kraken mech (Nov 16): ticks so far, from the hatch to where he lands. */
+  emerge?: { t: number; from: Vec3; to: Vec3 };
   /** Below half health: faster, shorter warnings. */
   enraged: boolean;
   /** Walking this tick (for the view's stride). */
@@ -124,6 +128,27 @@ export interface MechState {
   /** Is it walking this tick (for the view's stride)? */
   walking: boolean;
   /** The plating entity on its back. */
+  platingId: EntityId | null;
+}
+
+/** The Kraken mech's attacks: a tentacle sweep in front, and a slam all round that leaves its back exposed. */
+export type KrakenAttackKind = 'sweep' | 'slam';
+
+/**
+ * The Kraken mech (team request, Nov 16): it waits in the harbour, wakes when a
+ * god steps onto the dock, turns to face them and swings its tentacles. After
+ * a slam it slumps forward for a few seconds with the armoured hatch on its
+ * back (the dome) low and open: that's the only time it can be hurt.
+ */
+export interface KrakenMechState {
+  mode: 'idle' | 'fight' | 'slumped' | 'down';
+  targetId: EntityId | null;
+  /** Ticks in the current mode. */
+  timer: number;
+  attack: { kind: KrakenAttackKind; windup: number; active: number; yaw: number; hit?: EntityId[] } | null;
+  cooldown: number;
+  /** Alternates sweeps and slams. */
+  attacks: number;
   platingId: EntityId | null;
 }
 
@@ -197,7 +222,8 @@ export interface HeroState {
   /** A press made while busy, retried for a few ticks (input buffer). */
   buffer?: { action: 'dodge' | 'punch' | 'lightAttack' | 'heavyAttack'; ticks: number } | null;
   /** A called-down ultimate waiting to land (Sky Strike): where, how long, and stamina spent. */
-  ultimate?: { ticksLeft: number; point: Vec3; spent: number } | null;
+  /** `yaw`: which way the caster faced when it was called (Poseidon's Tsunami rolls that way). */
+  ultimate?: { ticksLeft: number; point: Vec3; spent: number; yaw?: number } | null;
   /** A Bolt Step waiting to happen this tick: the horizontal jump in metres. */
   blink?: { dx: number; dz: number } | null;
   /** Resting at a bed: ticks into the rest timeline (systems/rest.ts) and which bed. */
@@ -218,6 +244,8 @@ export interface HeroState {
   stuckTicks?: number;
   /** "Reset level": ticks into the fade before waking at the bed, or null. */
   resetting?: number | null;
+  /** Waking after a reset away from any bed (at the Ocean's sea-gate): ticks into the fade back in, or null. */
+  waking?: number | null;
   /** Ticks until health starts regenerating again (reset when hurt). Optional for older saves. */
   regenDelay?: number;
   /** Three-Fold Howl (M7): ticks left of lifesteal on everything this god hits. */
@@ -240,6 +268,8 @@ export interface SoldierState {
   state: 'patrol' | 'suspicious' | 'attack' | 'search' | 'return' | 'flee';
   /** The sentry squad it walks with (null for fort soldiers). Optional for older saves. */
   squadId?: string | null;
+  /** A raider in the Atlantean village (Nov 17): the house he's breaking into, or 'roam' for the plaza patrol. */
+  village?: string;
   /** Its place in the squad's formation (0 = front). */
   slot?: number;
   /** Set by the sim each tick: this soldier leads its squad (walks the route, carries the squad's sight cone). */
@@ -321,6 +351,18 @@ export interface WorldFlags {
   grottoBuilt?: boolean;
   /** Poseidon's sea-gate stands at the Gates, its twin on the Ocean's beach (team request, Nov 15). */
   seaGateOpen?: boolean;
+  /** Atlantis's keep door has been opened (team request, Nov 16). */
+  keepDoorOpen?: boolean;
+  /** The Kraken mech has been placed in the harbour, and beaten. */
+  krakenMechPlaced?: boolean;
+  krakenMechDown?: boolean;
+  /** Poseidon's kraken has been freed (the scene after the Kraken mech falls). */
+  krakenFreed?: boolean;
+  /** The Kraken mech's pilot has been beaten. */
+  tideEngineerDefeated?: boolean;
+  /** The Atlantean village (Nov 17): placed, and its bridge risen out of the sea. */
+  villagePlaced?: boolean;
+  villageBridgeUp?: boolean;
   /** The humans holding Atlantis are placed. */
   atlantisGarrisoned?: boolean;
   /** M5: the Forge and the bed were added when the meadow became the Refuge. */

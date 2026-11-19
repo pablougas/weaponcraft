@@ -1,5 +1,6 @@
 import type { ContentDef, ModelLoader } from '../types';
 import { poseidon } from './poseidon';
+import { villager } from './villager';
 
 /** A story character who isn't playable (yet): a name and a model. Behaviour comes from cutscenes and `npc` state. */
 export interface CharacterDef extends ContentDef {
@@ -8,4 +9,4 @@ export interface CharacterDef extends ContentDef {
 }
 
 // Registry: add a folder here and one line below. Never edit the engine.
-export const characters: readonly CharacterDef[] = [poseidon];
+export const characters: readonly CharacterDef[] = [poseidon, villager];

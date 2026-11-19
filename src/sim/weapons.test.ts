@@ -6,8 +6,8 @@ import { fuse, genericFusion, pairKey, recipeFor, weaponData } from './weapons';
 import { createWorld } from './world';
 
 describe('weapon registry', () => {
-  it('has 8 base weapons, Hades’s Shadow Bident and 6 named legendaries, with unique IDs', () => {
-    expect(weapons.filter((w) => !w.legendary && w.id !== 'shadow-bident')).toHaveLength(8);
+  it('has 8 base weapons, the gods’ own (Hades’s Shadow Bident, Poseidon’s Sea Trident) and 6 named legendaries, with unique IDs', () => {
+    expect(weapons.filter((w) => !w.legendary && w.id !== 'shadow-bident' && w.id !== 'sea-trident')).toHaveLength(8);
     expect(weapons.filter((w) => w.legendary)).toHaveLength(6);
     expect(new Set(weapons.map((w) => w.id)).size).toBe(weapons.length);
   });

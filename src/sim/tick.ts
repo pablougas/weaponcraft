@@ -7,10 +7,14 @@ import { switchCharacter, updateCompanions } from './systems/party';
 import { updateRoute } from './systems/route';
 import { updateSoldiers } from './systems/soldiers';
 import { findMech, updateMech } from './systems/mech';
+import { findKrakenMech, updateKrakenMech } from './systems/kraken-mech';
+import { ensureKeepDoor } from './systems/keep-door';
+import { raiseVillageBridge, updateVillage } from './systems/village';
 import { updateSpirits } from './systems/spirits';
 import { FREED_ID, skipFreed, updateFreed } from './cutscenes/freed';
 import { skipWardenScene, updateWardenScene, WARDEN_ID } from './cutscenes/warden';
-import { findWarden, updateWarden } from './systems/warden';
+import { KRAKEN_FREED_ID, skipKrakenFreed, updateKrakenFreed } from './cutscenes/kraken-freed';
+import { findTideEngineer, findWarden, updateWarden } from './systems/warden';
 import { updateReveal } from './systems/reveal';
 import { DESCENT_ID, skipDescent, updateDescent } from './cutscenes/descent';
 import { rocketTicks, skipRocket, startRocket, updateRocket } from './cutscenes/rocket';
@@ -60,7 +64,12 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
   if (input.isAuthority) updateCreatures(ctx, input.physics);
   updateSoldiers(ctx, input.physics);
   updateMech(ctx);
+  if (ctx.isAuthority) ensureKeepDoor(ctx);
+  updateKrakenMech(ctx);
   updateWarden(ctx, input.physics);
+  updateVillage(ctx);
+  // The bridge to the village: shown rising in the Kraken Freed scene; up at once if that scene was skipped.
+  if (ctx.isAuthority && world.flags.krakenFreed && !world.flags.villageBridgeUp && !world.cutscene) raiseVillageBridge(ctx);
   updateSpirits(ctx);
   updateReveal(ctx);
   updateRoute(ctx, events.filter((e): e is Extract<typeof e, { type: 'entity:defeated' }> => e.type === 'entity:defeated'));
@@ -73,6 +82,7 @@ export function tickWorld(world: WorldState, input: TickInput): GameEvent[] {
     else if (world.cutscene?.id === DESCENT_ID) updateDescent(ctx);
     else if (world.cutscene?.id === FREED_ID) updateFreed(ctx);
     else if (world.cutscene?.id === WARDEN_ID) updateWardenScene(ctx);
+    else if (world.cutscene?.id === KRAKEN_FREED_ID) updateKrakenFreed(ctx);
   }
 
   return events;
@@ -130,6 +140,17 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     }
     case 'dev:weakenMech': {
       if (!ctx.isAuthority) return;
+      if (intent.target === 'kraken' || intent.target === 'tide') {
+        // The Kraken mech's back armour (Nov 16), or its pilot (Nov 17); 0 breaks it outright (tests and review shots).
+        const kraken = findKrakenMech(world);
+        const back = intent.target === 'tide' ? findTideEngineer(world) : kraken?.kraken.platingId ? world.entities[kraken.kraken.platingId] : undefined;
+        if (!back?.health || !Number.isFinite(intent.fraction)) {
+          reject('no kraken mech');
+          return;
+        }
+        back.health.current = Math.round(back.health.max * Math.min(1, Math.max(0, intent.fraction)));
+        return;
+      }
       const mech = findMech(world);
       const plating = intent.target === 'warden' ? findWarden(world) : mech?.mech.platingId ? world.entities[mech.mech.platingId] : undefined;
       if (!plating?.health || !Number.isFinite(intent.fraction)) {
@@ -141,7 +162,7 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
     }
     case 'cutscene:skip': {
       const id = world.cutscene?.id;
-      const reason = id === DESCENT_ID ? skipDescent(ctx) : id === FREED_ID ? skipFreed(ctx) : id === WARDEN_ID ? skipWardenScene(ctx) : skipRocket(ctx);
+      const reason = id === DESCENT_ID ? skipDescent(ctx) : id === FREED_ID ? skipFreed(ctx) : id === WARDEN_ID ? skipWardenScene(ctx) : id === KRAKEN_FREED_ID ? skipKrakenFreed(ctx) : skipRocket(ctx);
       if (reason) reject(reason);
       return;
     }
@@ -168,6 +189,11 @@ function applyIntent(ctx: SimContext, intent: Intent): void {
       const heroId = world.players[intent.playerId].entityId;
       const hero = heroId ? world.entities[heroId] : undefined;
       const reason = hero?.hero ? startReset(ctx, hero as Entity & { hero: NonNullable<Entity['hero']> }) : 'no hero';
+      if (reason) reject(reason);
+      return;
+    }
+    case 'player:switchTo': {
+      const reason = switchCharacter(ctx, intent.playerId, intent.entityId);
       if (reason) reject(reason);
       return;
     }

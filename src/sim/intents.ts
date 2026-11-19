@@ -1,4 +1,4 @@
-import type { PlayerId, Vec3 } from './types';
+import type { EntityId, PlayerId, Vec3 } from './types';
 
 /**
  * Input never changes state directly. It produces intents tagged with the
@@ -14,7 +14,7 @@ export type Intent =
   /** Dev/test: mark a tutorial step done (wc.completeTutorialStep). */
   | { type: 'dev:breakBarricade'; playerId: PlayerId }
   /** Dev/test: wear the Mk. II's rear plating (or the Warden) down to a fraction of its durability. */
-  | { type: 'dev:weakenMech'; playerId: PlayerId; fraction: number; target?: 'plating' | 'warden' }
+  | { type: 'dev:weakenMech'; playerId: PlayerId; fraction: number; target?: 'plating' | 'warden' | 'kraken' | 'tide' }
   | { type: 'dev:tutorial'; playerId: PlayerId; stepId: string }
   /** Dev/test: put a weapon in the sender's inventory. */
   | { type: 'dev:give'; playerId: PlayerId; weaponId: string }
@@ -46,6 +46,8 @@ export type Intent =
   }
   /** "Reset level" (Esc menu): back to the last bed, the level's encounters started over. */
   | { type: 'player:resetLevel'; playerId: PlayerId }
+  /** The god wheel (hold V, Nov 16): take control of this god in your party. */
+  | { type: 'player:switchTo'; playerId: PlayerId; entityId: EntityId }
   /** A button press. */
   | { type: 'player:action'; playerId: PlayerId; action: PlayerAction };
 

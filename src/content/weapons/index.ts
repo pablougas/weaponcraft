@@ -41,6 +41,10 @@ const BASE: WeaponDef[] = [
     description: 'Cut from a fallen mech’s armour.',
   }),
   makeWeapon({
+    id: 'sea-trident', name: 'Sea Trident', archetype: 'spear', material: 'storm-iron', element: 'light', approved: true,
+    parts: { head: 'crescent', guard: 'ring' }, description: 'Poseidon’s own trident. The sea answers when it strikes.',
+  }),
+  makeWeapon({
     id: 'shadow-bident', name: 'Shadow Bident', archetype: 'spear', material: 'storm-iron', element: 'shadow', approved: true,
     parts: { head: 'crescent' }, description: 'Hades’s own two-pronged spear. What it wounds feeds its master.',
   }),

@@ -95,5 +95,5 @@ export interface UltimateModule {
   /** Where it will land, or null if it can't be used. */
   target(ctx: SimContext, casterId: EntityId): Vec3 | null;
   /** Applies the strike at `point` with `spent` stamina. Returns the entities hit. */
-  land(ctx: SimContext, casterId: EntityId, point: Vec3, spent: number): EntityId[];
+  land(ctx: SimContext, casterId: EntityId, point: Vec3, spent: number, yaw?: number): EntityId[];
 }

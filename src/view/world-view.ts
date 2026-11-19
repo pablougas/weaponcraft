@@ -33,6 +33,10 @@ export interface WorldView {
   setBarricadeBroken(broken: boolean): void;
   /** The Gates (M7): the Mk. II's beam, the freeing scene's time, and whether Cerberus is free. */
   setGates: FieldsView['setGates'];
+  /** Atlantis (Nov 16): the Kraken Freed scene's time, and whether the kraken is free. */
+  setKraken(state: { t: number | null; freed: boolean }): void;
+  /** The village bridge (Nov 17): seconds since it began to rise, or null. */
+  setVillage(state: { bridgeT: number | null }): void;
   /** Olympus intact or shattered, and the rocket cinematic's distant effects. */
   setOlympus(state: Omit<OlympusState, 'time'>): void;
   /** Extra bloom and exposure for the impact's slow swell (0 = none). */
@@ -267,6 +271,12 @@ export function createWorldView(renderer: THREE.WebGLRenderer): WorldView {
     },
     setGates(state) {
       fields.setGates(state);
+    },
+    setKraken(state) {
+      ocean.setKraken(state);
+    },
+    setVillage(state) {
+      ocean.setVillage(state);
     },
     setBarricadeBroken(broken) {
       grotto.setBarricadeBroken(broken);

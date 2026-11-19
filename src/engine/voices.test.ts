@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GOD_VOICES, lineSeconds, pickVoice, spokenLine } from './voices';
+import { GOD_VOICES, lineSeconds, pickVoice, spokenLine, type VoiceManifest } from './voices';
 import { DESCENT_CAPTIONS } from '../view/cinematics/descent';
 import { FREED_BEATS } from '../sim/cutscenes/freed';
 import { FREED_CAPTIONS } from '../view/cinematics/freed';
@@ -45,5 +45,42 @@ describe('the gods\' voices', () => {
     });
     // The descent's lines are short enough already.
     expect(spokenLine(DESCENT_CAPTIONS.lineHades1)).not.toBeNull();
+  });
+});
+
+describe('recorded god voices (team request, Nov 18: more real)', () => {
+  const manifest = Object.values(import.meta.glob('../../public/voices/manifest.json', { eager: true, import: 'default' }))[0] as VoiceManifest;
+  const recordings = Object.keys(import.meta.glob('../../public/voices/*.mp3', { query: '?url', eager: true })).map((p) => p.split('/').pop());
+  const sources = import.meta.glob(['../**/*.ts', '!../**/*.test.ts', '!./voices.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+
+  /** Every fixed god line in the game's source (what scripts/make-god-voices.py records). */
+  function godLines(): string[] {
+    const lines = new Set<string>();
+    for (const text of Object.values(sources)) {
+      for (const m of text.matchAll(/'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`|"((?:[^"\\\n]|\\.)*)"/g)) {
+        const literal = (m[1] ?? m[2] ?? m[3]).replace(/\\'/g, "'");
+        const line = spokenLine(literal);
+        if (line && !line.words.includes('${')) lines.add(line.words);
+      }
+    }
+    return [...lines];
+  }
+
+  it('every god line in the game has a recording, and every recording exists', () => {
+    const lines = godLines();
+    expect(lines.length).toBeGreaterThan(15);
+    const missing = lines.filter((w) => !manifest[w]);
+    expect(missing, 'run scripts/make-god-voices.py to record new lines').toEqual([]);
+    for (const { file } of Object.values(manifest)) expect(recordings, file).toContain(file);
+  });
+
+  it('the freed scene leaves time for each recorded line before the next', () => {
+    const order = ['lineHades', 'linePoseidon1', 'lineZeus', 'linePoseidon2'] as const;
+    const beats = [...order.map((b) => FREED_BEATS[b]), FREED_BEATS.end];
+    order.forEach((beat, i) => {
+      const line = spokenLine(FREED_CAPTIONS[beat])!;
+      const gap = (beats[i + 1] - beats[i]) / TICK_HZ;
+      expect(manifest[line.words].seconds, beat).toBeLessThan(gap);
+    });
   });
 });

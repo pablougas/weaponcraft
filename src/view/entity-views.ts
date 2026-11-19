@@ -61,7 +61,12 @@ export class EntityViews {
     private readonly factories: Map<string, ModelFactory>,
   ) {}
 
-  sync(world: WorldState, interpolator: Interpolator, alpha: number, frame: ModelFrame, region: RegionId = 'surface'): void {
+  /**
+   * `eye`: the camera. A character it is right up against (a companion walking
+   * past the lens, a villager by a wall) is hidden for that frame, so nobody's
+   * cloak fills the screen black (team report, Nov 17).
+   */
+  sync(world: WorldState, interpolator: Interpolator, alpha: number, frame: ModelFrame, region: RegionId = 'surface', eye?: { x: number; y: number; z: number }): void {
     for (const [id, entry] of this.models) {
       const entity = world.entities[id];
       if (!entity || entity.defId !== entry.defId) this.remove(id);
@@ -84,6 +89,13 @@ export class EntityViews {
       const root = entry.model.root;
       root.position.set(p.x, p.y, p.z);
       root.rotation.y = interpolator.rotation(world, entity.id, alpha) ?? entity.rotationY;
+      if (eye && entity.body && !entity.structure && !entity.mech && !entity.kraken) {
+        const reach = entity.body.radius + 0.9;
+        if (Math.hypot(eye.x - p.x, eye.z - p.z) < reach && eye.y > p.y - 0.5 && eye.y < p.y + entity.body.height + 0.6) {
+          root.visible = false;
+          continue;
+        }
+      }
       entry.model.update(entity, frame);
       if (entity.hero) this.poseResting(world, entity, root);
     }

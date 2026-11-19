@@ -12,12 +12,16 @@ import { ROCKET_CAPTIONS, rocketFrame, type CameraPose } from '../view/cinematic
 import { DESCENT_CAPTIONS, descentFrame } from '../view/cinematics/descent';
 import { FREED_CAPTION_SECONDS, FREED_CAPTIONS, freedFrame } from '../view/cinematics/freed';
 import { WARDEN_CAPTIONS, wardenFrame } from '../view/cinematics/warden';
+import { KRAKEN_FREED_CAPTION_SECONDS, KRAKEN_FREED_CAPTIONS, krakenFreedFrame } from '../view/cinematics/kraken-freed';
 import { ShadowPortal } from '../view/effects/portal';
 import { ShadowEffects } from '../view/effects/shadow';
+import { WaterEffects } from '../view/effects/water';
+import { GodWheel } from '../ui/god-wheel';
 import { createMinimap } from '../ui/minimap';
 import { descentTicks } from '../sim/cutscenes/descent';
 import { findPoseidon, FREED_ID, freedPoints, freedTicks } from '../sim/cutscenes/freed';
 import { WARDEN_ID, wardenTicks } from '../sim/cutscenes/warden';
+import { KRAKEN_FREED_ID, krakenFreedTicks } from '../sim/cutscenes/kraken-freed';
 import { findWarden } from '../sim/systems/warden';
 import { findMech } from '../sim/systems/mech';
 import { GROTTO, groundAt, regionOf } from '../sim/regions';
@@ -55,6 +59,7 @@ import { Sfx, SOLDIER_HORN_HEARD, SOLDIER_SHOUT_HEARD } from './sfx';
 import { openSession, randomSeed, type Session } from './session';
 import { defaultSettings, pickAutoQuality, QUALITY_PRESETS, SettingsStore, type QualityPreset } from './settings';
 import { devMenuEnabled, installTestApi, isTestRun, type ShellState, type TestState } from './test-api';
+import { CAGE_SECONDS } from '../content/gods/hades/skull-cage';
 
 /** Autosave interval while the game is open. */
 const AUTOSAVE_MS = 10_000;
@@ -307,6 +312,7 @@ export async function boot(): Promise<void> {
   entityViews = views;
   const lightning = new LightningEffects(meadow.scene);
   const shadow = new ShadowEffects(meadow.scene);
+  const water = new WaterEffects(meadow.scene);
   const skyStrikes = new SkyStrikeEffects(meadow.scene, lightning);
   /** When the player last turned the camera themselves (mouse or , .); auto-follow waits after it. */
   let lastCameraInputAt = -Infinity;
@@ -399,19 +405,52 @@ export async function boot(): Promise<void> {
           : '[Its three heads glow with stolen fire]', 2.5);
     }
     if (event.type === 'mech:down') captions.show('[The Mk. II shudders and powers down]', 3);
+    // Atlantis (Nov 16): the keep door and the Kraken mech in the harbour.
+    if (event.type === 'keep-door:opened') captions.show('[The great door of the keep groans open]', 3);
+    if (event.type === 'kraken-mech:awake') captions.show('[The Kraken mech\u2019s eyes light up. Its arms uncoil.] Its back is armoured \u2014 wait for an opening.', 4.5);
+    if (event.type === 'kraken-mech:windup') captions.show(event.kind === 'slam' ? '[Every arm rises. Get clear!]' : '[An arm rears back to sweep]', 1.8);
+    if (event.type === 'kraken-mech:slumped') captions.show('[It slumps forward \u2014 the hatch on its back is open. Hit it now!]', 3);
+    // (The first time, the Kraken Freed scene captions this itself.)
+    if (event.type === 'kraken-mech:down') captions.show('[The Kraken mech goes dark. Its hatch bursts open \u2014 its pilot, the Tide Engineer, climbs out.]', 4.5);
     if (event.type === 'cutscene:beat' && event.cutsceneId === FREED_ID && FREED_CAPTIONS[event.beat]) captions.show(FREED_CAPTIONS[event.beat], FREED_CAPTION_SECONDS[event.beat] ?? 2.6);
     if (event.type === 'level:reset' && event.entityId === localHero()?.id) {
       voices.stop();
       cameraRig.rearm();
-      captions.show(event.reason === 'fell' ? '[You wake at the Refuge. Your enemies have regrouped.]' : '[Back at the Refuge. The level starts over.]', 3.5);
+      const where = event.at === 'sea-gate' ? 'by the sea-gate' : 'at the Refuge';
+      captions.show(event.reason === 'fell' ? `[You wake ${where}. Your enemies have regrouped.]`
+        : event.at === 'sea-gate' ? '[Back at the sea-gate. The level starts over.]' : '[Back at the Refuge. The level starts over.]', 3.5);
     }
     // The Warden (M7 boss).
+    if (event.type === 'cutscene:beat' && event.cutsceneId === KRAKEN_FREED_ID && KRAKEN_FREED_CAPTIONS[event.beat]) {
+      captions.show(KRAKEN_FREED_CAPTIONS[event.beat], KRAKEN_FREED_CAPTION_SECONDS[event.beat] ?? 2.6);
+    }
     if (event.type === 'cutscene:beat' && event.cutsceneId === WARDEN_ID && WARDEN_CAPTIONS[event.beat]) captions.show(WARDEN_CAPTIONS[event.beat], event.beat === 'roar' ? 3.5 : 2.4);
     if (event.type === 'objective:set' && event.objectiveId === 'defeat-the-warden') captions.show('Defeat the Warden.', 3);
-    if (event.type === 'warden:windup' && event.kind === 'leap') captions.show('[The Warden crouches to leap. Move!]', 1.8);
-    if (event.type === 'warden:windup' && event.kind === 'dash') captions.show('[The Warden lowers his shoulder]', 1.6);
-    if (event.type === 'warden:enraged') captions.show('The Warden: Is that all the gods have left?', 3.5);
-    if (event.type === 'warden:defeated') captions.show('[The Warden falls] Hades: The chains, brother. Free him.', 5);
+    // The Atlantean village (Nov 17).
+    if (event.type === 'village:say') captions.show(`${event.name}: ${event.line}`, Math.min(8, 2.5 + event.line.length / 22));
+    if (event.type === 'village:rescued') captions.show(`[The door opens] ${event.name}: Thank the gods! Come, talk to me.`, 4);
+    if (event.type === 'village:pearl') captions.show(`Glow pearl ${event.count} of ${event.goal}`, 2.2);
+    if (event.type === 'village:ram-broken') captions.show('[The battering ram splinters apart]', 2.5);
+    if (event.type === 'village:reward') {
+      const text: Record<string, string> = {
+        elder: 'Blessing of Atlantis: +20 max health for every god',
+        fisher: 'Dawnbringer added to your weapons',
+        smith: 'Tempered: +20 max stamina for every god',
+        healer: 'Thunderclap Halberd added to your weapons. Fully healed.',
+      };
+      window.setTimeout(() => captions.show(text[event.task] ?? 'Reward', 4), 3500);
+    }
+    if (event.type === 'village:bridge' && activeSession.world.cutscene?.id !== KRAKEN_FREED_ID) captions.show('[Behind the harbour, an old bridge has risen from the sea]', 4);
+    // The pilot bosses: the Warden, and the Tide Engineer (the Kraken mech's pilot, Nov 16).
+    const bossName = 'entityId' in event && activeSession.world.entities[event.entityId as string]?.defId === 'tide-engineer' ? 'The Tide Engineer' : 'The Warden';
+    const tideBoss = bossName === 'The Tide Engineer';
+    if (event.type === 'warden:windup' && event.kind === 'leap') captions.show(`[${bossName} crouches to leap. Move!]`, 1.8);
+    if (event.type === 'warden:windup' && event.kind === 'dash') captions.show(`[${bossName} lowers his shoulder]`, 1.6);
+    if (event.type === 'warden:enraged') captions.show(tideBoss ? 'The Tide Engineer: The sea is ours now, old man!' : 'The Warden: Is that all the gods have left?', 3.5);
+    if (event.type === 'warden:defeated') {
+      captions.show(tideBoss ? '[The Tide Engineer falls] Zeus: Now, the kraken.' : '[The Warden falls] Hades: The chains, brother. Free him.', 5);
+    }
+    if (event.type === 'warden:awake' && tideBoss) captions.show('The Tide Engineer: You broke my machine. Now I break you.', 4);
     if (event.type === 'chains:examined' && event.playerId === activeSession.localPlayerId) {
       captions.show(event.reason === 'machine' ? 'The chains feed their machine. Bring the Mk. II down first.'
         : event.reason === 'warden' ? 'The Warden still stands.' : 'Cerberus is free.', 3);
@@ -451,7 +490,9 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'altar:opened' && event.playerId === activeSession.localPlayerId) openScreen(altarScreen);
     const rm = settings.get().reduceMotion;
-    if (event.type === 'ability:blink' && event.abilityId === 'shadow-step') {
+    if (event.type === 'ability:blink' && event.abilityId === 'riptide') {
+      water.riptide(event.from, event.to, rm);
+    } else if (event.type === 'ability:blink' && event.abilityId === 'shadow-step') {
       shadow.puff(event.from, rm);
       shadow.puff(event.to, rm);
     } else if (event.type === 'ability:blink') {
@@ -467,6 +508,9 @@ export async function boot(): Promise<void> {
     }
     if (event.type === 'ability:cast' && event.abilityId === 'shadow-dagger' && event.points.length > 1) {
       shadow.dagger(event.points[0], event.points[1], rm);
+    } else if (event.type === 'ability:cast' && event.abilityId === 'tide-bolts' && event.points.length > 1) {
+      const tip = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
+      water.bolt(tip ? { x: tip.x, y: tip.y, z: tip.z } : event.points[0], event.points[1], rm);
     } else if (event.type === 'ability:cast' && event.abilityId === 'soul-bolts' && event.points.length > 1) {
       const hand = views.anchor(event.casterId, 'spearTip', new THREE.Vector3());
       shadow.soulBolt(hand ? { x: hand.x, y: hand.y, z: hand.z } : event.points[0], event.points[1], rm);
@@ -479,15 +523,26 @@ export async function boot(): Promise<void> {
       }
       lightning.spawn(points, event.tick, settings.get().reduceMotion);
     }
-    if (event.type === 'ability:telegraph' && event.abilityId === 'skull-cage') shadow.cageWarning(event.point, event.radius, event.ticks / 30);
+    if (event.type === 'ability:telegraph' && event.abilityId === 'tsunami') water.tsunamiWarning(event.point, event.yaw ?? 0, event.ticks / 30);
+    else if (event.type === 'ability:telegraph' && event.abilityId === 'skull-cage') shadow.cageWarning(event.point, event.radius, event.ticks / 30);
     else if (event.type === 'ability:telegraph') skyStrikes.telegraph(event.point, event.radius, event.ticks / 30);
-    if (event.type === 'ability:strike' && event.abilityId === 'skull-cage') shadow.cage(event.point, event.radius, 4, rm);
+    if (event.type === 'ability:strike' && event.abilityId === 'tsunami') water.tsunami(event.point, event.yaw ?? 0, rm);
+    else if (event.type === 'ability:strike' && event.abilityId === 'skull-cage') shadow.cage(event.point, event.radius, CAGE_SECONDS, rm);
     else if (event.type === 'ability:strike') skyStrikes.strike(event.point, event.radius, event.tick, settings.get().reduceMotion);
+    if (event.type === 'hero:attack' && event.abilityId === 'whirlpool') {
+      const caster = activeSession.world.entities[event.entityId];
+      if (caster) water.whirlpool(caster.position, 3.5 + 2.5 * (event.power ?? 0), rm);
+    }
     if (event.type === 'hero:attack' && event.abilityId === 'grasp-of-the-dead') {
       const caster = activeSession.world.entities[event.entityId];
       if (caster) shadow.grasp(caster.position, 3 + 2 * (event.power ?? 0), rm);
     }
-    if (event.type === 'party:joined') captions.show(`Hades: I will walk with you, brother. (${keyLabel(inputMap.codesFor('switchCharacter')[0] ?? 'KeyV')} to switch)`, 5);
+    if (event.type === 'party:joined') {
+      const v = keyLabel(inputMap.codesFor('switchCharacter')[0] ?? 'KeyV');
+      captions.show(event.defId === 'poseidon'
+        ? `Poseidon: Enough waiting. The sea fights beside you now. (Hold ${v} to choose a god)`
+        : `Hades: I will walk with you, brother. (${v} to switch)`, 5);
+    }
   });
   activeSession.onReset(() => {
     voices.stop();
@@ -496,6 +551,7 @@ export async function boot(): Promise<void> {
     views.clear();
     lightning.clear();
     shadow.clear();
+    water.clear();
     skyStrikes.clear();
     dust.clear();
     labels.clear();
@@ -552,7 +608,41 @@ export async function boot(): Promise<void> {
   };
   const anyScreenOpen = () => screens.some((screen) => screen.isOpen);
   const labels = new WorldLabels(document.body, () => keyLabel(inputMap.codesFor('interact')[0] ?? 'KeyF'));
-  const gameplayInput = () => shell.screen === 'playing' && !settingsMenu?.isOpen && !devMenu?.isOpen && !anyScreenOpen();
+  // The god wheel (hold V, Nov 16): the game pauses while it's open.
+  const godWheel = new GodWheel(document.body, (entityId) => activeSession.sendIntent({ type: 'player:switchTo', entityId }));
+  /** V's hold timer: a tap switches to the next god; held this long, the wheel opens. */
+  const WHEEL_HOLD_MS = 220;
+  let switchHold: number | null = null;
+  const openGodWheel = () => {
+    const world = activeSession.world;
+    const player = world.players[activeSession.localPlayerId];
+    const party = (player?.party ?? []).map((id) => world.entities[id]).filter((e) => !!e?.hero);
+    if (party.length < 2 || world.cutscene) return false;
+    godWheel.show(party.map((e) => ({
+      id: e.id,
+      name: godDef(e.defId).name,
+      element: godDef(e.defId).element,
+      health: e.health ? e.health.current / e.health.max : 0,
+      down: e.hero!.down != null,
+      current: e.id === player?.entityId,
+    })), party.map((e) => e.defId), keyLabel(inputMap.codesFor('switchCharacter')[0] ?? 'KeyV'));
+    return true;
+  };
+  const gameplayInput = () => shell.screen === 'playing' && !settingsMenu?.isOpen && !devMenu?.isOpen && !anyScreenOpen() && !godWheel.open;
+  window.addEventListener('keyup', (event) => {
+    if (!inputMap.matches('switchCharacter', event)) return;
+    if (godWheel.open) {
+      event.preventDefault();
+      godWheel.confirm();
+      return;
+    }
+    if (switchHold !== null) {
+      // A tap: straight to the next god, as before.
+      window.clearTimeout(switchHold);
+      switchHold = null;
+      activeSession.sendIntent({ type: 'player:action', action: 'switchCharacter' });
+    }
+  });
   input = new InputController(inputMap, view.canvas, gameplayInput);
   hud.setBindings(inputMap);
   if (devMenuEnabled()) {
@@ -568,7 +658,27 @@ export async function boot(): Promise<void> {
   const minimap = createMinimap(document.body);
   const tutorialPanel = createTutorialPanel(document.body, (action) => keyLabel(inputMap.codesFor(action)[0] ?? ''));
   window.addEventListener('keydown', (event) => {
+    // The god wheel is open: ← → or 1–3 choose, Esc cancels; everything else waits.
+    if (godWheel.open) {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (inputMap.matches('settings', event)) godWheel.close();
+      else if (event.code === 'ArrowLeft' || event.code === 'ArrowUp') godWheel.step(-1);
+      else if (event.code === 'ArrowRight' || event.code === 'ArrowDown') godWheel.step(1);
+      else if (/^(Digit|Numpad)[1-9]$/.test(event.code)) godWheel.pickNumber(Number(event.code.slice(-1)));
+      return;
+    }
     if (event.repeat) return;
+    if (inputMap.matches('switchCharacter', event) && gameplayInput() && !activeSession.world.cutscene) {
+      event.preventDefault();
+      if (switchHold !== null) window.clearTimeout(switchHold);
+      switchHold = window.setTimeout(() => {
+        switchHold = null;
+        // Held: open the wheel (if there's anyone to switch to and no scene is playing).
+        openGodWheel();
+      }, WHEEL_HOLD_MS);
+      return;
+    }
     // A skippable cinematic: Enter (or Esc) skips it.
     if (activeSession.world.cutscene?.skippable && shell.screen === 'playing' && !settingsMenu?.isOpen
       && (inputMap.matches('skipCutscene', event) || inputMap.matches('settings', event))) {
@@ -631,6 +741,11 @@ export async function boot(): Promise<void> {
     if (!gameplayInput() || cameraMode !== 'follow') return;
     if (document.pointerLockElement === view.canvas || dragging) {
       const current = settings.get();
+      if (godWheel.open) {
+        // The mouse points at a god on the wheel instead of turning the camera.
+        godWheel.aim(event.movementX, event.movementY);
+        return;
+      }
       cameraRig.look(event.movementX, event.movementY, current.mouseSensitivity, current.invertY);
       if (event.movementX !== 0 || event.movementY !== 0) lastCameraInputAt = performance.now();
     }
@@ -686,7 +801,9 @@ export async function boot(): Promise<void> {
     lastFrameMs = timeMs;
     const frozen = frozenAt !== null;
 
-    if (!frozen) {
+    if (godWheel.open) {
+      // Paused while you choose a god: no ticks, and the world holds still.
+    } else if (!frozen) {
       viewSeconds = timeMs / 1000;
       // The sim runs at a fixed 30 Hz; alpha is how far we are toward the next tick.
       alpha = loop.advance(frameMs, timeMs, tick);
@@ -701,12 +818,14 @@ export async function boot(): Promise<void> {
 
     if (!frozen || dirty) {
       dirty = false;
-      const dt = frozen ? 0 : Math.min(0.1, frameMs / 1000);
+      // Paused (tests, or the god wheel open): effects hold still too.
+      const dt = frozen || godWheel.open ? 0 : Math.min(0.1, frameMs / 1000);
       const world = activeSession.world;
       frame = { time: viewSeconds, dt, world, reduceMotion: settings.get().reduceMotion };
-      views.sync(world, interpolator, alpha, frame, regionOf(localHero()));
+      views.sync(world, interpolator, alpha, frame, regionOf(localHero()), world.cutscene ? undefined : meadow.camera.position);
       lightning.update(dt);
       shadow.update(dt);
+      water.update(dt);
       skyStrikes.update(dt);
       dust.update(dt);
 
@@ -752,7 +871,15 @@ export async function boot(): Promise<void> {
       const descentT = descentTicks({ world });
       const freedT = freedTicks(world);
       const wardenT = wardenTicks(world);
-      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : freedT !== null ? FREED_ID : wardenT !== null ? WARDEN_ID : null;
+      const krakenT = krakenFreedTicks(world);
+      const cutsceneId = rocketT !== null ? 'rocket' : descentT !== null ? 'descent' : freedT !== null ? FREED_ID : wardenT !== null ? WARDEN_ID
+        : krakenT !== null ? KRAKEN_FREED_ID : null;
+      // Atlantis: the rig, the chains and the kraken play the Kraken Freed scene.
+      meadow.setKraken({ t: krakenT === null ? null : (krakenT + (frozen ? 0 : alpha)) / 30, freed: !!world.flags.krakenFreed });
+      // The village bridge (Nov 17): rising for 4 s from when it was raised, then up.
+      const villageBridge = Object.values(world.entities).find((e) => e.structure?.kind === 'village-bridge');
+      const raisedAt = Number(villageBridge?.data.raisedAt ?? -1);
+      meadow.setVillage({ bridgeT: world.flags.villageBridgeUp && raisedAt >= 0 ? (world.tick - raisedAt + (frozen ? 0 : alpha)) / 30 : world.flags.villageBridgeUp ? 99 : null });
       // The Gates: the pylon's beam follows the Mk. II; the hound plays the freeing scene.
       const mechEntity = findMech(world);
       const mechPoint = mechEntity ? interpolator.position(world, mechEntity.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
@@ -779,7 +906,7 @@ export async function boot(): Promise<void> {
         }
         cameraRig.update(followCamera, heroPoint, 0, null, floorAt);
         const followPose: CameraPose = { position: followCamera.position.clone(), target: new THREE.Vector3(heroPoint.x, heroPoint.y + 1.55, heroPoint.z), fov: 50 };
-        const ticksIn = (rocketT ?? descentT ?? freedT ?? wardenT ?? 0) + (frozen ? 0 : alpha);
+        const ticksIn = (rocketT ?? descentT ?? freedT ?? wardenT ?? krakenT ?? 0) + (frozen ? 0 : alpha);
         let pose: CameraPose;
         if (cutsceneId === 'rocket') {
           const frame = rocketFrame(ticksIn / 30, heroPoint, meadow.olympus, cinematicStart, followPose, reduceMotion);
@@ -787,6 +914,10 @@ export async function boot(): Promise<void> {
           meadow.setCinematicBoost(frame.bloom, frame.exposure);
           cameraShake = frame.shake;
           olympusTiming = frame;
+        } else if (cutsceneId === KRAKEN_FREED_ID) {
+          pose = krakenFreedFrame(ticksIn / 30, world.cutscene?.points ?? {}, cinematicStart, followPose);
+          meadow.setCinematicBoost(0, 0);
+          cameraShake = 0;
         } else if (cutsceneId === WARDEN_ID) {
           const warden = findWarden(world);
           const wardenPoint = warden ? interpolator.position(world, warden.id, alpha, { x: 0, y: 0, z: 0 }) : undefined;
@@ -842,6 +973,8 @@ export async function boot(): Promise<void> {
 
       if (cameraMode === 'follow' && hero && !cinematic) {
         // Keyboard camera (, and .) and auto-follow, so the game plays without a mouse.
+        const zoomKey = (input?.isHeld('cameraFarther') ? 1 : 0) - (input?.isHeld('cameraCloser') ? 1 : 0);
+        if (zoomKey !== 0 && dt > 0) cameraRig.zoomKeys(zoomKey * dt);
         const turn = (input?.isHeld('cameraRight') ? 1 : 0) - (input?.isHeld('cameraLeft') ? 1 : 0);
         if (turn !== 0) {
           cameraRig.turn(turn * CAMERA_TURN_SPEED * dt);
@@ -857,7 +990,8 @@ export async function boot(): Promise<void> {
         const gx = heroPoint.x - GROTTO.center.x;
         const gz = heroPoint.z - GROTTO.center.z;
         const enclosed = region === 'underworld' && (Math.hypot(gx, gz) < GROTTO.radius + 2 || (Math.abs(gx) < TUNNEL.halfWidth + 3 && gz > TUNNEL.toZ - 4 && gz < TUNNEL.fromZ + 2));
-        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt, enclosed ? 6.5 : undefined);
+        cameraRig.update(meadow.camera, heroPoint, dt, lock ? lockPoint.set(lock.position.x, lock.position.y, lock.position.z) : null, floorAt, enclosed ? 6.5 : undefined,
+          (from, to) => activeSession.physics?.cameraClearance(from, to) ?? null);
         if (region === 'underworld' && Math.hypot(heroPoint.x - GROTTO.center.x, heroPoint.z - GROTTO.center.z) < GROTTO.radius + 1) {
           // Keep the camera inside the grotto's walls (pull it in toward the god).
           const c = GROTTO.center;

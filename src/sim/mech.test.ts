@@ -404,6 +404,24 @@ describe('Skull Cage and Three-Fold Howl (team tuning, Nov 15)', () => {
     expect(warden.health.current).toBeLessThan(before - 60);
   });
 
+  it('Skull Cage lasts longer (team request, Nov 18): soldiers held 8 s, a boss 4 s', async () => {
+    const { skullCage, CAGE_SECONDS } = await import('../content/gods/hades/skull-cage');
+    expect(CAGE_SECONDS).toBe(8);
+    const { world, run, plating } = atTheGates();
+    plating().health!.current = 0;
+    run([], 2);
+    run([], WARDEN_BEATS.end + 2);
+    const warden = findWarden(world)!;
+    const { ctx } = createSimContext(world, true);
+    const zeus = world.entities[world.players.p1.entityId!];
+    skullCage.land(ctx, zeus.id, { ...warden.position }, 100);
+    const caged = () => warden.statuses?.some((s) => s.kind === 'caged') ?? false;
+    run([], 30 * 3.5);
+    expect(caged()).toBe(true);
+    run([], 30 * 1);
+    expect(caged()).toBe(false);
+  });
+
   it('Three-Fold Howl leaves dread: enemies in range keep taking damage for a few seconds', async () => {
     const { world, run, zeus, plating, near } = atTheGates();
     world.flags.cerberusFreed = true;

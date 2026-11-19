@@ -2,7 +2,7 @@ import type RAPIER_NS from '@dimforge/rapier3d-compat';
 import { meadowHeightAt } from './terrain/meadow';
 import { GROTTO_SPOTS } from './cutscenes/descent';
 import { GROTTO, OCEAN } from './regions';
-import { CASTLE_TOWERS, CASTLE_WALL, castleWallSegments, KEEP, KRAKEN_RIG, OCEAN_GRID, oceanLocalHeight, SHIPWRECK, STATUE, TEMPLES, TOWER, wallSegmentLength } from './terrain/ocean';
+import { avenueColumns, BRIDGE, CASTLE, VILLAGE, VILLAGE_FOUNTAIN, VILLAGE_HOUSES, villageHouse, villageHouseHeights, CASTLE_TOWERS, CASTLE_WALL, castleWallSegments, COLUMN_RADIUS, CRATES, gatePillars, GIANT_CLAMS, KEEP, KEEP_DOOR, KEEP_DOOR_SPOT, KEEP_PLINTH, keepSteps, KEEP_WALL, keepColumns, keepWallSegments, KRAKEN_MECH_SIZE, KRAKEN_RIG, OCEAN_GRID, oceanLocalHeight, SCAFFOLD_ANGLES, SHIPWRECK, STATUE, TEMPLES, TENTS, TOWER, wallSegmentLength } from './terrain/ocean';
 import { CERBERUS_POST, FIELDS, FIELDS_CELL, FORT_SPOTS, GATE_PILLARS, MECH_SIZE, palisadeSegments, spireBase, SPIRES, TUNNEL, underworldLocalHeight, watchtowerSpot } from './terrain/underworld';
 import { heroRockHullPoints, MEADOW_ROCKS, rockColliderRadius } from './terrain/meadow-rocks';
 import { MEADOW_TREES, trunkRadius } from './terrain/meadow-trees';
@@ -40,6 +40,13 @@ export class PhysicsWorld {
   private readonly bodies = new Map<EntityId, BodyRecord>();
   /** The humans' barricade across the tunnel (removed once it's torn down). */
   private barricade: RAPIER_NS.Collider | null = null;
+  /** The door of Atlantis's keep: solid until it's opened (team request, Nov 16). */
+  private keepDoor: RAPIER_NS.Collider | null = null;
+  /** The village bridge (Nov 17): its deck is solid once it has risen; until then a barrier closes its end. */
+  private bridgeDeck: RAPIER_NS.Collider | null = null;
+  /** Colliders on moving bodies that still keep the camera out (the mechs; characters don't). */
+  private readonly cameraBlockers = new Set<number>();
+  private bridgeBarrier: RAPIER_NS.Collider | null = null;
 
   constructor(private readonly R: Rapier) {
     this.world = new R.World({ x: 0, y: 0, z: 0 });
@@ -160,7 +167,65 @@ export class PhysicsWorld {
         .setTranslation(c.x + seg.x, c.y + CASTLE_WALL.height / 2, c.z + seg.z).setRotation(yawQ(seg.yaw)));
     }
     for (const tower of CASTLE_TOWERS) this.world.createCollider(R.ColliderDesc.cylinder(TOWER.height / 2, TOWER.radius).setTranslation(c.x + tower.x, c.y + TOWER.height / 2, c.z + tower.z));
-    this.world.createCollider(R.ColliderDesc.cylinder(14, KEEP.radius + 1.2).setTranslation(c.x + KEEP.x, c.y + 14, c.z + KEEP.z));
+    // The keep is a hollow hall: a ring of wall blocks with the door and a great opening at the back.
+    for (const seg of keepWallSegments()) {
+      this.world.createCollider(R.ColliderDesc.cuboid(seg.length / 2, KEEP_WALL.height / 2, KEEP_WALL.thickness / 2)
+        .setTranslation(c.x + seg.x, c.y + KEEP_WALL.height / 2, c.z + seg.z).setRotation(yawQ(seg.yaw)));
+    }
+    // The keep's base is solid (it's the hall's floor), with stairs up to the door and down from the back.
+    const ky = c.y + oceanLocalHeight(KEEP.x, KEEP.z);
+    const plinthHalf = (KEEP_PLINTH.top + 1) / 2;
+    this.world.createCollider(R.ColliderDesc.cylinder(plinthHalf, KEEP_PLINTH.radius).setTranslation(c.x + KEEP.x, ky + KEEP_PLINTH.top - plinthHalf, c.z + KEEP.z));
+    for (const step of keepSteps()) {
+      const half = (step.top + 1) / 2;
+      this.world.createCollider(R.ColliderDesc.cuboid(step.halfX, half, step.halfZ).setTranslation(c.x + step.x, ky + step.top - half, c.z + step.z));
+    }
+    this.keepDoor = this.world.createCollider(R.ColliderDesc.cuboid(KEEP_DOOR.halfWidth + 0.3, KEEP_DOOR.height / 2, 0.4)
+      .setTranslation(c.x + KEEP_DOOR_SPOT.x, ky + KEEP_PLINTH.top + KEEP_DOOR.height / 2, c.z + KEEP_DOOR_SPOT.z));
+    // Everything you could walk through before: columns, the gates' pillars, tents, scaffolds, clams and crates.
+    const post = (x: number, z: number, radius: number, height: number) =>
+      this.world.createCollider(R.ColliderDesc.cylinder(height / 2, radius).setTranslation(c.x + x, c.y + oceanLocalHeight(x, z) + height / 2 - 0.5, c.z + z));
+    for (const col of keepColumns()) post(col.x, col.z, COLUMN_RADIUS, 20);
+    // The village (Nov 17): its houses and fountain, and the bridge out to it.
+    for (const h of VILLAGE_HOUSES) {
+      const at = villageHouse(h);
+      const { wall, roofTop } = villageHouseHeights(h);
+      post(at.x, at.z, h.radius + 0.2, wall + 0.5);
+      // The shell-dome roof, as a solid hull, so the camera can't end up inside it.
+      const base = oceanLocalHeight(at.x, at.z) + wall - 0.1;
+      const r = h.radius + 0.6;
+      const points: number[] = [];
+      for (const [ring, up] of [[1, 0], [0.92, 0.4], [0.7, 0.72], [0.38, 0.93]] as const) {
+        for (let k = 0; k < 12; k += 1) {
+          const a = (k / 12) * Math.PI * 2;
+          points.push(Math.sin(a) * r * ring, up * (roofTop - base + 0.1), Math.cos(a) * r * ring);
+        }
+      }
+      points.push(0, roofTop - base + 0.1, 0);
+      const hull = this.R.ColliderDesc.convexHull(new Float32Array(points));
+      if (hull) this.world.createCollider(hull.setTranslation(c.x + at.x, c.y + base, c.z + at.z));
+    }
+    post(VILLAGE_FOUNTAIN.x, VILLAGE_FOUNTAIN.z, VILLAGE_FOUNTAIN.radius, 2);
+    const bridgeLength = BRIDGE.fromZ - BRIDGE.toZ;
+    this.bridgeDeck = this.world.createCollider(R.ColliderDesc.cuboid(BRIDGE.halfWidth, 0.5, bridgeLength / 2)
+      .setTranslation(c.x + VILLAGE.x, c.y + BRIDGE.deck - 0.5, c.z + (BRIDGE.fromZ + BRIDGE.toZ) / 2));
+    this.bridgeDeck.setEnabled(false);
+    this.bridgeBarrier = this.world.createCollider(R.ColliderDesc.cuboid(BRIDGE.halfWidth + 1, 3, 0.4)
+      .setTranslation(c.x + VILLAGE.x, c.y + BRIDGE.deck + 2, c.z + BRIDGE.fromZ - 3.2));
+    for (const col of avenueColumns()) post(col.x, col.z, 0.65, 8);
+    for (const pillar of gatePillars()) post(pillar.x, pillar.z, pillar.radius, CASTLE_WALL.height + 6);
+    for (const [x, z] of TENTS) post(x, z, 2.1, 3);
+    for (const [x, z, r] of GIANT_CLAMS) post(x, z, r * 0.95, r * 1.2);
+    for (const [x, z, size, yaw] of CRATES) {
+      this.world.createCollider(R.ColliderDesc.cuboid(size / 2, size / 2, size / 2)
+        .setTranslation(c.x + x, c.y + oceanLocalHeight(x, z) + size / 2, c.z + z).setRotation(yawQ(yaw)));
+    }
+    for (const a of SCAFFOLD_ANGLES) {
+      const x = CASTLE.x + Math.sin(a) * (CASTLE_WALL.radius - 2.8);
+      const z = CASTLE.z + Math.cos(a) * (CASTLE_WALL.radius - 2.8);
+      this.world.createCollider(R.ColliderDesc.cuboid(3.3, CASTLE_WALL.height / 2, 1.2)
+        .setTranslation(c.x + x, c.y + oceanLocalHeight(x, z) + CASTLE_WALL.height / 2, c.z + z).setRotation(yawQ(a)));
+    }
     for (const t of TEMPLES) this.world.createCollider(R.ColliderDesc.cylinder(6, t.radius + 0.6).setTranslation(c.x + t.x, c.y + 6, c.z + t.z));
     this.world.createCollider(R.ColliderDesc.cylinder(4, STATUE.radius).setTranslation(c.x + STATUE.x, c.y + 3, c.z + STATUE.z));
     this.world.createCollider(R.ColliderDesc.cuboid(1.6, 1.4, 1.1).setTranslation(c.x + KRAKEN_RIG.x, c.y + 3, c.z + KRAKEN_RIG.z));
@@ -191,8 +256,12 @@ export class PhysicsWorld {
       this.world.removeCollider(this.barricade, false);
       this.barricade = null;
     }
+    if (this.keepDoor) this.keepDoor.setEnabled(!state.flags.keepDoorOpen);
+    this.bridgeDeck?.setEnabled(!!state.flags.villageBridgeUp);
+    this.bridgeBarrier?.setEnabled(!state.flags.villageBridgeUp);
     for (const [id, record] of this.bodies) {
       if (!state.entities[id]) {
+        for (let i = 0; i < record.body.numColliders(); i += 1) this.cameraBlockers.delete(record.body.collider(i).handle);
         this.world.removeRigidBody(record.body);
         this.bodies.delete(id);
       }
@@ -205,6 +274,7 @@ export class PhysicsWorld {
           const body = this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased());
           const collider = this.world.createCollider(this.R.ColliderDesc.cuboid(MECH_SIZE.halfX, MECH_SIZE.halfY, MECH_SIZE.halfZ), body);
           record = { body, collider, centerOffset: MECH_SIZE.halfY };
+          this.cameraBlockers.add(collider.handle);
           this.bodies.set(entity.id, record);
         }
         const p = entity.position;
@@ -212,6 +282,27 @@ export class PhysicsWorld {
         record.body.setRotation({ x: 0, y: Math.sin(entity.rotationY / 2), z: 0, w: Math.cos(entity.rotationY / 2) }, false);
         continue;
       }
+      if (entity.kraken) {
+        // The Kraken mech (Nov 16): a squat drum that turns where it stands.
+        let record = this.bodies.get(entity.id);
+        if (!record) {
+          const body = this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased());
+          const collider = this.world.createCollider(this.R.ColliderDesc.cylinder(KRAKEN_MECH_SIZE.height / 2, KRAKEN_MECH_SIZE.radius), body);
+          record = { body, collider, centerOffset: KRAKEN_MECH_SIZE.height / 2 };
+          this.cameraBlockers.add(collider.handle);
+          // Its dome and core seat stand well above the drum: a camera-only ball (a sensor: nothing bumps into it).
+          const dome = this.world.createCollider(this.R.ColliderDesc.ball(5).setSensor(true).setTranslation(0, 4.6 - KRAKEN_MECH_SIZE.height / 2, 0), body);
+          this.cameraBlockers.add(dome.handle);
+          this.bodies.set(entity.id, record);
+        }
+        const p = entity.position;
+        record.body.setTranslation({ x: p.x, y: p.y + record.centerOffset, z: p.z }, false);
+        continue;
+      }
+      // The Kraken mech's back plating rides inside its drum: hittable, but no body of its own.
+      if (entity.mechPart?.part === 'back-plating') continue;
+      // The keep's door is a structure, but the door collider above blocks the doorway.
+      if (entity.structure?.kind === 'keep-door') continue;
       if (!entity.body || !(entity.hero || entity.creature || entity.structure || entity.npc)) continue;
       let record = this.bodies.get(entity.id);
       if (!record) {
@@ -230,6 +321,23 @@ export class PhysicsWorld {
   /** Updates the collision queries after a sync. */
   step(): void {
     this.world.step();
+  }
+
+  /**
+   * How far a camera can sit from `from` toward `to` before something solid
+   * (a wall, pillar, tower…) is in the way, or null if the line is clear.
+   * Characters (kinematic bodies) don't block it; the mechs do.
+   */
+  cameraClearance(from: Vec3, to: Vec3): number | null {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dz = to.z - from.z;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-3) return null;
+    const ray = new this.R.Ray(from, { x: dx / length, y: dy / length, z: dz / length });
+    const hit = this.world.castRay(ray, length, true, undefined, undefined, undefined, undefined,
+      (collider) => this.cameraBlockers.has(collider.handle) || (!collider.isSensor() && !collider.parent()?.isKinematic()));
+    return hit ? hit.timeOfImpact : null;
   }
 
   /**
@@ -254,7 +362,7 @@ export class PhysicsWorld {
 
   /** Height of the first surface below (x, y, z), for tests and spawning. */
   groundBelow(x: number, y: number, z: number): number | undefined {
-    const hit = this.world.castRay(new this.R.Ray({ x, y, z }, { x: 0, y: -1, z: 0 }), 500, true);
+    const hit = this.world.castRay(new this.R.Ray({ x, y, z }, { x: 0, y: -1, z: 0 }), 500, true, this.R.QueryFilterFlags.EXCLUDE_SENSORS);
     return hit ? y - hit.timeOfImpact : undefined;
   }
 

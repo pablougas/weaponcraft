@@ -12,7 +12,7 @@ const PRESS_ACTIONS: Partial<Record<InputAction, PlayerAction>> = {
   lockOn: 'lockOn',
   blink: 'blink',
   interact: 'interact',
-  switchCharacter: 'switchCharacter',
+  // V is handled by boot: a tap switches to the next god, holding it opens the god wheel (Nov 16).
   spiritAbility: 'spiritAbility',
 };
 

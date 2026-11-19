@@ -1,11 +1,14 @@
 import { ticks } from '../constants';
-import { GROTTO, groundAt } from '../regions';
+import { GROTTO, groundAt, oceanPoint, regionOf } from '../regions';
+import { OCEAN_ARRIVAL } from '../terrain/ocean';
 import { MECH_PATROL } from '../terrain/underworld';
 import type { Entity, HeroState } from '../types';
 import { despawn, type SimContext } from '../world';
 import { findMech, MECH, spawnPlating } from './mech';
-import { bedSide, REST_HEAL_TICK, respawnBed, startRest } from './rest';
+import { bedSide, REST_HEAL_TICK, respawnBed, startRest, stopEverything } from './rest';
 import { restartGarrison } from './soldiers';
+import { restartKrakenMech } from './kraken-mech';
+import { restartVillage } from './village';
 import { findWarden } from './warden';
 
 /** "Reset level": the screen fades this long before the god wakes at the bed. */
@@ -22,6 +25,8 @@ export function restartEncounters(ctx: SimContext): void {
   const { world } = ctx;
   for (const e of Object.values(world.entities)) if (e.decoy) despawn(ctx, e.id);
   restartGarrison(ctx);
+  restartVillage(ctx);
+  restartKrakenMech(ctx);
 
   // The Mk. II stands up again on watch with fresh plating, even if it was beaten (team request).
   const mech = findMech(world);
@@ -49,10 +54,18 @@ export function restartEncounters(ctx: SimContext): void {
   }
 }
 
-/** Both gods of the player wake at the bed, healed (the companion stands beside it). */
-export function wakeAtBed(ctx: SimContext, entity: Entity & { hero: HeroState }): void {
+/**
+ * Both gods of the player wake at the bed, healed (the companion stands beside
+ * it). In the Ocean (no bed there) they start over at the sea-gate they came
+ * through instead of back in the Underworld (team request, Nov 16).
+ */
+export function wakeAtBed(ctx: SimContext, entity: Entity & { hero: HeroState }): 'refuge' | 'sea-gate' {
   const bed = respawnBed(ctx, entity);
-  if (!bed) return;
+  if (regionOf(entity) === 'ocean' && ctx.world.flags.seaGateOpen && (!bed || regionOf(bed) !== 'ocean')) {
+    wakeAtSeaGate(ctx, entity);
+    return 'sea-gate';
+  }
+  if (!bed) return 'refuge';
   startRest(ctx, entity, bed, REST_HEAL_TICK - 1); // already in the dark; heals on the next tick
   const player = Object.values(ctx.world.players).find((p) => p.entityId === entity.id);
   for (const id of player?.party ?? []) {
@@ -72,4 +85,31 @@ export function wakeAtBed(ctx: SimContext, entity: Entity & { hero: HeroState })
     other.statuses = [];
     other.hero.lastSafe = { ...other.position };
   }
+  return 'refuge';
+}
+
+/** The party stands up by the Ocean's sea-gate, where they arrived, healed, and the screen fades back in. */
+function wakeAtSeaGate(ctx: SimContext, entity: Entity & { hero: HeroState }): void {
+  const arrival = oceanPoint(OCEAN_ARRIVAL.x, OCEAN_ARRIVAL.z);
+  const yaw = OCEAN_ARRIVAL.rotationY;
+  const player = Object.values(ctx.world.players).find((p) => p.entityId === entity.id);
+  const party = [entity.id, ...(player?.party ?? []).filter((id) => id !== entity.id)];
+  party.forEach((id, i) => {
+    const god = ctx.world.entities[id];
+    if (!god?.hero) return;
+    // Same spots as stepping through the gate: the companion beside and a little behind.
+    const side = i === 0 ? 0 : 1.6;
+    const back = i === 0 ? 0 : 1.4;
+    const x = arrival.x + Math.cos(yaw) * side - Math.sin(yaw) * back;
+    const z = arrival.z - Math.sin(yaw) * side - Math.cos(yaw) * back;
+    stopEverything(god.hero);
+    Object.assign(god.hero, { down: null, rest: null, resetting: null, waking: i === 0 ? 0 : null, grounded: true, moving: false });
+    god.region = 'ocean';
+    god.position = { x, y: groundAt('ocean', x, z), z };
+    god.rotationY = yaw;
+    if (god.health) god.health.current = god.health.max;
+    if (god.stamina) god.stamina.current = god.stamina.max;
+    god.statuses = [];
+    god.hero.lastSafe = { ...god.position };
+  });
 }

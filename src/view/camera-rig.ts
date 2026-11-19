@@ -19,6 +19,8 @@ const FOLLOW_RATE = 1.3;
 export const CAMERA_TURN_SPEED = 2.2;
 /** Camera looks at this height above the player's feet. */
 const PIVOT_HEIGHT = 1.55;
+/** How far in front of a wall the camera stops. */
+const CAMERA_WALL_GAP = 0.45;
 
 /**
  * Third-person orbit camera around the local player. View state only: the
@@ -62,6 +64,11 @@ export class CameraRig {
     this.yaw += delta * Math.min(1, dt * FOLLOW_RATE);
   }
 
+  /** [ and ] held: zoom by `amount` (positive farther), at a steady rate (`amount` is per frame, already × dt). */
+  zoomKeys(amount: number): void {
+    this.zoom(amount * 1000);
+  }
+
   /** Mouse wheel: the player's own zoom (the automatic zoom-out won't override it afterwards). */
   zoom(deltaY: number): void {
     this.targetDistance = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, this.targetDistance * Math.exp(deltaY * 0.001)));
@@ -90,7 +97,12 @@ export class CameraRig {
   }
 
   /** Positions `camera` behind `target`; while locked on, swings to keep the lock target in view. */
-  update(camera: THREE.PerspectiveCamera, target: Vec3, dt: number, lockTarget: Vec3 | null, floorAt: (x: number, z: number) => number = meadowHeightAt, maxDistance: number = MAX_DISTANCE): void {
+  update(
+    camera: THREE.PerspectiveCamera, target: Vec3, dt: number, lockTarget: Vec3 | null,
+    floorAt: (x: number, z: number) => number = meadowHeightAt, maxDistance: number = MAX_DISTANCE,
+    /** How far the camera can sit from the pivot toward its spot before a wall is in the way (null: clear). */
+    clearance?: (from: Vec3, to: Vec3) => number | null,
+  ): void {
     // Ease toward the wanted distance (never past a cap, e.g. in the grotto and its tunnel).
     const want = Math.min(this.targetDistance, maxDistance);
     this.distance = dt <= 0 || !this.initialized ? want : this.distance + (want - this.distance) * Math.min(1, dt * ZOOM_RATE);
@@ -113,7 +125,17 @@ export class CameraRig {
     // Stay above the ground.
     const floor = floorAt(this.desired.x, this.desired.z) + 0.4;
     if (this.desired.y < floor) this.desired.y = floor;
-    if (!this.initialized || dt <= 0) {
+    // Never inside a wall, pillar or tower (team request, Nov 16): pull in in front of whatever is in the way.
+    let blocked = false;
+    const hit = clearance?.(this.pivot, this.desired);
+    if (hit != null) {
+      const full = this.pivot.distanceTo(this.desired);
+      const keep = Math.max(0.6, hit - CAMERA_WALL_GAP) / full;
+      this.desired.lerpVectors(this.pivot, this.desired, Math.min(1, keep));
+      blocked = true;
+    }
+    // Pulling in for a wall is immediate (easing would slide through it); easing back out is smooth.
+    if (!this.initialized || dt <= 0 || (blocked && this.pivot.distanceTo(this.desired) < this.pivot.distanceTo(camera.position))) {
       camera.position.copy(this.desired);
       this.initialized = true;
     } else {

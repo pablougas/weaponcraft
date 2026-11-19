@@ -1,4 +1,4 @@
-import type { AttackKind, Element, EntityId, MechAttackKind, PlayerId, Vec3, WardenAttackKind } from './types';
+import type { AttackKind, Element, EntityId, KrakenAttackKind, MechAttackKind, PlayerId, Vec3, WardenAttackKind } from './types';
 import type { RegionId } from './regions';
 
 /**
@@ -31,9 +31,9 @@ export interface EventMap {
   'ability:blink': { casterId: EntityId; abilityId: string; from: Vec3; to: Vec3; targetIds: EntityId[] };
   'ability:fizzled': { casterId: EntityId; abilityId: string; reason: string };
   /** A ground marker before an ability lands (Sky Strike): where, how wide, and how long until it hits. */
-  'ability:telegraph': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; ticks: number };
+  'ability:telegraph': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; ticks: number; yaw?: number };
   /** A big area strike landed (Sky Strike). */
-  'ability:strike': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; targetIds: EntityId[] };
+  'ability:strike': { casterId: EntityId; abilityId: string; point: Vec3; radius: number; targetIds: EntityId[]; yaw?: number };
   /** Charging a charged move started (Lightning Fist). */
   'hero:charge': { entityId: EntityId; abilityId: string };
   /** Ran out of stamina while holding an ability: regen pauses longer. */
@@ -106,6 +106,13 @@ export interface EventMap {
   'mech:strike': { entityId: EntityId; kind: MechAttackKind };
   /** Its rear plating broke: the Mk. II powers down. */
   'mech:down': { entityId: EntityId };
+  /** Atlantis's keep door swung open (Nov 16). */
+  'keep-door:opened': { playerId: PlayerId; doorId: EntityId };
+  /** The Kraken mech (Nov 16): wakes, winds up an attack, slumps with its back open, breaks down. */
+  'kraken-mech:awake': { entityId: EntityId };
+  'kraken-mech:windup': { entityId: EntityId; kind: KrakenAttackKind; ticks: number };
+  'kraken-mech:slumped': { entityId: EntityId; ticks: number };
+  'kraken-mech:down': { entityId: EntityId };
   /** The Warden winds up an attack (the warning lasts `ticks`); `point` is where a leap will land. */
   'warden:windup': { entityId: EntityId; kind: WardenAttackKind; ticks: number; point: Vec3 };
   /** The Warden's attack lands (the maul hits, the leap lands, the dash starts). */
@@ -114,12 +121,22 @@ export interface EventMap {
   'warden:enraged': { entityId: EntityId };
   /** The Warden falls: Cerberus's chains can be broken. */
   'warden:defeated': { entityId: EntityId };
+  /** A pilot boss who climbed out on his own (the Tide Engineer) is ready to fight. */
+  'warden:awake': { entityId: EntityId };
+  /** The Atlantean village (Nov 17). */
+  'village:bridge': { entityId: EntityId };
+  'village:rescued': { villagerId: EntityId; name: string };
+  'village:say': { playerId: PlayerId; villagerId: EntityId; name: string; line: string; state: 'task' | 'progress' | 'reward' | 'thanks' | 'pip' };
+  'village:task': { playerId: PlayerId; villagerId: EntityId; task: string; state: 'given' | 'rewarded' };
+  'village:reward': { playerId: PlayerId; task: string };
+  'village:pearl': { playerId: PlayerId; count: number; goal: number };
+  'village:ram-broken': { entityId: EntityId };
   /** F on Cerberus's chains before they can be broken: why not yet. */
   'chains:examined': { playerId: PlayerId; reason: 'machine' | 'warden' | 'freed' };
   /** "Reset level" pressed: the screen fades before the god wakes at the bed. */
   'level:resetting': { entityId: EntityId };
   /** The level started over: the god woke at the bed (after falling, or "Reset level"). */
-  'level:reset': { entityId: EntityId; reason: 'fell' | 'reset' };
+  'level:reset': { entityId: EntityId; reason: 'fell' | 'reset'; at: 'refuge' | 'sea-gate' };
   /** A spirit was freed and bonded with the gods (its ability is unlocked). */
   'spirit:freed': { spiritId: string };
 }

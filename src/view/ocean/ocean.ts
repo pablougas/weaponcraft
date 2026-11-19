@@ -4,33 +4,67 @@ import { OCEAN } from '../../sim/regions';
 import { rng } from '../../sim/rng';
 import { fbm } from '../../sim/terrain/noise';
 import {
+  avenueColumns,
+  BACK_GATE_HALF_ANGLE,
   BEACH,
+  BRIDGE,
+  VILLAGE,
+  VILLAGE_FOUNTAIN,
+  VILLAGE_PLAZA,
+  VILLAGE_RING_ROADS,
+  VILLAGE_HOUSES,
+  villageHouse,
+  villageHouseHeights,
   CASTLE,
   CASTLE_GATE_HALF,
   CASTLE_TOWERS,
   CASTLE_WALL,
   castleWallSegments,
   CAUSEWAY,
+  COLUMN_RADIUS,
+  CRATES,
+  gatePillars,
+  GIANT_CLAMS,
+  HARBOUR,
   KEEP,
+  KEEP_BACK_OPENING_HALF,
+  KEEP_DOOR,
+  KEEP_PLINTH,
+  keepSteps,
+  KEEP_WALL,
+  keepColumns,
+  keepWallSegments,
   KRAKEN,
   KRAKEN_RIG,
   landDistance,
   OCEAN_GRID,
   oceanLocalHeight,
   OCEAN_ARRIVAL,
+  PIER,
+  SCAFFOLD_ANGLES,
   SEA_GATE,
   SHIPWRECK,
   STATUE,
   TEMPLES,
+  TENTS,
   TOWER,
   wallSegmentLength,
 } from '../../sim/terrain/ocean';
 import { brainCoralGeometry, branchCoralGeometry, clamGeometry, conchGeometry, kelpGeometry, sandDollarGeometry, scallopGeometry, ShellBatch, starfishGeometry } from './shells';
 import type { Look } from '../look';
+import { CHAIN_SNAP_GAP, KRAKEN_FREED_BEATS, krakenFreedPoints } from '../../sim/cutscenes/kraken-freed';
+import { TICK_HZ } from '../../sim/constants';
 
 export interface OceanView {
   group: THREE.Group;
   setActive(active: boolean): void;
+  /**
+   * "The Kraken Freed" (Nov 16): seconds into the scene (null when it isn't
+   * playing), and whether the kraken is already free (rig dark, chains gone).
+   */
+  setKraken(state: { t: number | null; freed: boolean }): void;
+  /** The village bridge (Nov 17): seconds since it began to rise (null: still under the sea). */
+  setVillage(state: { bridgeT: number | null }): void;
   update(time: number, reduceMotion: boolean): void;
 }
 
@@ -90,8 +124,31 @@ export function buildOcean(look: Look): OceanView {
       if (wave > 0.8) c.lerp(tileAqua, 0.7);
       else if (wave < -0.94) c.lerp(tileDeep, 0.55);
       if (Math.abs(fromCastle - 30) < 1.2 || Math.abs(fromCastle - 46) < 1.2) c.copy(tileCoral);
-      // The avenue from the gate to the keep stays plain pearl.
+      // The avenue from the gate to the keep stays plain pearl, and so does the way on to the back gate.
       if (Math.abs(x - CASTLE.x) < 4.5 && z > KEEP.z) c.copy(paving);
+      if (Math.abs(x - CASTLE.x) < 6 && z < KEEP.z) c.copy(paving).lerp(pavingB, fbm(x * 0.4, z * 0.4) * 0.6);
+      // The keep's hall: a great compass rose of aqua and gold on pearl.
+      const inKeep = Math.hypot(x - KEEP.x, z - KEEP.z);
+      if (inKeep < KEEP.radius) {
+        const ka = Math.atan2(x - KEEP.x, z - KEEP.z);
+        c.copy(paving);
+        if (Math.abs(Math.sin(ka * 4)) * inKeep < 1.4 || Math.abs(inKeep - 9) < 0.6) c.copy(tileAqua);
+        if (inKeep < 2.2) c.copy(tileDeep);
+      }
+    } else if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.radius + 1 && d < -0.5) {
+      // The village (Nov 17): warm coral-sand paving, a pale ring round the plaza and lanes to each door.
+      const fromCentre = Math.hypot(x - VILLAGE.x, z - VILLAGE.z);
+      c.set('#e6cfae').lerp(new THREE.Color('#d9b996'), fbm(x * 0.3, z * 0.3));
+      // The four main streets and the two ring roads, paved pale; the plaza with a teal border.
+      if (Math.abs(x - VILLAGE.x) < 3 || Math.abs(z - VILLAGE.z) < 3) c.set('#f1e3cb');
+      for (const road of VILLAGE_RING_ROADS) if (Math.abs(fromCentre - road) < 1.4) c.set('#efdec2');
+      if (fromCentre < VILLAGE_PLAZA) c.set('#f1e3cb').lerp(new THREE.Color('#e8d4b4'), fbm(x * 0.5, z * 0.5) * 0.6);
+      if (Math.abs(fromCentre - VILLAGE_PLAZA) < 0.6) c.set('#5fb0a8');
+    } else if (z < CASTLE.z - CASTLE_WALL.radius && d < -0.5 && (Math.hypot(x - HARBOUR.x, z - HARBOUR.z) < HARBOUR.radius + 1 || (Math.abs(x - HARBOUR.x) < PIER.halfWidth + 1 && z < PIER.fromZ + 4))) {
+      // The humans' harbour: grey dock stone with a dark iron-banded rim.
+      const fromDock = Math.hypot(x - HARBOUR.x, z - HARBOUR.z);
+      c.set('#a9a69c').lerp(new THREE.Color('#8d8a82'), fbm(x * 0.35, z * 0.35));
+      if (Math.abs(fromDock - (HARBOUR.radius - 2)) < 0.7) c.set('#5b5650');
     } else if (Math.abs(x) < CAUSEWAY.halfWidth - 1 && z < CAUSEWAY.fromZ - 2 && d < -1) {
       // The causeway: pale flagstones with an aqua border.
       c.copy(paving).lerp(pavingB, fbm(x * 0.5, z * 0.5));
@@ -188,15 +245,20 @@ export function buildOcean(look: Look): OceanView {
   group.add(M(mergeGeometries(crenels), marbleShade, [0, 0, 0], { outline: 0.014 }));
   // Bands along the wall, both faces: gold at the top, a frieze of aqua waves lower down; both broken by the gate.
   const gap = Math.asin((CASTLE_GATE_HALF + 0.3) / CASTLE_WALL.radius);
-  const ringArc = (radius: number, tube: number) => {
-    const ring = new THREE.TorusGeometry(radius, tube, 4, 150, Math.PI * 2 - gap * 2);
+  // …and by the back gate (Nov 16).
+  const backGap = Math.asin((Math.abs(gatePillars()[2].x) - 1.4 + 0.3) / CASTLE_WALL.radius);
+  /** An arc of band covering headings `start` to `start + length` round the castle. */
+  const ringArc = (radius: number, tube: number, start: number, length: number) => {
+    const ring = new THREE.TorusGeometry(radius, tube, 4, Math.ceil(150 * length / (Math.PI * 2)), length);
     ring.rotateX(Math.PI / 2);
-    ring.rotateY(-(Math.PI / 2 + gap));
+    ring.rotateY(start + length - Math.PI / 2);
     return ring;
   };
   for (const side of [-1.15, 1.15]) {
-    group.add(M(ringArc(CASTLE_WALL.radius + side, 0.18), gold, [CASTLE.x, baseY + H - 1.2, CASTLE.z], { outline: false, cast: false }));
-    group.add(M(ringArc(CASTLE_WALL.radius + side, 0.45), teal, [CASTLE.x, baseY + 2.4, CASTLE.z], { outline: false, cast: false }));
+    for (const [start, length] of [[gap, Math.PI - backGap - gap], [Math.PI + backGap, Math.PI - backGap - gap]] as const) {
+      group.add(M(ringArc(CASTLE_WALL.radius + side, 0.18, start, length), gold, [CASTLE.x, baseY + H - 1.2, CASTLE.z], { outline: false, cast: false }));
+      group.add(M(ringArc(CASTLE_WALL.radius + side, 0.45, start, length), teal, [CASTLE.x, baseY + 2.4, CASTLE.z], { outline: false, cast: false }));
+    }
   }
   for (const tower of CASTLE_TOWERS) {
     const ty = oceanLocalHeight(tower.x, tower.z);
@@ -218,24 +280,28 @@ export function buildOcean(look: Look): OceanView {
   // The gate: two great pillars crowned with conches, an arch, and a giant scallop crest over it.
   const gateZ = CASTLE.z + CASTLE_WALL.radius;
   const pillarX = CASTLE_GATE_HALF + 1.4;
-  for (const side of [-1, 1]) {
-    group.add(M(new THREE.CylinderGeometry(1.6, 1.9, H + 6, 16), marble, at(side * pillarX, gateZ, (H + 6) / 2 - 0.4), { outline: 0.02 }));
-    shells.add(conch, conchMat, at(side * pillarX, gateZ, H + 5.6), [0, side, 0], 1.6, 0.016);
+  for (const pillar of gatePillars()) {
+    group.add(M(new THREE.CylinderGeometry(1.6, pillar.radius, H + 6, 16), marble, at(pillar.x, pillar.z, (H + 6) / 2 - 0.4), { outline: 0.02 }));
+    shells.add(conch, conchMat, at(pillar.x, pillar.z, H + 5.6), [0, Math.sign(pillar.x), 0], 1.6, 0.016);
   }
+  // The back gate (Nov 16): a wide arch out to the harbour, hung with the humans' chains.
+  const backZ = CASTLE.z - CASTLE_WALL.radius;
+  const backX = Math.abs(gatePillars()[2].x);
+  group.add(M(new THREE.TorusGeometry(backX, 0.9, 8, 36, Math.PI), marble, at(0, backZ, H + 2), { outline: 0.02 }));
+  shells.add(scallop, shellCream, at(0, backZ - 0.8, H + 2 + backX * 0.55), [0, Math.PI, 0], 4.2, 0.022);
+  void BACK_GATE_HALF_ANGLE;
   group.add(M(new THREE.TorusGeometry(pillarX, 0.9, 8, 36, Math.PI), marble, at(0, gateZ, H + 2), { outline: 0.02 }));
   shells.add(scallop, shellPink, at(0, gateZ + 0.8, H + 2 + pillarX * 0.6), [0, 0, 0], 5.2, 0.025);
   group.add(M(new THREE.SphereGeometry(0.9, 16, 12), pearl, at(0, gateZ + 1.5, H + 2 + pillarX * 0.6 + 1), { outline: 0.01 }));
   group.add(M(new THREE.PlaneGeometry(3.2, 7), banner, at(0, gateZ + 1.2, H - 2), { outline: false }));
   // The avenue: paired columns from the gate to the keep, each topped with a cream scallop.
   const avenue: THREE.BufferGeometry[] = [];
-  for (let z = gateZ - 8; z > KEEP.z + KEEP.radius + 8; z -= 9) {
-    if (Math.abs(z - STATUE.z) < STATUE.radius + 3) continue;
-    for (const side of [-1, 1]) {
-      const col = new THREE.CylinderGeometry(0.55, 0.65, 8, 10);
-      col.translate(side * 7.5, oceanLocalHeight(side * 7.5, z) + 3.8, z);
-      avenue.push(col);
-      shells.add(scallop, shellCream, at(side * 7.5, z, 7.8), [0, -side * Math.PI / 2, 0], 1.1, 0.01);
-    }
+  for (const { x, z } of avenueColumns()) {
+    const side = Math.sign(x);
+    const col = new THREE.CylinderGeometry(0.55, 0.65, 8, 10);
+    col.translate(x, oceanLocalHeight(x, z) + 3.8, z);
+    avenue.push(col);
+    shells.add(scallop, shellCream, at(x, z, 7.8), [0, -side * Math.PI / 2, 0], 1.1, 0.01);
   }
   group.add(M(mergeGeometries(avenue), marbleShade, [0, 0, 0], { outline: 0.012 }));
   // Poseidon's statue on his fountain: a shell basin, a robed figure, a gold trident.
@@ -269,15 +335,62 @@ export function buildOcean(look: Look): OceanView {
   // The keep: a great drum of columns under a nacre dome, a lantern, and a gold trident.
   const ky = oceanLocalHeight(KEEP.x, KEEP.z);
   const KR = KEEP.radius;
-  group.add(M(new THREE.CylinderGeometry(KR + 3, KR + 3.4, 1.4, 40), marbleShade, [KEEP.x, ky + 0.3, KEEP.z], { outline: 0.018 }));
-  group.add(M(new THREE.CylinderGeometry(KR, KR + 0.6, 22, 40), marble, [KEEP.x, ky + 11, KEEP.z], { outline: 0.025 }));
+  // The keep's base (Nov 16): a solid round step that is also the hall's floor, with stairs front and back.
+  const PT = KEEP_PLINTH.top;
+  group.add(M(new THREE.CylinderGeometry(KEEP_PLINTH.radius, KEEP_PLINTH.radius + 0.2, PT + 1, 56), marbleShade, [KEEP.x, ky + PT - (PT + 1) / 2, KEEP.z], { outline: 0.018 }));
+  for (const step of keepSteps()) {
+    group.add(M(new THREE.BoxGeometry(step.halfX * 2, step.top + 1, step.halfZ * 2), marble, [step.x, ky + step.top - (step.top + 1) / 2, step.z], { outline: 0.012 }));
+  }
+  // The hall's floor: a compass rose of aqua and gold on pearl, laid on the base.
+  {
+    const floor = new THREE.CircleGeometry(KR - 0.3, 64, 8);
+    floor.rotateX(-Math.PI / 2);
+    const fp = floor.attributes.position;
+    const fc = new Float32Array(fp.count * 3);
+    const col = new THREE.Color();
+    for (let i = 0; i < fp.count; i += 1) {
+      const fx = fp.getX(i);
+      const fz = fp.getZ(i);
+      const r = Math.hypot(fx, fz);
+      const fa = Math.atan2(fx, fz);
+      col.copy(paving);
+      if (Math.abs(Math.sin(fa * 4)) * r < 1.4 || Math.abs(r - 9) < 0.6) col.copy(tileAqua);
+      if (r < 2.2) col.copy(tileDeep);
+      fc.set([col.r, col.g, col.b], i * 3);
+    }
+    floor.setAttribute('color', new THREE.BufferAttribute(fc, 3));
+    group.add(M(floor, toon({ vertexColors: true, grad: look.GRAD4, rim: false }), [KEEP.x, ky + PT + 0.02, KEEP.z], { outline: false, cast: false }));
+  }
+  // The hall's wall (Nov 16): a ring of blocks with the door toward the gate and a great opening at the back.
+  const keepBlocks: THREE.BufferGeometry[] = [];
+  for (const seg of keepWallSegments()) {
+    const block = new THREE.BoxGeometry(seg.length, KEEP_WALL.height, KEEP_WALL.thickness);
+    block.rotateY(seg.yaw);
+    block.translate(seg.x, ky + KEEP_WALL.height / 2 - 0.4, seg.z);
+    keepBlocks.push(block);
+  }
+  // Lintels: the wall carries on above the door and above the back opening.
+  const lintel = (yaw: number, halfWidth: number, bottom: number) => {
+    const half = Math.asin(Math.min(1, (halfWidth + 1.2) / KR));
+    const geo = new THREE.CylinderGeometry(KR + KEEP_WALL.thickness / 2, KR + KEEP_WALL.thickness / 2, KEEP_WALL.height - bottom, 24, 1, false, yaw - half, half * 2);
+    geo.translate(KEEP.x, ky + bottom + (KEEP_WALL.height - bottom) / 2 - 0.4, KEEP.z);
+    return geo;
+  };
+  keepBlocks.push(lintel(0, KEEP_DOOR.halfWidth, KEEP_PLINTH.top + KEEP_DOOR.height));
+  keepBlocks.push(lintel(Math.PI, KEEP_BACK_OPENING_HALF, KEEP_PLINTH.top + 13));
+  const keepWallMat = toon({ color: '#eef3ef', side: THREE.DoubleSide });
+  group.add(M(mergeGeometries(keepBlocks), keepWallMat, [0, 0, 0], { outline: 0.02 }));
   const columns: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 28; i += 1) {
-    const a = (i / 28) * Math.PI * 2;
-    const col = new THREE.CylinderGeometry(0.6, 0.7, 20, 10);
-    col.translate(KEEP.x + Math.sin(a) * (KR + 1.8), ky + 10.6, KEEP.z + Math.cos(a) * (KR + 1.8));
+  for (const colAt of keepColumns()) {
+    const col = new THREE.CylinderGeometry(COLUMN_RADIUS - 0.1, COLUMN_RADIUS, 20, 10);
+    col.translate(colAt.x, ky + 10.6, colAt.z);
     columns.push(col);
-    if (i % 2 === 0) shells.add(scallop, scallopMats[(i / 2) % 3], [KEEP.x + Math.sin(a) * (KR + 0.3), ky + 15, KEEP.z + Math.cos(a) * (KR + 0.3)], [0, a, 0], 1.8, 0.012);
+  }
+  for (let i = 0; i < 28; i += 2) {
+    const a = (i / 28) * Math.PI * 2;
+    // Scallops on the drum, but none over the door or the back opening (the door has its own).
+    if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.5 || Math.abs(Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Math.PI))) < 0.6) continue;
+    shells.add(scallop, scallopMats[(i / 2) % 3], [KEEP.x + Math.sin(a) * (KR + 0.9), ky + 15, KEEP.z + Math.cos(a) * (KR + 0.9)], [0, a, 0], 1.8, 0.012);
   }
   group.add(M(mergeGeometries(columns), marbleShade, [0, 0, 0], { outline: 0.012 }));
   group.add(M(new THREE.CylinderGeometry(KR + 3, KR + 3, 1.2, 40), marble, [KEEP.x, ky + 21.2, KEEP.z], { outline: 0.02 }));
@@ -302,10 +415,24 @@ export function buildOcean(look: Look): OceanView {
   for (const x of [-0.9, 0, 0.9]) group.add(M(new THREE.ConeGeometry(0.24, 1.2, 5), gold, [KEEP.x + x, tipY + (x === 0 ? 6.6 : 6.2), KEEP.z], { outline: 0.008 }));
   group.add(M(new THREE.BoxGeometry(2.1, 0.22, 0.3), gold, [KEEP.x, tipY + 5.8, KEEP.z], { outline: false }));
   // The keep's door, toward the gate, under a scallop; the humans' banners either side.
-  const doorZ = KEEP.z + KR + 0.4;
-  group.add(M(new THREE.BoxGeometry(4.4, 7, 0.6), woodDark, [KEEP.x, ky + 3.5, doorZ], { outline: 0.014 }));
-  shells.add(scallop, shellPink, [KEEP.x, ky + 7.4, doorZ + 0.5], [0, 0, 0], 2.8, 0.014);
-  for (const side of [-1, 1]) group.add(M(new THREE.PlaneGeometry(2.2, 6.5), banner, [KEEP.x + side * 5, ky + 9, doorZ + 1.6], { outline: false }));
+  // (Nov 16) The door sits in the wall: a marble frame round the doorway; the leaves are the keep-door entity.
+  const doorZ = KEEP.z + KR + KEEP_WALL.thickness / 2;
+  const DW = KEEP_DOOR.halfWidth;
+  const DH = KEEP_DOOR.height;
+  const doorY = ky + KEEP_PLINTH.top;
+  // The jambs and lintel run through the wall's whole thickness, so nothing shows round the door from the side.
+  const frameDepth = KEEP_WALL.thickness + 0.5;
+  for (const side of [-1, 1]) group.add(M(new THREE.BoxGeometry(0.9, DH + 0.9, frameDepth), marbleShade, [KEEP.x + side * (DW + 0.45), doorY + (DH + 0.9) / 2, KEEP.z + KR], { outline: 0.012 }));
+  group.add(M(new THREE.BoxGeometry(DW * 2 + 1.8, 0.9, frameDepth + 0.2), marbleShade, [KEEP.x, doorY + DH + 0.45, KEEP.z + KR], { outline: 0.012 }));
+  // The scallop over the door glows sea-blue (team request): a pulsing shell and a soft blue light on the threshold.
+  const doorShellMat = toon({ color: '#9fe6ff', emissive: '#1f8fff', emissiveIntensity: 1.6, side: THREE.DoubleSide, rim: false });
+  const doorShell = M(scallop, doorShellMat, [KEEP.x, doorY + DH + 2.1, doorZ + 0.5], { outline: 0.014 });
+  doorShell.scale.setScalar(2.6);
+  group.add(doorShell);
+  const doorGlow = new THREE.PointLight('#3aa8ff', 30, 16, 2);
+  doorGlow.position.set(KEEP.x, doorY + DH + 2.2, doorZ + 2.2);
+  group.add(doorGlow);
+  for (const side of [-1, 1]) group.add(M(new THREE.PlaneGeometry(2.2, 6.5), banner, [KEEP.x + side * 6.4, ky + 10, doorZ + 0.12], { outline: false }));
   // The temples: round, columned, under ribbed pink shell domes with a pearl on top.
   for (const t of TEMPLES) {
     const ty = oceanLocalHeight(t.x, t.z);
@@ -326,16 +453,13 @@ export function buildOcean(look: Look): OceanView {
   }
 
   // Human occupation: tents and crates in the courtyard, scaffolds against the wall.
-  for (const [x, z, yaw] of [[-20, CASTLE.z + 40, 0.4], [-38, CASTLE.z - 8, -0.6], [36, CASTLE.z + 22, 2.4], [-16, CASTLE.z + 12, 1.1], [16, CASTLE.z - 40, 0.2], [-40, CASTLE.z + 18, 2]] as const) {
+  for (const [x, z, yaw] of TENTS) {
     group.add(M(new THREE.ConeGeometry(2.4, 3, 4), canvas, at(x, z, 1.5), { rot: [0, yaw, 0], outline: 0.012 }));
   }
-  for (let i = 0; i < 14; i += 1) {
-    const x = (i % 2 ? 1 : -1) * (12 + rand() * 10);
-    const z = CASTLE.z + 26 + rand() * 18;
-    const s = 0.7 + rand() * 0.4;
-    group.add(M(new THREE.BoxGeometry(s, s, s), wood, at(x, z, s / 2), { rot: [0, rand() * 3, 0], outline: 0.01 }));
+  for (const [x, z, s, yaw] of CRATES) {
+    group.add(M(new THREE.BoxGeometry(s, s, s), wood, at(x, z, s / 2), { rot: [0, yaw, 0], outline: 0.01 }));
   }
-  for (const sa of [-1.1, 2.2]) {
+  for (const sa of SCAFFOLD_ANGLES) {
     const scaffold = new THREE.Group();
     for (const dx of [-3, 3]) for (const dz of [-1, 1]) scaffold.add(M(new THREE.BoxGeometry(0.25, H, 0.25), wood, [dx, H / 2, dz], { outline: 0.006 }));
     for (const y of [H * 0.33, H * 0.66, H - 0.5]) scaffold.add(M(new THREE.BoxGeometry(6.6, 0.2, 2.3), wood, [0, y, 0], { outline: 0.008 }));
@@ -344,7 +468,7 @@ export function buildOcean(look: Look): OceanView {
     group.add(scaffold);
   }
   // Giant clams in the courtyard's corners, pearls glowing.
-  for (const [x, z, yaw] of [[-36, CASTLE.z + 30, 0.6], [36, CASTLE.z + 32, -0.6], [-12, CASTLE.z - 42, 0.2]] as const) giantClam(x, z, 2.2, yaw);
+  for (const [x, z, r, yaw] of GIANT_CLAMS) giantClam(x, z, r, yaw);
 
   // ---- The rig: a tall iron frame and glowing conduit, cables out over the wall to the kraken. ----
   const RIG_H = H + 4;
@@ -362,10 +486,140 @@ export function buildOcean(look: Look): OceanView {
     return new THREE.QuadraticBezierCurve3(from, mid, to);
   };
   const rigTop = new THREE.Vector3(KRAKEN_RIG.x, oceanLocalHeight(KRAKEN_RIG.x, KRAKEN_RIG.z) + RIG_H, KRAKEN_RIG.z);
+  // The drain cables: they tear loose with the chains when the kraken is freed.
+  const drainCables: THREE.Mesh[] = [];
   for (const [dz, dy] of [[-4, 10], [4, 7]] as const) {
     const end = new THREE.Vector3(KRAKEN.x - 9 * KRAKEN.scale, 6 + dy * 0.6, KRAKEN.z + dz);
-    group.add(M(new THREE.TubeGeometry(cablePath(rigTop, end, -6), 40, 0.24, 6), conduitMat, [0, 0, 0], { outline: false, cast: false }));
+    const cable = M(new THREE.TubeGeometry(cablePath(rigTop, end, -6), 40, 0.24, 6), conduitMat, [0, 0, 0], { outline: false, cast: false });
+    group.add(cable);
+    drainCables.push(cable);
   }
+
+  // ---- The harbour behind the castle (Nov 16): iron bollards round the dock, lamps on the pier. ----
+  for (let i = 0; i < 18; i += 1) {
+    const a = (i / 18) * Math.PI * 2;
+    if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.4) continue; // the pier joins here
+    const x = HARBOUR.x + Math.sin(a) * (HARBOUR.radius - 1.2);
+    const z = HARBOUR.z + Math.cos(a) * (HARBOUR.radius - 1.2);
+    group.add(M(new THREE.CylinderGeometry(0.4, 0.5, 1.1, 8), iron, at(x, z, 0.55), { outline: 0.008 }));
+  }
+  const lampMat = toon({ color: '#ffd98a', emissive: '#ffb340', emissiveIntensity: 1.2, rim: false });
+  for (const z of [PIER.fromZ - 2, PIER.toZ + 2]) {
+    for (const side of [-1, 1]) {
+      const x = HARBOUR.x + side * (PIER.halfWidth - 1);
+      group.add(M(new THREE.CylinderGeometry(0.12, 0.15, 4, 6), iron, at(x, z, 2), { outline: 0.006 }));
+      group.add(M(new THREE.SphereGeometry(0.35, 10, 8), lampMat, at(x, z, 4.2), { outline: false }));
+    }
+  }
+
+  // ---- The Atlantean village (Nov 17): coral-stone houses with shell roofs round a plaza and its fountain. ----
+  const villageGroup = new THREE.Group();
+  group.add(villageGroup);
+  const coralStone = toon({ color: '#e9b99a' });
+  const coralStoneDark = toon({ color: '#c98f74' });
+  const roofMats = [toon({ color: '#5fb8b0' }), toon({ color: '#8fd0e0' }), toon({ color: '#e0a6c8' }), toon({ color: '#f2d27a' })];
+  const lanternMat = toon({ color: '#c8fff4', emissive: '#3fe0c8', emissiveIntensity: 1.1, rim: false });
+  // 34 houses (Nov 17): built as a handful of merged meshes (one per material) so the big village stays cheap.
+  const wallGeos: THREE.BufferGeometry[] = [];
+  const darkGeos: THREE.BufferGeometry[] = [];
+  const roofGeos: THREE.BufferGeometry[][] = roofMats.map(() => []);
+  const glowGeos: THREE.BufferGeometry[] = [];
+  const placed = (geo: THREE.BufferGeometry, x: number, y: number, z: number, yaw = 0) => {
+    if (yaw) geo.rotateY(yaw);
+    geo.translate(x, y, z);
+    return geo;
+  };
+  VILLAGE_HOUSES.forEach((h, i) => {
+    const hv = villageHouse(h);
+    const y = oceanLocalHeight(hv.x, hv.z);
+    const wallH = villageHouseHeights(h).wall;
+    // Round walls with a doorway cut toward the plaza (the door itself is an entity).
+    const doorHalf = Math.asin(1.0 / h.radius);
+    wallGeos.push(placed(new THREE.CylinderGeometry(h.radius, h.radius + 0.25, wallH, 28, 1, true, hv.doorYaw + doorHalf, Math.PI * 2 - doorHalf * 2), hv.x, y + wallH / 2 - 0.1, hv.z));
+    // Above the doorway, a lintel; a band of darker coral at the base.
+    darkGeos.push(placed(new THREE.BoxGeometry(2.6, 0.5, 0.6), hv.door.x, y + 2.75, hv.door.z, hv.doorYaw));
+    wallGeos.push(placed(new THREE.BoxGeometry(2.6, Math.max(0.1, wallH - 2.75), 0.5), hv.door.x, y + 2.75 + (wallH - 2.75) / 2, hv.door.z, hv.doorYaw));
+    darkGeos.push(placed(new THREE.CylinderGeometry(h.radius + 0.3, h.radius + 0.35, 0.5, 28, 1, true, hv.doorYaw + doorHalf, Math.PI * 2 - doorHalf * 2), hv.x, y + 0.2, hv.z));
+    // A shell dome roof, ribbed like a scallop, and a little lantern at its tip.
+    const roof = new THREE.SphereGeometry(h.radius + 0.6, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+    roof.scale(1, 0.75, 1);
+    roofGeos[(i * 3 + Math.floor(h.ring / 10)) % roofMats.length].push(placed(roof, hv.x, y + wallH - 0.1, hv.z));
+    for (let k = 0; k < 10; k += 1) {
+      const rib = new THREE.TorusGeometry(h.radius + 0.62, 0.07, 4, 12, Math.PI / 2);
+      rib.rotateY((k / 10) * Math.PI * 2);
+      rib.scale(1, 0.75, 1);
+      darkGeos.push(placed(rib, hv.x, y + wallH - 0.1, hv.z));
+    }
+    glowGeos.push(placed(new THREE.SphereGeometry(0.32, 8, 6), hv.x, y + wallH - 0.1 + (h.radius + 0.6) * 0.75 + 0.2, hv.z));
+    // Round windows either side of the door.
+    for (const side of [-1, 1]) {
+      const a = hv.doorYaw + side * 0.7;
+      const win = new THREE.CircleGeometry(0.42, 12);
+      win.rotateY(a);
+      glowGeos.push(placed(win, hv.x + Math.sin(a) * (h.radius + 0.27), y + 2.2, hv.z + Math.cos(a) * (h.radius + 0.27)));
+    }
+  });
+  // Lanterns round the plaza and along the four main streets.
+  const lampPost = (lx: number, lz: number) => {
+    const ly = oceanLocalHeight(lx, lz);
+    darkGeos.push(placed(new THREE.CylinderGeometry(0.09, 0.12, 2.6, 6), lx, ly + 1.3, lz));
+    glowGeos.push(placed(new THREE.SphereGeometry(0.28, 8, 6), lx, ly + 2.7, lz));
+  };
+  for (let k = 0; k < 12; k += 1) {
+    const a = (k / 12) * Math.PI * 2 + Math.PI / 12;
+    lampPost(VILLAGE.x + Math.sin(a) * (VILLAGE_PLAZA + 1), VILLAGE.z + Math.cos(a) * (VILLAGE_PLAZA + 1));
+  }
+  for (let d = VILLAGE_PLAZA + 10; d < VILLAGE.radius - 6; d += 13) {
+    for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      for (const side of [-1, 1]) lampPost(VILLAGE.x + sx * d + sz * side * 4, VILLAGE.z + sz * d + sx * side * 4);
+    }
+  }
+  villageGroup.add(M(mergeGeometries(wallGeos), toon({ color: '#e9b99a', side: THREE.DoubleSide }), [0, 0, 0], { outline: 0.02 }));
+  villageGroup.add(M(mergeGeometries(darkGeos), coralStoneDark, [0, 0, 0], { outline: false }));
+  roofGeos.forEach((geos, i) => {
+    if (geos.length) villageGroup.add(M(mergeGeometries(geos), roofMats[i], [0, 0, 0], { outline: 0.02 }));
+  });
+  villageGroup.add(M(mergeGeometries(glowGeos), lanternMat, [0, 0, 0], { outline: false, cast: false }));
+  // The plaza's coral fountain.
+  {
+    const fy = oceanLocalHeight(VILLAGE_FOUNTAIN.x, VILLAGE_FOUNTAIN.z);
+    villageGroup.add(M(new THREE.CylinderGeometry(VILLAGE_FOUNTAIN.radius, VILLAGE_FOUNTAIN.radius + 0.2, 0.9, 28), coralStoneDark, [VILLAGE_FOUNTAIN.x, fy + 0.45, VILLAGE_FOUNTAIN.z], { outline: 0.015 }));
+    villageGroup.add(M(new THREE.CircleGeometry(VILLAGE_FOUNTAIN.radius - 0.25, 28), toon({ color: '#6fd0e8', emissive: '#1f7a9a', emissiveIntensity: 0.3, rim: false }), [VILLAGE_FOUNTAIN.x, fy + 0.8, VILLAGE_FOUNTAIN.z], { rot: [-Math.PI / 2, 0, 0], outline: false }));
+    villageGroup.add(M(new THREE.CylinderGeometry(0.3, 0.5, 2.4, 10), coralStone, [VILLAGE_FOUNTAIN.x, fy + 1.6, VILLAGE_FOUNTAIN.z], { outline: 0.012 }));
+    shells.add(conch, conchMat, [VILLAGE_FOUNTAIN.x, fy + 3.4, VILLAGE_FOUNTAIN.z], [0, 0.6, 0], 2.2, 0.014);
+  }
+  /** Within `pad` metres of the bridge's footprint (sea props stay clear of it). */
+  function nearBridge(x: number, z: number, pad: number): boolean {
+    return Math.abs(x - VILLAGE.x) < BRIDGE.halfWidth + pad && z < BRIDGE.fromZ + pad && z > BRIDGE.toZ - pad;
+  }
+  // ---- The bridge to the village (Nov 17): old coral-stone spans on pillars, under the sea until it rises. ----
+  const bridgeGroup = new THREE.Group();
+  group.add(bridgeGroup);
+  {
+    const length = BRIDGE.fromZ - BRIDGE.toZ;
+    const midZ = (BRIDGE.fromZ + BRIDGE.toZ) / 2;
+    // The deck is three side-by-side slabs (stone edges, a pale walkway down the
+    // middle) so no two surfaces share a plane and flicker; its top sits a little
+    // above the land at both ends for the same reason.
+    const walk = BRIDGE.halfWidth * 0.55;
+    const edge = BRIDGE.halfWidth - walk;
+    bridgeGroup.add(M(new THREE.BoxGeometry(walk * 2, 0.9, length), toon({ color: '#f1e3cb', rim: false }), [VILLAGE.x, BRIDGE.deck - 0.45, midZ], { outline: 0.02 }));
+    for (const side of [-1, 1]) {
+      bridgeGroup.add(M(new THREE.BoxGeometry(edge, 0.9, length), coralStone, [VILLAGE.x + side * (walk + edge / 2), BRIDGE.deck - 0.45, midZ], { outline: 0.02 }));
+      // Low parapets.
+      bridgeGroup.add(M(new THREE.BoxGeometry(0.5, 0.8, length), coralStoneDark, [VILLAGE.x + side * (BRIDGE.halfWidth - 0.25), BRIDGE.deck + 0.4, midZ], { outline: 0.012 }));
+    }
+    // Supports down into the sea, under the deck.
+    const spans = 6;
+    for (let k = 0; k <= spans; k += 1) {
+      const z = BRIDGE.fromZ - (k / spans) * length;
+      for (const side of [-1, 1]) {
+        bridgeGroup.add(M(new THREE.CylinderGeometry(0.75, 1, 7, 10), coralStoneDark, [VILLAGE.x + side * (BRIDGE.halfWidth - 0.9), BRIDGE.deck - 4.5, z], { outline: 0.012 }));
+      }
+    }
+  }
+  let bridgeState: { bridgeT: number | null } = { bridgeT: null };
+  const BRIDGE_SUNK = -9;
 
   // ---- Poseidon's kraken, chained in the sea beside the castle. ----
   const kraken = new THREE.Group();
@@ -391,7 +645,7 @@ export function buildOcean(look: Look): OceanView {
   }
   // Tentacles: thick tubes curling up out of the sea, some pinned by chains.
   const tentacles: Array<{ mesh: THREE.Object3D; phase: number }> = [];
-  const chainLinks: THREE.BufferGeometry[] = [];
+  const chainLinks: THREE.BufferGeometry[][] = [];
   const anchors: THREE.Vector3[] = [];
   const tentacleCount = 8;
   for (let i = 0; i < tentacleCount; i += 1) {
@@ -441,6 +695,7 @@ export function buildOcean(look: Look): OceanView {
     z: CASTLE.z + Math.cos(towardKraken + da) * (CASTLE.radius - 4),
   }));
   anchors.forEach((local, i) => {
+    chainLinks.push([]);
     const from = local.clone().applyMatrix4(kraken.matrix);
     const post = posts[i % posts.length];
     const py = oceanLocalHeight(post.x, post.z);
@@ -459,10 +714,15 @@ export function buildOcean(look: Look): OceanView {
       const twist = new THREE.Quaternion().setFromAxisAngle(tangent, k % 2 ? Math.PI / 2 : 0);
       link.applyQuaternion(q.premultiply(twist));
       link.translate(p.x, p.y, p.z);
-      chainLinks.push(link);
+      chainLinks[i].push(link);
     }
   });
-  if (chainLinks.length) group.add(M(mergeGeometries(chainLinks), iron, [0, 0, 0], { outline: false }));
+  // One mesh per chain, so they can snap one at a time when the kraken is freed.
+  const chains = chainLinks.filter((links) => links.length > 0).map((links) => {
+    const mesh = M(mergeGeometries(links), iron, [0, 0, 0], { outline: false });
+    group.add(mesh);
+    return mesh;
+  });
 
   // ---- The wrecked ship, run aground and listing on the beach. ----
   const ship = new THREE.Group();
@@ -555,14 +815,14 @@ export function buildOcean(look: Look): OceanView {
     else shells.add(brain, coralMats[placed % 4], [x, y - 0.05, z], [0, yaw, 0], 0.25 + rand() * 0.2, 0.006, false);
   }
   // Giant clams on the beach, pearls glowing.
-  for (const [x, z, r, yaw] of [[22, 30, 1.4, -0.8], [-6, 34, 1.1, 0.3], [26, 20, 0.9, -1.4]] as const) giantClam(x, z, r, yaw);
+  // (The beach's giant clams are in GIANT_CLAMS, drawn with the courtyard's.)
   // Coral at the water's edge all round the beach, the causeway and the island.
   const coralBranch = Array.from({ length: 4 }, () => branchCoralGeometry(1, rand));
   for (let placed = 0, tries = 0; placed < 170 && tries < 8000; tries += 1) {
     const x = g.minX + rand() * (g.maxX - g.minX);
     const z = g.minZ + rand() * (g.maxZ - g.minZ);
     const d = landDistance(x, z);
-    if (d < -0.8 || d > 2.5 || !awayFromPaths(x, z)) continue;
+    if (d < -0.8 || d > 2.5 || !awayFromPaths(x, z) || nearBridge(x, z, 2)) continue;
     placed += 1;
     const y = Math.max(-0.6, oceanLocalHeight(x, z));
     const mat = coralMats[placed % 4];
@@ -577,12 +837,26 @@ export function buildOcean(look: Look): OceanView {
     const d = landDistance(x, z);
     if (d < 3 || d > 22) continue;
     if (Math.hypot(x - KRAKEN.x, z - KRAKEN.z) < 14 * KRAKEN.scale) continue;
+    if (nearBridge(x, z, 8)) continue; // tall kelp would poke up through the risen bridge
     placed += 1;
     for (let k = 0; k < 3; k += 1) {
       shells.add(kelpGeos[(placed + k) % 5], k === 2 ? kelpGold : kelpMat, [x + (rand() - 0.5) * 1.5, -4 - rand() * 1.5, z + (rand() - 0.5) * 1.5], [0, rand() * 6, 0], 0.8 + rand() * 0.5, false, false);
     }
   }
   shells.flush(look, group);
+
+  // The kraken freed (Nov 16): yaw then tilt, so he can lean forward toward the gods.
+  kraken.rotation.order = 'YXZ';
+  const restYaw = kraken.rotation.y;
+  const godsSpot = krakenFreedPoints({ x: 0, y: 0, z: 0 }).gods;
+  const bowYaw = Math.atan2(godsSpot.x - OCEAN.center.x - KRAKEN.x, godsSpot.z - OCEAN.center.z - KRAKEN.z);
+  const beat = (name: keyof typeof KRAKEN_FREED_BEATS) => KRAKEN_FREED_BEATS[name] / TICK_HZ;
+  const smooth = (x: number) => {
+    const k = Math.min(1, Math.max(0, x));
+    return k * k * (3 - 2 * k);
+  };
+  const conduitColor = conduitMat.color.clone();
+  let krakenState: { t: number | null; freed: boolean } = { t: null, freed: false };
 
   let active = false;
   return {
@@ -591,13 +865,52 @@ export function buildOcean(look: Look): OceanView {
       active = on;
       group.visible = on;
     },
+    setKraken(state) {
+      krakenState = state;
+    },
+    setVillage(state) {
+      bridgeState = state;
+    },
     update(time, reduceMotion) {
       if (!active) return;
       // The kraken strains slowly against his chains; the conduit pulses gently (never a flash).
       const amount = reduceMotion ? 0.3 : 1;
-      for (const t of tentacles) t.mesh.rotation.y = Math.sin(time * 0.5 + t.phase) * 0.05 * amount;
-      kraken.position.y = Math.sin(time * 0.6) * 0.25 * amount;
-      conduitMat.emissiveIntensity = 0.9 + Math.sin(time * (reduceMotion ? 0.8 : 2.2)) * 0.25 * amount;
+      const { t: st, freed } = krakenState;
+      const sceneT = st ?? (freed ? Infinity : -1);
+      // Rising out of the sea, then bowing his head to the gods; once free he stays up, calmer.
+      const rise = smooth((sceneT - beat('rise')) / 2.5);
+      const bow = smooth((sceneT - beat('bow')) / 1.6) * (1 - smooth((sceneT - beat('end') + 2.5) / 2.5));
+      const turn = smooth((sceneT - beat('rise')) / 4);
+      const free = sceneT > beat('rise');
+      for (const t of tentacles) t.mesh.rotation.y = Math.sin(time * (free ? 0.9 : 0.5) + t.phase) * (free ? 0.12 : 0.05) * amount;
+      kraken.position.y = Math.sin(time * 0.6) * 0.25 * amount + rise * 4.5;
+      kraken.rotation.y = restYaw + Math.atan2(Math.sin(bowYaw - restYaw), Math.cos(bowYaw - restYaw)) * turn;
+      kraken.rotation.x = bow * 0.42;
+      // The village bridge rises out of the sea over 4 s (eased; lanterns on once it's up).
+      const bt = bridgeState.bridgeT;
+      const risen = bt === null ? 0 : smooth(bt / 4);
+      bridgeGroup.position.y = BRIDGE_SUNK * (1 - risen) + (bt !== null && bt < 4 && !reduceMotion ? Math.sin(bt * 9) * 0.04 * (1 - risen) : 0);
+      bridgeGroup.visible = risen > 0.001;
+      lanternMat.emissiveIntensity = 0.9 + Math.sin(time * 1.3) * 0.15 * amount;
+      // The rig dies: its glow sputters out (a slow flicker, never a flash) and stays dark.
+      const rigOff = sceneT - beat('rig');
+      if (rigOff < 0) {
+        conduitMat.emissiveIntensity = 0.9 + Math.sin(time * (reduceMotion ? 0.8 : 2.2)) * 0.25 * amount;
+        conduitMat.color.copy(conduitColor);
+      } else {
+        const fading = 1 - smooth(rigOff / 2);
+        conduitMat.emissiveIntensity = 0.9 * fading * (0.6 + 0.4 * Math.abs(Math.sin(rigOff * (reduceMotion ? 3 : 9))));
+        conduitMat.color.copy(conduitColor).multiplyScalar(0.2 + 0.8 * fading);
+      }
+      // The chains snap one after another and drop into the sea.
+      [...chains, ...drainCables].forEach((chain, i) => {
+        const since = sceneT - beat('chains') - (i * CHAIN_SNAP_GAP) / TICK_HZ;
+        chain.visible = since < 1.6;
+        chain.position.y = since > 0 ? -since * since * 4 : 0;
+      });
+      // The door's shell breathes sea-blue light (slow, never a flash).
+      doorShellMat.emissiveIntensity = 1.5 + Math.sin(time * 1.4) * 0.35 * amount;
+      doorGlow.intensity = 28 + Math.sin(time * 1.4) * 6 * amount;
     },
   };
 }

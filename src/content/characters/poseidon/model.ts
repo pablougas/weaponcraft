@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { EntityModel, ModelFactory } from '../../../view/entity-model';
 import { drawFace, SKIN } from '../../gods/zeus/face';
+import { DODGE_TICKS } from '../../../sim/systems/hero';
 
 /**
  * Poseidon, built from primitives in the gods' style: sea-green robes with
@@ -68,7 +69,7 @@ export const createModel: ModelFactory = (look) => {
     torso.add(shoulder);
     return shoulder;
   };
-  arm(1, [0.1, 0, 0.14]);
+  const leftArm = arm(1, [0.1, 0, 0.14]);
   const rightArm = arm(-1, [-0.35, 0, -0.1]);
 
   // The trident: a long gold-bound shaft and three glowing sea-glass tines.
@@ -85,6 +86,10 @@ export const createModel: ModelFactory = (look) => {
   const tridentLight = new THREE.PointLight('#5ff0e0', 0.9, 7, 2);
   tridentLight.position.set(0, 2, 0);
   trident.add(tridentLight);
+  /** Where his water leaves the trident (the middle tine's tip). */
+  const tip = new THREE.Object3D();
+  tip.position.set(0, 2.2, 0);
+  trident.add(tip);
 
   // Head: the face, flowing hair, a long beard, and a crown of coral spikes.
   torso.add(M(new THREE.CylinderGeometry(0.075, 0.085, 0.14, 10), skin, [0, 0.66, 0]));
@@ -115,15 +120,66 @@ export const createModel: ModelFactory = (look) => {
     root,
     update(entity, frame) {
       const t = frame.time;
-      const walking = entity.data.walking === true;
+      // As a story character he walks when a scene moves him; as a playable god (Nov 16) he follows his hero state.
+      const hero = entity.hero;
+      const walking = hero ? !!hero.moving : entity.data.walking === true;
+      const sprinting = !!hero?.sprinting;
+      const airborne = hero ? !hero.grounded : false;
       torso.scale.y = 1 + Math.sin(t * 1.4) * 0.012;
       head.rotation.y = walking ? 0 : Math.sin(t * 0.3) * 0.15;
-      walkPhase += frame.dt * (walking ? 9 : 0);
-      const swing = walking ? Math.sin(walkPhase) * 0.5 : 0;
-      legs[0].rotation.x = swing;
-      legs[1].rotation.x = -swing;
-      mantle.rotation.x = 0.12 + (walking ? 0.2 : 0) + Math.sin(t * 1.2) * 0.04;
-      tridentLight.intensity = 0.9 + look.U.night.value * 1.2;
+      walkPhase += frame.dt * (walking ? (sprinting ? 12 : 9) : 0);
+      const swing = walking ? Math.sin(walkPhase) * (sprinting ? 0.7 : 0.5) : 0;
+      legs[0].rotation.x = airborne ? -0.5 : swing;
+      legs[1].rotation.x = airborne ? 0.2 : -swing;
+      mantle.rotation.x = 0.12 + (walking ? (sprinting ? 0.35 : 0.2) : 0) + (airborne ? 0.3 : 0) + Math.sin(t * 1.2) * 0.04;
+      torso.rotation.x = walking ? (sprinting ? 0.18 : 0.06) : 0;
+      // The dodge: a low, quick lunge (his robes don't roll).
+      const lunge = hero?.dodge ? Math.sin((1 - hero.dodge.ticksLeft / DODGE_TICKS) * Math.PI) : 0;
+      body.rotation.x = lunge * 0.45;
+      body.position.y = -lunge * 0.3;
+
+      // Arms: the trident in his right hand, the left free.
+      let right = -0.35;
+      let left = 0.1 - swing * 0.4;
+      let twist = 0;
+      let glow = 0;
+      const attack = hero?.attack;
+      if (attack) {
+        const p = Math.min(1, attack.tick / 16);
+        const strike = p < 0.4 ? p / 0.4 : 1 - (p - 0.4) / 0.6;
+        if (attack.kind === 'punch') {
+          if ((attack.step ?? 1) === 2) right = -0.35 - 1.2 * strike;
+          else left = 0.1 - 1.5 * strike;
+          twist = ((attack.step ?? 1) === 2 ? 0.4 : -0.4) * strike;
+        } else if (attack.kind === 'light') {
+          right = -0.35 - 1.1 * strike;
+        } else if (attack.kind === 'heavy') {
+          right = p < 0.4 ? -0.35 - 2.2 * (p / 0.4) : -2.55 + 2.6 * Math.min(1, (p - 0.4) / 0.3);
+          twist = 0.3 * strike;
+        } else {
+          // Whirlpool: the trident driven down into the ground.
+          right = -2.6 + 2.4 * Math.min(1, p / 0.4);
+          left = -2.2 + 2.0 * Math.min(1, p / 0.4);
+          glow = 1 - p;
+        }
+      } else if (hero && hero.charge != null) {
+        const charge = Math.min(1, hero.charge / 30);
+        right = -0.35 - 2.25 * charge;
+        left = 0.1 - 2.3 * charge;
+        glow = charge;
+      } else if (hero?.ultimate) {
+        // Tsunami: the trident raised high, calling the sea.
+        right = -2.95;
+        left = -2.6;
+        glow = 1;
+      }
+      rightArm.rotation.x = right;
+      leftArm.rotation.x = left;
+      torso.rotation.y = twist;
+      tridentLight.intensity = 0.9 + look.U.night.value * 1.2 + glow * 3;
+    },
+    anchor(_name, out) {
+      return tip.getWorldPosition(out);
     },
     dispose() {
       faceTex.dispose();

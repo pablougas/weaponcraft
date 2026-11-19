@@ -27,6 +27,8 @@ export type InputAction =
   | 'codex'
   | 'map'
   | 'cameraLeft'
+  | 'cameraCloser'
+  | 'cameraFarther'
   | 'cameraRight'
   | 'settings'
   | 'devMenu';
@@ -65,6 +67,9 @@ export const DEFAULT_BINDINGS: Readonly<Record<InputAction, readonly string[]>> 
   // The full Underworld map (M6).
   map: ['KeyM'],
   cameraLeft: ['Comma'],
+  // [ and ] bring the camera closer or farther (team request, Nov 16).
+  cameraCloser: ['BracketLeft'],
+  cameraFarther: ['BracketRight'],
   cameraRight: ['Period'],
   settings: ['Escape'],
   devMenu: ['Backquote'],
